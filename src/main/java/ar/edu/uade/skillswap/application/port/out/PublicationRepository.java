@@ -19,6 +19,8 @@ public interface PublicationRepository {
      * Toda implementación debe pasar {@code PublicationSearchContract}.
      */
     PageResult<Publication> searchPublished(SearchQuery query);
+    /** Publicaciones PUBLISHED de un autor, de la más reciente a la más antigua, paginadas en la consulta. */
+    PageResult<Publication> findPublishedByAuthor(String authorUserId, int page, int size);
 
     Publication save(Publication publication);
 }

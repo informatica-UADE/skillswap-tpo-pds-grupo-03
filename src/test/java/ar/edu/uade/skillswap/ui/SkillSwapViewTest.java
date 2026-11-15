@@ -9,6 +9,8 @@ import javax.swing.JLabel;
 import javax.swing.SwingUtilities;
 import java.awt.Component;
 import java.awt.Container;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -39,6 +41,78 @@ class SkillSwapViewTest {
                 }
             });
         }
+    }
+
+    @Test
+    void elNombreDelUsuarioAbreSuPerfilPublicoDesdeTarjetasDetalleYContratacionesYVuelve() throws Exception {
+        try (var wiring = new SkillSwapApplicationWiring()) {
+            var ui = new WiredUiControllers(wiring);
+            var publication = ui.publicaciones().listarPropias("user-mateo").get(0);
+            ui.sesionDemo().cambiarUsuario("mentor-ana");
+            ui.contrataciones().solicitar("mentor-ana", publication.id(), "", "Objetivo",
+                    publication.franjasDisponibles().get(0).id());
+            ui.sesionDemo().cambiarUsuario("user-mateo");
+            SwingUtilities.invokeAndWait(() -> {
+                var view = new SkillSwapView(ui);
+
+                // Desde la tarjeta de Inicio, sin entrar al detalle.
+                clickProfileLink(view, "Ana García");
+                assertTrue(hasLabel(view, "Perfil público"));
+                assertTrue(hasLabel(view, "Historial"));
+                click(view, "← Volver");
+                assertTrue(hasLabel(view, "Inicio"));
+
+                // Desde Contrataciones: la contraparte.
+                click(view, "✓  Contrataciones");
+                clickProfileLink(view, "Ana García");
+                assertTrue(hasLabel(view, "Perfil público"));
+                click(view, "← Volver");
+                assertTrue(hasLabel(view, "Tus contrataciones"));
+
+                // Desde el detalle de una publicación: su autor.
+                click(view, "⌕  Explorar");
+                click(view, "Ver detalle");
+                List<JLabel> authorLinks = profileLinks(view);
+                assertEquals(1, authorLinks.size());
+                click(authorLinks.get(0));
+                assertTrue(hasLabel(view, "Perfil público"));
+                assertTrue(hasLabel(view, "Publicaciones activas · Página 1 de 1"));
+                click(view, "← Volver");
+                assertTrue(hasLabel(view, "Detalle"));
+            });
+        }
+    }
+
+    private static void clickProfileLink(Container root, String name) {
+        JLabel link = profileLinks(root).stream()
+                .filter(label -> ("Ver el perfil público de " + name).equals(label.getToolTipText()))
+                .findFirst().orElseThrow();
+        assertEquals("<html><u>" + name + "</u></html>", link.getText());
+        click(link);
+    }
+
+    private static void click(JLabel link) {
+        var event = new MouseEvent(link, MouseEvent.MOUSE_CLICKED, 0, 0, 1, 1, 1, false);
+        for (MouseListener listener : link.getMouseListeners()) listener.mouseClicked(event);
+    }
+
+    private static List<JLabel> profileLinks(Container root) {
+        return descendants(root).stream().filter(JLabel.class::isInstance).map(JLabel.class::cast)
+                .filter(label -> label.getToolTipText() != null
+                        && label.getToolTipText().startsWith("Ver el perfil público de ")).toList();
+    }
+
+    private static void click(Container root, String text) {
+        buttons(root).stream().filter(button -> text.equals(button.getText())).findFirst().orElseThrow().doClick();
+    }
+
+    private static List<JButton> buttons(Container root) {
+        return descendants(root).stream().filter(JButton.class::isInstance).map(JButton.class::cast).toList();
+    }
+
+    private static boolean hasLabel(Container root, String text) {
+        return descendants(root).stream().filter(JLabel.class::isInstance).map(JLabel.class::cast)
+                .anyMatch(label -> text.equals(label.getText()));
     }
 
     private static List<Component> descendants(Container root) {

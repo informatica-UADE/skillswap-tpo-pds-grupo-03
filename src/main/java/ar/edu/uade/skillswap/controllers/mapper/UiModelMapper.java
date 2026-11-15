@@ -6,6 +6,10 @@ import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchQuery;
 import ar.edu.uade.skillswap.application.model.NotificationData.NotificationView;
 import ar.edu.uade.skillswap.application.model.PageResult;
 import ar.edu.uade.skillswap.application.model.ProfileData.ProfileView;
+import ar.edu.uade.skillswap.application.model.PublicProfileData.CompletedBookingsSummary;
+import ar.edu.uade.skillswap.application.model.PublicProfileData.PublicProfileQuery;
+import ar.edu.uade.skillswap.application.model.PublicProfileData.PublicProfileView;
+import ar.edu.uade.skillswap.application.model.PublicProfileData.ReceivedRatingView;
 import ar.edu.uade.skillswap.application.model.PublicationData.PublicationView;
 import ar.edu.uade.skillswap.application.model.WalletData.MovementView;
 import ar.edu.uade.skillswap.domain.model.BookingStatus;
@@ -87,7 +91,8 @@ public final class UiModelMapper {
     public Models.Publicacion toPublicacion(PublicationView view) {
         return new Models.Publicacion(view.id(), view.title(), view.description(), view.category(),
                 toModalidad(view.modality()), view.durationMinutes(), view.priceInSkillCoins(),
-                view.author().reputation(), view.author().displayName(), view.tags().stream().toList(),
+                view.author().reputation(), view.author().displayName(), view.author().userId(),
+                view.tags().stream().toList(),
                 toEstadoPublicacion(view.status()),
                 false, view.availability().stream()
                     .map(slot -> new Models.FranjaDisponibilidad(slot.id(), slot.startsAt(), slot.endsAt(),
@@ -112,15 +117,45 @@ public final class UiModelMapper {
         };
     }
 
-    public Models.Contratacion toContratacion(BookingView view, String titulo, String contraparte) {
-        return new Models.Contratacion(view.id(), titulo, contraparte, view.createdAt(),
+    public Models.Contratacion toContratacion(BookingView view, String titulo, String contraparte,
+                                              String contraparteId) {
+        return new Models.Contratacion(view.id(), titulo, contraparte, contraparteId, view.createdAt(),
                 view.priceInSkillCoins(), toEstadoContratacion(view.status()), view.objective(),
                 view.clientMessage(), view.slotId());
     }
 
-    public Models.Perfil toPerfil(ProfileView view, String rol, int proyectosCompletados) {
-        return new Models.Perfil(view.userId(), view.displayName(), rol, view.biography(),
-                view.skills(), view.reputation(), view.ratingCount(), proyectosCompletados);
+    public Models.Perfil toPerfil(ProfileView view) {
+        return new Models.Perfil(view.userId(), view.displayName(), toRol(view.actorType()), view.biography(),
+                view.skills(), view.reputation(), view.ratingCount(), total(view.completedBookings()));
+    }
+
+    public PublicProfileQuery toPublicProfileQuery(String perfilUserId, int pagina) {
+        return new PublicProfileQuery(perfilUserId, pagina, Models.PerfilPublico.TAMANIO_PAGINA);
+    }
+
+    public Models.PerfilPublico toPerfilPublico(PublicProfileView view) {
+        CompletedBookingsSummary completed = view.completedBookings();
+        var perfil = new Models.Perfil(view.userId(), view.displayName(), toRol(view.actorType()), view.biography(),
+                view.skills(), view.reputation(), view.ratingCount(), total(completed));
+        return new Models.PerfilPublico(perfil, toPaginaPublicaciones(view.activePublications()),
+                Math.toIntExact(completed.asProvider()), Math.toIntExact(completed.asClient()),
+                view.recentRatings().stream().map(this::toResena).toList());
+    }
+
+    private Models.Resena toResena(ReceivedRatingView rating) {
+        return new Models.Resena(rating.score(), rating.comment(), rating.createdAt());
+    }
+
+    private static int total(CompletedBookingsSummary completed) {
+        return Math.toIntExact(completed.total());
+    }
+
+    /** Texto con el que la pantalla presenta el tipo de actor. */
+    public String toRol(ActorType actorType) {
+        return switch (actorType) {
+            case PROFESSIONAL -> "Profesional";
+            case ORGANIZATION -> "Organización";
+        };
     }
 
     public Models.Movimiento toMovimiento(MovementView view) {

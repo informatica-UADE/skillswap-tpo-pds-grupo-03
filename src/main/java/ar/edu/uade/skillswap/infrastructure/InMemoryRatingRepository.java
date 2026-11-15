@@ -3,6 +3,7 @@ package ar.edu.uade.skillswap.infrastructure;
 import ar.edu.uade.skillswap.application.port.out.RatingRepository;
 import ar.edu.uade.skillswap.domain.model.Rating;
 
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +21,16 @@ public final class InMemoryRatingRepository implements RatingRepository {
     public List<Rating> findBySubjectUserId(String subjectUserId) {
         return ratings.values().stream()
                 .filter(rating -> rating.subjectUserId().equals(subjectUserId))
+                .toList();
+    }
+
+    @Override
+    public List<Rating> findRecentBySubjectUserId(String subjectUserId, int limit) {
+        if (limit < 1) throw new IllegalArgumentException("El límite debe ser positivo");
+        return ratings.values().stream()
+                .filter(rating -> rating.subjectUserId().equals(subjectUserId))
+                .sorted(Comparator.comparing(Rating::createdAt).reversed().thenComparing(Rating::id))
+                .limit(limit)
                 .toList();
     }
 

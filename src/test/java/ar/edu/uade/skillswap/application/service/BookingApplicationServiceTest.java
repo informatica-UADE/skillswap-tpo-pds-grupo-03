@@ -225,6 +225,16 @@ class BookingApplicationServiceTest {
                 }
 
                 @Override
+                public long countCompletedByProvider(String providerUserId) {
+                    return 0;
+                }
+
+                @Override
+                public long countCompletedByBuyer(String buyerUserId) {
+                    return 0;
+                }
+
+                @Override
                 public Booking save(Booking value) {
                     bookings.put(value.id(), value);
                     return value;
@@ -265,6 +275,12 @@ class BookingApplicationServiceTest {
                             query.page(),
                             query.size(),
                             items.size());
+                }
+
+                @Override
+                public PageResult<Publication> findPublishedByAuthor(
+                        String authorUserId, int page, int size) {
+                    return new PageResult<>(List.of(), page, size, 0);
                 }
 
                 @Override

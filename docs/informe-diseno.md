@@ -46,13 +46,14 @@ El controller valida el usuario contra la identidad activa. Application/Domain c
 | State | BookingStates y PublicationStates determinan transiciones válidas; el agregado cambia estado y conserva historial. |
 | Builder | PublicationBuilder reúne datos obligatorios/opcionales y construye un borrador válido con tipos explícitos. |
 | Decorator | Promociones fijas/porcentuales acumulables en domain/pricing, probadas a nivel de cotización. La contratación toma el precio base: no se afirma integración de promociones desde la UI. |
+| Facade | PublicProfileFacade implementa PublicProfileUseCases: una sola consulta arma el perfil público (§4.1) coordinando perfiles, publicaciones, contrataciones y calificaciones en una transacción de lectura. Solo compone; las reglas quedan en las entidades y las consultas. Decisión en decision-perfil-publico.md (#40). |
 | Singleton localizado | Los enums reutilizan estados inmutables. No hay un Singleton mutable de aplicación o sesión. |
 | Repository / DAO | Puertos y adaptadores aíslan almacenamiento. Patrón de acceso a datos, distinto del catálogo GoF. |
 | MVC / Controller | Swing presenta, controllers convierten/delegan y Application/Domain ejecutan. La fachada no justifica concentrar reglas de todas las áreas. |
 
 Agregar un canal modifica el enum y switch de Simple Factory, su adapter y configuración; los casos de uso conservan el contrato. No se afirma OCP sin modificaciones en toda la solución.
 
-Factory Method se descartó por ausencia de una variación de creación mediante subclases; ver decision-factory-method-vs-simple-factory.md. El nombre create o la ausencia de static no cambian esa clasificación. Abstract Factory no tiene una familia de productos relacionados que construir. Composite (#37), Facade de perfil público (#40) y la decisión formal de CQRS (#42) permanecen fuera de esta entrega.
+Factory Method se descartó por ausencia de una variación de creación mediante subclases; ver decision-factory-method-vs-simple-factory.md. El nombre create o la ausencia de static no cambian esa clasificación. Abstract Factory no tiene una familia de productos relacionados que construir. Composite (#37) y la decisión formal de CQRS (#42) permanecen fuera de esta entrega.
 
 ## 5. GRASP y SOLID
 

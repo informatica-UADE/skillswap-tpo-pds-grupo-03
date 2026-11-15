@@ -7,6 +7,8 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -92,7 +94,7 @@ public final class SkillSwapView extends JPanel {
     private JPanel base(){JPanel p=new JPanel();p.setBackground(BG);p.setLayout(new BoxLayout(p,BoxLayout.Y_AXIS));p.setBorder(new EmptyBorder(24,26,28,26));return p;}
     private void addSection(JPanel p,String title,String subtitle){JLabel h=label(title,H2,TEXT);h.setAlignmentX(LEFT_ALIGNMENT);p.add(h);if(subtitle!=null){JLabel s=label(subtitle,BODY,MUTED);s.setAlignmentX(LEFT_ALIGNMENT);p.add(Box.createVerticalStrut(3));p.add(s);}p.add(Box.createVerticalStrut(14));}
 
-    private void showHome(){JPanel p=base();JPanel hero=new Theme.RoundedPanel(22,NAVY_2);hero.setLayout(new BorderLayout(22,0));hero.setBorder(new EmptyBorder(24,26,24,26));hero.setMaximumSize(new Dimension(Integer.MAX_VALUE,155));JPanel words=new JPanel();words.setOpaque(false);words.setLayout(new BoxLayout(words,BoxLayout.Y_AXIS));words.add(label("Hola, "+firstName(controllers.perfiles().verPerfil(USER_ID).nombre())+" 👋",new Font("SansSerif",Font.BOLD,25),Color.WHITE));words.add(Box.createVerticalStrut(7));words.add(label("¿Qué habilidad querés desbloquear hoy?",BODY,new Color(213,228,238)));words.add(Box.createVerticalStrut(16));JTextField search=new JTextField();search.putClientProperty("JTextField.placeholderText","Buscar mentorías, servicios o habilidades...");search.setBorder(new EmptyBorder(11,13,11,13));search.addActionListener(uiAction(e->showExplore(search.getText())));words.add(search);hero.add(words);JPanel stat=new JPanel();stat.setOpaque(false);stat.setLayout(new BoxLayout(stat,BoxLayout.Y_AXIS));stat.add(label("TU PROGRESO",SMALL,new Color(169,202,219)));stat.add(label("52",new Font("SansSerif",Font.BOLD,34),Color.WHITE));stat.add(label("proyectos completados",SMALL,new Color(213,228,238)));hero.add(stat,BorderLayout.EAST);hero.setAlignmentX(LEFT_ALIGNMENT);p.add(hero);p.add(Box.createVerticalStrut(26));addSection(p,"Recomendado para vos","Selecciones basadas en tus habilidades e intereses");p.add(cardGrid(controllers.busqueda().recomendar(USER_ID)));p.add(Box.createVerticalStrut(26));addSection(p,"Explorá por categoría",null);JPanel cats=new JPanel(new FlowLayout(FlowLayout.LEFT,10,0));cats.setOpaque(false);for(String c:controllers.busqueda().categorias())if(!c.equals("Todas")){JButton b=button(c,false);b.addActionListener(uiAction(e->showExploreCategory(c)));cats.add(b);}cats.setAlignmentX(LEFT_ALIGNMENT);p.add(cats);page("Inicio",p);}
+    private void showHome(){Perfil me=controllers.perfiles().verPerfil(USER_ID);JPanel p=base();JPanel hero=new Theme.RoundedPanel(22,NAVY_2);hero.setLayout(new BorderLayout(22,0));hero.setBorder(new EmptyBorder(24,26,24,26));hero.setMaximumSize(new Dimension(Integer.MAX_VALUE,155));JPanel words=new JPanel();words.setOpaque(false);words.setLayout(new BoxLayout(words,BoxLayout.Y_AXIS));words.add(label("Hola, "+firstName(me.nombre())+" 👋",new Font("SansSerif",Font.BOLD,25),Color.WHITE));words.add(Box.createVerticalStrut(7));words.add(label("¿Qué habilidad querés desbloquear hoy?",BODY,new Color(213,228,238)));words.add(Box.createVerticalStrut(16));JTextField search=new JTextField();search.putClientProperty("JTextField.placeholderText","Buscar mentorías, servicios o habilidades...");search.setBorder(new EmptyBorder(11,13,11,13));search.addActionListener(uiAction(e->showExplore(search.getText())));words.add(search);hero.add(words);JPanel stat=new JPanel();stat.setOpaque(false);stat.setLayout(new BoxLayout(stat,BoxLayout.Y_AXIS));stat.add(label("TU PROGRESO",SMALL,new Color(169,202,219)));stat.add(label(String.valueOf(me.proyectosCompletados()),new Font("SansSerif",Font.BOLD,34),Color.WHITE));stat.add(label("proyectos completados",SMALL,new Color(213,228,238)));hero.add(stat,BorderLayout.EAST);hero.setAlignmentX(LEFT_ALIGNMENT);p.add(hero);p.add(Box.createVerticalStrut(26));addSection(p,"Recomendado para vos","Selecciones basadas en tus habilidades e intereses");p.add(cardGrid(controllers.busqueda().recomendar(USER_ID),this::showHome));p.add(Box.createVerticalStrut(26));addSection(p,"Explorá por categoría",null);JPanel cats=new JPanel(new FlowLayout(FlowLayout.LEFT,10,0));cats.setOpaque(false);for(String c:controllers.busqueda().categorias())if(!c.equals("Todas")){JButton b=button(c,false);b.addActionListener(uiAction(e->showExploreCategory(c)));cats.add(b);}cats.setAlignmentX(LEFT_ALIGNMENT);p.add(cats);page("Inicio",p);}
 
     private void showExplore(){showExplore("");}
     private void showExplore(String initial){showExploreWith(initial,"Todas");}
@@ -151,7 +153,8 @@ public final class SkillSwapView extends JPanel {
             results.removeAll();
             String pages = page.totalPaginas() == 0 ? "" : " · Página " + (page.pagina() + 1) + " de " + page.totalPaginas();
             addSection(results, page.total() + " resultados" + pages, "Mentorías y servicios disponibles");
-            results.add(cardGrid(page.items()));
+            results.add(cardGrid(page.items(),
+                    () -> showExploreWith(q.getText(), (String) cat.getSelectedItem())));
             JPanel pager = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 12));
             pager.setOpaque(false);
             pager.setAlignmentX(LEFT_ALIGNMENT);
@@ -199,8 +202,8 @@ public final class SkillSwapView extends JPanel {
         return value > 0 ? value : null;
     }
 
-    private JPanel cardGrid(List<Publicacion> list){JPanel grid=new JPanel(new GridLayout(0,3,14,14));grid.setOpaque(false);grid.setAlignmentX(LEFT_ALIGNMENT);for(Publicacion x:list)grid.add(listingCard(x));return grid;}
-    private JComponent listingCard(Publicacion x){JPanel c=card(new BorderLayout(0,12));JPanel top=new JPanel(new BorderLayout());top.setOpaque(false);top.add(pill(x.categoria(),TEAL),BorderLayout.WEST);top.add(label("★ "+x.reputacion(),H3,GOLD),BorderLayout.EAST);c.add(top,BorderLayout.NORTH);JPanel mid=new JPanel();mid.setOpaque(false);mid.setLayout(new BoxLayout(mid,BoxLayout.Y_AXIS));JLabel t=label("<html><div style='width:210px'>"+x.titulo()+"</div></html>",H3,TEXT);mid.add(t);mid.add(Box.createVerticalStrut(7));mid.add(label("Por "+x.proveedor(),SMALL,MUTED));mid.add(Box.createVerticalStrut(9));mid.add(label("<html><div style='width:215px;color:#677480'>"+x.descripcion()+"</div></html>",BODY,MUTED));mid.add(Box.createVerticalStrut(9));mid.add(label(x.modalidad()+"  ·  "+x.duracionMinutos()+" min",SMALL,MUTED));c.add(mid);JPanel bottom=new JPanel(new BorderLayout());bottom.setOpaque(false);bottom.add(label(x.precio()+" ◈",new Font("SansSerif",Font.BOLD,20),NAVY),BorderLayout.WEST);JButton detail=button("Ver detalle",true);detail.addActionListener(uiAction(e->showDetail(x)));bottom.add(detail,BorderLayout.EAST);c.add(bottom,BorderLayout.SOUTH);return c;}
+    private JPanel cardGrid(List<Publicacion> list,Runnable back){JPanel grid=new JPanel(new GridLayout(0,3,14,14));grid.setOpaque(false);grid.setAlignmentX(LEFT_ALIGNMENT);for(Publicacion x:list)grid.add(listingCard(x,back));return grid;}
+    private JComponent listingCard(Publicacion x,Runnable back){JPanel c=card(new BorderLayout(0,12));JPanel top=new JPanel(new BorderLayout());top.setOpaque(false);top.add(pill(x.categoria(),TEAL),BorderLayout.WEST);top.add(label("★ "+x.reputacion(),H3,GOLD),BorderLayout.EAST);c.add(top,BorderLayout.NORTH);JPanel mid=new JPanel();mid.setOpaque(false);mid.setLayout(new BoxLayout(mid,BoxLayout.Y_AXIS));JLabel t=label("<html><div style='width:210px'>"+x.titulo()+"</div></html>",H3,TEXT);mid.add(t);mid.add(Box.createVerticalStrut(7));mid.add(inline(label("Por ",SMALL,MUTED),profileLink(x.proveedor(),x.proveedorId(),SMALL,back)));mid.add(Box.createVerticalStrut(9));mid.add(label("<html><div style='width:215px;color:#677480'>"+x.descripcion()+"</div></html>",BODY,MUTED));mid.add(Box.createVerticalStrut(9));mid.add(label(x.modalidad()+"  ·  "+x.duracionMinutos()+" min",SMALL,MUTED));c.add(mid);JPanel bottom=new JPanel(new BorderLayout());bottom.setOpaque(false);bottom.add(label(x.precio()+" ◈",new Font("SansSerif",Font.BOLD,20),NAVY),BorderLayout.WEST);JButton detail=button("Ver detalle",true);detail.addActionListener(uiAction(e->showDetail(x)));bottom.add(detail,BorderLayout.EAST);c.add(bottom,BorderLayout.SOUTH);return c;}
 
     private void showDetail(Publicacion publication) {
         JPanel page = base();
@@ -219,8 +222,9 @@ public final class SkillSwapView extends JPanel {
         information.add(Box.createVerticalStrut(14));
         information.add(label("<html><div style='width:540px'>" + publication.titulo() + "</div></html>", H1, TEXT));
         information.add(Box.createVerticalStrut(10));
-        information.add(label("★ " + publication.reputacion() + "  ·  " + publication.proveedor()
-                + "  ·  " + publication.modalidad(), H3, MUTED));
+        information.add(inline(label("★ " + publication.reputacion() + "  ·  ", H3, MUTED),
+                profileLink(publication.proveedor(), publication.proveedorId(), H3, () -> showDetail(publication)),
+                label("  ·  " + publication.modalidad(), H3, MUTED)));
         information.add(Box.createVerticalStrut(22));
         information.add(label("Sobre esta propuesta", H2, TEXT));
         information.add(Box.createVerticalStrut(8));
@@ -321,8 +325,8 @@ public final class SkillSwapView extends JPanel {
             text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
             text.add(label(booking.titulo(), H3, TEXT));
             text.add(Box.createVerticalStrut(5));
-            text.add(label(booking.contraparte() + "  ·  "
-                    + booking.fecha().format(DateTimeFormatter.ofPattern("dd/MM · HH:mm")), BODY, MUTED));
+            text.add(inline(profileLink(booking.contraparte(), booking.contraparteId(), BODY, this::showContracts),
+                    label("  ·  " + booking.fecha().format(DateTimeFormatter.ofPattern("dd/MM · HH:mm")), BODY, MUTED)));
             if (!booking.objetivo().isBlank()) text.add(label("Objetivo: " + booking.objetivo(), SMALL, MUTED));
             if (!booking.mensajeCliente().isBlank()) text.add(label("Mensaje: " + booking.mensajeCliente(), SMALL, MUTED));
             text.add(pill(booking.estado().name(), booking.estado() == EstadoContratacion.COMPLETADA ? TEAL : NAVY_2));
@@ -384,9 +388,134 @@ public final class SkillSwapView extends JPanel {
 
     private void showProfile(){Perfil x=controllers.perfiles().verPerfil(USER_ID);JPanel p=base();JPanel hero=card(new BorderLayout(20,0));hero.setMaximumSize(new Dimension(Integer.MAX_VALUE,180));hero.add(avatar(initials(x.nombre()),86),BorderLayout.WEST);JPanel data=new JPanel();data.setOpaque(false);data.setLayout(new BoxLayout(data,BoxLayout.Y_AXIS));data.add(label(x.nombre(),H1,TEXT));data.add(label(x.rol(),H3,TEAL_DARK));data.add(Box.createVerticalStrut(10));data.add(label("<html><div style='width:570px'>"+x.bio()+"</div></html>",BODY,MUTED));hero.add(data);JPanel stats=new JPanel(new GridLayout(3,1,0,4));stats.setOpaque(false);stats.add(label("★ "+x.reputacion()+" reputación",H3,GOLD));stats.add(label(x.resenas()+" reseñas",BODY,MUTED));stats.add(label(x.proyectosCompletados()+" proyectos",BODY,MUTED));hero.add(stats,BorderLayout.EAST);hero.setAlignmentX(LEFT_ALIGNMENT);p.add(hero);p.add(Box.createVerticalStrut(24));addSection(p,"Habilidades",null);JPanel tags=new JPanel(new FlowLayout(FlowLayout.LEFT,8,0));tags.setOpaque(false);for(String s:x.habilidades())tags.add(pill(s,NAVY_2));tags.setAlignmentX(LEFT_ALIGNMENT);p.add(tags);page("Mi perfil",p);}
 
+    /** Perfil público de otro usuario; {@code back} vuelve a la pantalla desde la que se abrió. */
+    private void showPublicProfile(String perfilUserId, int pagina, Runnable back) {
+        PerfilPublico profile = controllers.perfiles().verPerfilPublico(perfilUserId, pagina);
+        Perfil x = profile.perfil();
+        JPanel p = base();
+        JButton backButton = button("← Volver", false);
+        backButton.setAlignmentX(LEFT_ALIGNMENT);
+        backButton.addActionListener(uiAction(event -> back.run()));
+        p.add(backButton);
+        p.add(Box.createVerticalStrut(18));
+
+        JPanel hero = card(new BorderLayout(20, 0));
+        hero.setMaximumSize(new Dimension(Integer.MAX_VALUE, 180));
+        hero.add(avatar(initials(x.nombre()), 86), BorderLayout.WEST);
+        JPanel data = new JPanel();
+        data.setOpaque(false);
+        data.setLayout(new BoxLayout(data, BoxLayout.Y_AXIS));
+        data.add(label(x.nombre(), H1, TEXT));
+        data.add(label(x.rol(), H3, TEAL_DARK));
+        data.add(Box.createVerticalStrut(10));
+        data.add(label("<html><div style='width:570px'>" + x.bio() + "</div></html>", BODY, MUTED));
+        hero.add(data);
+        JPanel stats = new JPanel(new GridLayout(3, 1, 0, 4));
+        stats.setOpaque(false);
+        stats.add(label("★ " + x.reputacion() + " reputación", H3, GOLD));
+        stats.add(label(x.resenas() + " reseñas", BODY, MUTED));
+        stats.add(label(x.proyectosCompletados() + " proyectos", BODY, MUTED));
+        hero.add(stats, BorderLayout.EAST);
+        hero.setAlignmentX(LEFT_ALIGNMENT);
+        p.add(hero);
+        p.add(Box.createVerticalStrut(24));
+
+        addSection(p, "Habilidades", null);
+        JPanel tags = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        tags.setOpaque(false);
+        for (String skill : x.habilidades()) tags.add(pill(skill, NAVY_2));
+        tags.setAlignmentX(LEFT_ALIGNMENT);
+        tags.setMaximumSize(new Dimension(Integer.MAX_VALUE, tags.getPreferredSize().height));
+        p.add(tags);
+        p.add(Box.createVerticalStrut(24));
+
+        addSection(p, "Historial", "Contrataciones completadas en SkillSwap");
+        JLabel history = label(profile.completadasComoProveedor() + " como proveedor  ·  "
+                + profile.completadasComoCliente() + " como cliente", H3, TEXT);
+        history.setAlignmentX(LEFT_ALIGNMENT);
+        p.add(history);
+        p.add(Box.createVerticalStrut(24));
+
+        addSection(p, "Últimas reseñas", null);
+        if (profile.ultimasResenas().isEmpty()) {
+            JLabel none = label("Todavía no recibió reseñas.", BODY, MUTED);
+            none.setAlignmentX(LEFT_ALIGNMENT);
+            p.add(none);
+        }
+        for (Resena review : profile.ultimasResenas()) {
+            JPanel row = card(new BorderLayout(14, 0));
+            row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 72));
+            row.add(label("★ " + review.puntaje(), H3, GOLD), BorderLayout.WEST);
+            JPanel text = new JPanel();
+            text.setOpaque(false);
+            text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
+            text.add(label(review.comentario().isBlank() ? "Sin comentario" : review.comentario(), BODY, TEXT));
+            text.add(label(review.fecha().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), SMALL, MUTED));
+            row.add(text);
+            row.setAlignmentX(LEFT_ALIGNMENT);
+            p.add(row);
+            p.add(Box.createVerticalStrut(8));
+        }
+        p.add(Box.createVerticalStrut(16));
+
+        PaginaPublicaciones publications = profile.publicaciones();
+        String pages = publications.totalPaginas() == 0 ? ""
+                : " · Página " + (publications.pagina() + 1) + " de " + publications.totalPaginas();
+        addSection(p, "Publicaciones activas" + pages,
+                publications.total() + (publications.total() == 1 ? " publicación" : " publicaciones"));
+        if (publications.items().isEmpty()) {
+            p.add(empty("Sin publicaciones activas", "Este usuario no tiene propuestas publicadas en este momento."));
+        } else {
+            JPanel grid = cardGrid(publications.items(), () -> showPublicProfile(perfilUserId, pagina, back));
+            grid.setMaximumSize(new Dimension(Integer.MAX_VALUE, grid.getPreferredSize().height));
+            p.add(grid);
+        }
+        JPanel pager = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 12));
+        pager.setOpaque(false);
+        pager.setAlignmentX(LEFT_ALIGNMENT);
+        JButton previous = button("← Anterior", false);
+        previous.setEnabled(publications.hayAnterior());
+        previous.addActionListener(uiAction(e -> showPublicProfile(perfilUserId, pagina - 1, back)));
+        JButton next = button("Siguiente →", false);
+        next.setEnabled(publications.haySiguiente());
+        next.addActionListener(uiAction(e -> showPublicProfile(perfilUserId, pagina + 1, back)));
+        pager.add(previous);
+        pager.add(next);
+        p.add(pager);
+        page("Perfil público", p);
+    }
+
     private JLabel pill(String text,Color color){JLabel l=label(text,new Font("SansSerif",Font.BOLD,10),Color.WHITE);l.setOpaque(true);l.setBackground(color);l.setBorder(new EmptyBorder(6,9,6,9));return l;}
     private JLabel avatar(String initials,int size){JLabel a=new JLabel(initials,SwingConstants.CENTER);a.setPreferredSize(new Dimension(size,size));a.setMinimumSize(new Dimension(size,size));a.setMaximumSize(new Dimension(size,size));a.setOpaque(true);a.setBackground(TEAL);a.setForeground(Color.WHITE);a.setFont(new Font("SansSerif",Font.BOLD,size/3));a.setBorder(BorderFactory.createLineBorder(new Color(255,255,255,100),2,true));return a;}
     private JComponent empty(String title,String subtitle){JPanel e=card(new GridBagLayout());e.setMaximumSize(new Dimension(Integer.MAX_VALUE,190));JPanel t=new JPanel();t.setOpaque(false);t.setLayout(new BoxLayout(t,BoxLayout.Y_AXIS));JLabel h=label(title,H2,TEXT);h.setAlignmentX(CENTER_ALIGNMENT);t.add(h);t.add(Box.createVerticalStrut(8));JLabel s=label(subtitle,BODY,MUTED);s.setAlignmentX(CENTER_ALIGNMENT);t.add(s);e.add(t);return e;}
+    /**
+     * Nombre de un usuario que abre su perfil público al hacer clic; {@code back} vuelve a la
+     * pantalla actual. Sin identificador se muestra como texto común.
+     */
+    private JLabel profileLink(String name, String userId, Font font, Runnable back) {
+        if (userId == null || userId.isBlank()) return label(name, font, MUTED);
+        JLabel link = label("<html><u>" + name + "</u></html>", font, LINK);
+        link.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        link.setToolTipText("Ver el perfil público de " + name);
+        link.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent event) {
+                actions.run(() -> showPublicProfile(userId, 0, back));
+            }
+        });
+        return link;
+    }
+
+    /** Fila de componentes en línea, alineada a la izquierda y sin estirarse en alto. */
+    private static JPanel inline(JComponent... parts) {
+        JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        row.setOpaque(false);
+        for (JComponent part : parts) row.add(part);
+        row.setAlignmentX(LEFT_ALIGNMENT);
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, row.getPreferredSize().height));
+        return row;
+    }
+
     private ActionListener uiAction(ActionListener listener) {
         return event -> actions.run(() -> listener.actionPerformed(event));
     }
