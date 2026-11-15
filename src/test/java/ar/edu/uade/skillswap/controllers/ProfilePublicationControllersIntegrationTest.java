@@ -28,6 +28,40 @@ class ProfilePublicationControllersIntegrationTest {
             publicationRepository, profileRepository, () -> actor, transactions), () -> actor, new UiOperationExecutor());
 
     @Test
+    void registraUnaOrganizacionYCreaEditaYPublicaSuDesafioDesdeLosControllers() {
+        profiles.crearPerfil("u1", new Models.NuevoPerfil("Organización", "Bio", "UTC",
+                List.of(), List.of(), Set.of(), List.of(), Models.TipoActor.ORGANIZACION));
+        assertEquals(ar.edu.uade.skillswap.domain.model.ActorType.ORGANIZATION,
+                profileRepository.findByUserId("u1").orElseThrow().actorType());
+        assertEquals(List.of(Models.TipoPublicacion.DESAFIO), publications.tiposPublicacion("u1"));
+        var input = draft();
+        var challenge = publications.crearBorrador("u1", new Models.DatosBorrador(input.titulo(),
+                input.descripcion(), input.categoria(), input.modalidad(), input.duracionMinutos(),
+                input.cupos(), input.precio(), input.etiquetas(), input.disponibilidad(), Models.TipoPublicacion.DESAFIO));
+        var edited = publications.editarBorrador("u1", challenge.id(), edition("Desafío actualizado"));
+        assertEquals(Models.TipoPublicacion.DESAFIO, edited.tipo());
+        var published = publications.cambiarEstado("u1", challenge.id(), Models.EstadoPublicacion.PUBLICADA);
+        assertEquals(Models.TipoPublicacion.DESAFIO, published.tipo());
+        assertEquals(Models.EstadoPublicacion.PUBLICADA, published.estado());
+        assertCode(Models.CodigoError.PERMISOS, () -> publications.crearBorrador("u1", draft()));
+        assertEquals(1, publications.listarPropias("u1").size());
+    }
+
+    @Test
+    void rechazaTiposAusentesEnLosDtosSinGuardarDatos() {
+        assertCode(Models.CodigoError.VALIDACION, () -> profiles.crearPerfil("u1",
+                new Models.NuevoPerfil("Julieta", "Bio", "UTC", List.of(), List.of(), Set.of(), List.of(), null)));
+        assertTrue(profileRepository.findByUserId("u1").isEmpty());
+        profiles.crearPerfil("u1", profile("Julieta"));
+        var input = draft();
+        assertCode(Models.CodigoError.VALIDACION, () -> publications.crearBorrador("u1",
+                new Models.DatosBorrador(input.titulo(), input.descripcion(), input.categoria(),
+                        input.modalidad(), input.duracionMinutos(), input.cupos(), input.precio(),
+                        input.etiquetas(), input.disponibilidad(), null)));
+        assertTrue(publications.listarPropias("u1").isEmpty());
+    }
+
+    @Test
     void creaConsultaYRechazaUnPerfilDuplicado() {
         var created = profiles.crearPerfil("u1", profile("Julieta"));
         assertEquals("Julieta", created.nombre());
@@ -81,20 +115,20 @@ class ProfilePublicationControllersIntegrationTest {
                 () -> publications.cambiarEstado("u1", "inexistente", Models.EstadoPublicacion.PUBLICADA));
         var start = LocalDateTime.now().plusDays(2);
         var invalid = new Models.DatosBorrador("Java", "Mentoría", "Tecnología", Models.Modalidad.REMOTA,
-                60, 2, 100, List.of(), List.of(new Models.Disponibilidad(null, start, start.minusHours(1), 2)));
+                60, 2, 100, List.of(), List.of(new Models.Disponibilidad(null, start, start.minusHours(1), 2)), Models.TipoPublicacion.MENTORIA);
         assertCode(Models.CodigoError.VALIDACION, () -> publications.crearBorrador("u1", invalid));
         assertTrue(publications.listarPropias("u1").isEmpty());
     }
 
     private Models.NuevoPerfil profile(String name) {
         return new Models.NuevoPerfil(name, "Bio", "UTC", List.of("Java"), List.of("SQL"),
-                Set.of(Models.CanalNotificacion.IN_APP), List.of());
+                Set.of(Models.CanalNotificacion.IN_APP), List.of(), Models.TipoActor.PROFESIONAL);
     }
 
     private Models.DatosBorrador draft() {
         var start = LocalDateTime.now().plusDays(2);
         return new Models.DatosBorrador("Java", "Mentoría", "Tecnología", Models.Modalidad.REMOTA,
-                60, 2, 100, List.of("OO"), List.of(new Models.Disponibilidad(null, start, start.plusHours(2), 2)));
+                60, 2, 100, List.of("OO"), List.of(new Models.Disponibilidad(null, start, start.plusHours(2), 2)), Models.TipoPublicacion.MENTORIA);
     }
 
     private Models.EdicionBorrador edition(String title) {
