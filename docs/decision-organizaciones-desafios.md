@@ -53,7 +53,7 @@ La única regla que distingue a los tipos es quién puede crear cada uno.
 
 | Rama | Qué hay que adaptar al integrar |
 | --- | --- |
-| PR #63 (#28) | `PublicacionUiController` debe implementar `tiposPublicacion(userId)` y pasar el tipo en `crearBorrador` (y en `DatosBorrador` si se usa esa variante). `UiModelMapper` debe pasar el tipo al crear `RegisterCommand` y `CreateDraftCommand`. `PublicationSpy` debe sumar `allowedPublicationTypes()`. Sus tests crean `ProfileView`, `PublicationView` y `Publicacion`, que ahora reciben el tipo. |
+| PR #63 (#28), integrado en main | Adaptado en esta revisión: `PublicacionUiController` implementa `tiposPublicacion(userId)` y conserva el tipo explícito en ambas entradas de borrador; `NuevoPerfil` recibe `TipoActor`. `UiModelMapper` convierte esos valores a los comandos. La fachada delega en los controllers dedicados y los fixtures usan los contratos actuales. |
 | PR #65 (#33, WIP) | `Publication.builder(id)` pasa a `builder(id, actorType, type)` y `Profile.register` exige el tipo de actor (seed y `MySqlPersistenceIntegrationTest`). Su mock suma `tiposPublicacion` y el tipo en `crearBorrador` y en `Publicacion`. Los cambios de `SkillSwapView` no tocan las mismas líneas. |
 | #6 (presentación) | Mostrar el tipo en las tarjetas de Explorar y el detalle, y el alta de organizaciones desde la UI. |
 | #26 (datos demo) | Agregar al seed una organización con un desafío publicado. |
@@ -69,3 +69,20 @@ La única regla que distingue a los tipos es quién puede crear cada uno.
 | `WiredUiControllersTest` | Opciones del usuario de la demo, borrador del tipo elegido, sin tipo como `VALIDACION`, tipo en "Mis publicaciones" y tipo no permitido como `PERMISOS` sin crear nada. |
 | `MockSkillSwapControllersTest` / `UiModelMapperTest` | El mock ofrece y conserva el tipo; conversión de los tres tipos entre Application y la UI. |
 | `MySqlPersistenceIntegrationTest` | Organización y desafío en MySQL real, incluida la búsqueda; migración desde V4 que completa filas existentes y rechaza filas sin tipo o con un tipo inválido. |
+
+## Actualización con main — 15/11/2026
+
+Se incorpora main en `103fd9b`, que integra los controllers de #63 y #64. Se
+resuelven los conflictos de contratos, fachada y mock sin recuperar la lógica
+duplicada del controller anterior. El registro y los borradores por DTO exigen
+el tipo explícito, sin firmas antiguas que elijan valores por defecto.
+
+Las pruebas adicionales recorren registro de organización, selección de desafío,
+edición, publicación y rechazo de un tipo no permitido mediante los controllers
+reales. También verifican que omitir el tipo no guarde datos.
+
+Validación local: `mvn test`, 257 pruebas detectadas, 219 ejecutadas sin fallos ni
+errores y 38 de MySQL omitidas al no habilitar `mysql-it`. La validación de MySQL
+se informa por separado en los checks del PR. `git diff --check` está limpio.
+Esta actualización no modifica los archivos UML que ya contenía la rama y no
+fusiona el PR en main.
