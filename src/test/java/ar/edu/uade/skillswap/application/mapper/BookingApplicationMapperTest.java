@@ -27,10 +27,11 @@ class BookingApplicationMapperTest {
         Booking booking = Booking.request(publication, "buyer", "Necesito revisar un proyecto",
                 "Preparar una entrevista técnica", publication.availability().get(0).id(), new SkillCoins(20));
 
-        BookingView view = BookingApplicationMapper.toView(booking);
+        BookingView view = BookingApplicationMapper.toView(booking, publication.title());
 
         assertEquals("Necesito revisar un proyecto", view.clientMessage());
         assertEquals("Preparar una entrevista técnica", view.objective());
         assertEquals(booking.slotId(), view.slotId());
+        assertEquals("Java", view.publicationTitle());
     }
 }

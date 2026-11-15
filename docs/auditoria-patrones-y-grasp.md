@@ -1,5 +1,7 @@
 # Trazabilidad para la defensa: patrones, GRASP y arquitectura
 
+Actualización del 15/11/2026, PR #65: #61, #63/#64 y #75 ya están integrados en la base `e64048c`. El [informe actualizado](informe-diseno.md) describe la implementación actual y sus límites; el [registro de integración](issue33-integracion-y-validacion.md) enlaza el recorrido visual y la cobertura de Domain/Application. Los cortes y pendientes anteriores que siguen debajo son históricos. Esta revisión no modifica UML.
+
 Matriz de seguimiento del issue [#35](https://github.com/tomasbondUade/skillswap-tpo-pds-grupo-03/issues/35). Revisión del 02/11/2026 sobre `feature/persistence-infrastructure`, partiendo de `d0f036a` (PR #61), que incluye `main` en `9752c91` y la decisión del PR #66. La evidencia de esta rama no implica que #61 esté integrado en `main`. Esta actualización es documental; no crea ni modifica UML.
 
 Las secciones señaladas como **históricas** conservan el inventario de `main` en `36b07b0` (26/10/2026, PR #48–#52) para trazabilidad. Sus pendientes no describen el estado actual. El inventario de patrones y la actualización siguiente distinguen implementación disponible de validación pendiente.

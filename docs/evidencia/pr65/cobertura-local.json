@@ -1,0 +1,32 @@
+[
+  {
+    "area": "domain",
+    "line": {
+      "covered": 658,
+      "missed": 62,
+      "total": 720,
+      "percent": 91.39
+    },
+    "branch": {
+      "covered": 248,
+      "missed": 126,
+      "total": 374,
+      "percent": 66.31
+    }
+  },
+  {
+    "area": "application",
+    "line": {
+      "covered": 534,
+      "missed": 93,
+      "total": 627,
+      "percent": 85.17
+    },
+    "branch": {
+      "covered": 120,
+      "missed": 74,
+      "total": 194,
+      "percent": 61.86
+    }
+  }
+]

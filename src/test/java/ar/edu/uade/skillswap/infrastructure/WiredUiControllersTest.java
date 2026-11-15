@@ -16,6 +16,51 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class WiredUiControllersTest {
     @Test
+    void muestraElTituloSinCacheYLaContraparteSegunLaIdentidadActiva() {
+        try (var wiring = new SkillSwapApplicationWiring()) {
+            var ui = new WiredUiControllers(wiring);
+            var publication = ui.publicaciones().listarPropias("user-mateo").get(0);
+            ui.sesionDemo().cambiarUsuario("mentor-ana");
+            ui.contrataciones().solicitar("mentor-ana", publication.id(), "Mensaje", "Objetivo",
+                    publication.franjasDisponibles().get(0).id());
+            var freshUi = new WiredUiControllers(wiring);
+            var buyerView = freshUi.contrataciones().listarContrataciones("mentor-ana").get(0);
+            assertEquals(publication.titulo(), buyerView.titulo());
+            assertEquals("Mateo Silva", buyerView.contraparte());
+            freshUi.sesionDemo().cambiarUsuario("user-mateo");
+            var providerView = freshUi.contrataciones().listarContrataciones("user-mateo").get(0);
+            assertEquals(publication.titulo(), providerView.titulo());
+            assertEquals("Ana García", providerView.contraparte());
+        }
+    }
+
+    @Test
+    void mantieneLosTiposExplicitosYLosPermisosAlCambiarLaSesionDemo() {
+        var controllers = new WiredUiControllers();
+        controllers.sesionDemo().cambiarUsuario("mentor-lu");
+        assertEquals(List.of(Models.TipoPublicacion.MENTORIA, Models.TipoPublicacion.SERVICIO),
+                controllers.publicaciones().tiposPublicacion("mentor-lu"));
+        assertEquals(Models.TipoPublicacion.SERVICIO,
+                controllers.publicaciones().listarPropias("mentor-lu").get(0).tipo());
+        var draft = controllers.publicaciones().crearBorrador("mentor-lu", "Revisión de portfolio",
+                "Servicio de revisión", "Diseño", Modalidad.REMOTA, 60, 100, Models.TipoPublicacion.SERVICIO);
+        assertEquals(Models.TipoPublicacion.SERVICIO, draft.tipo());
+        var forbidden = assertThrows(PresentationException.class, () -> controllers.publicaciones()
+                .crearBorrador("mentor-lu", "Desafío", "Descripción", "Diseño", Modalidad.REMOTA,
+                        60, 100, Models.TipoPublicacion.DESAFIO));
+        assertEquals(Models.CodigoError.PERMISOS, forbidden.error().codigo());
+        controllers.sesionDemo().cambiarUsuario("mentor-ana");
+        assertTrue(controllers.publicaciones().listarPropias("mentor-ana").stream()
+                .noneMatch(item -> item.id().equals(draft.id())));
+        var mismatch = assertThrows(PresentationException.class,
+                () -> controllers.publicaciones().tiposPublicacion("mentor-lu"));
+        assertEquals(Models.CodigoError.PERMISOS, mismatch.error().codigo());
+        controllers.sesionDemo().cambiarUsuario("mentor-lu");
+        assertEquals(Models.TipoPublicacion.SERVICIO, controllers.publicaciones().listarPropias("mentor-lu")
+                .stream().filter(item -> item.id().equals(draft.id())).findFirst().orElseThrow().tipo());
+    }
+
+    @Test
     void conectaLasNuevasOperacionesSinCambiarLaFachadaDeLaUi() {
         var controllers = new WiredUiControllers();
         var draft = controllers.publicaciones().crearBorrador("user-mateo", "Java",
