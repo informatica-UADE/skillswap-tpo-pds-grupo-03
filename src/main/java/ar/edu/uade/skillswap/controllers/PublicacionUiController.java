@@ -44,14 +44,22 @@ public final class PublicacionUiController implements UiControllers.PublicacionC
     @Override
     public Models.Publicacion crearBorrador(String userId, String titulo, String descripcion,
                                            String categoria, Models.Modalidad modalidad,
-                                           int duracion, int precio) {
-        // Compatibility with the provided UI: one demo slot and the existing capacity of six.
+                                           int duracion, int precio, Models.TipoPublicacion tipo) {
+        // The supplied form uses one demo slot and the existing capacity of six.
         return operations.execute(() -> {
             ControllerUser.requireActive(identity, userId);
             LocalDateTime inicio = LocalDateTime.now().plusDays(1).withSecond(0).withNano(0);
             return toUi(publications.createDraft(mapper.toCreateDraftCommand(new Models.DatosBorrador(
                     titulo, descripcion, categoria, modalidad, duracion, 6, precio, List.of(),
-                    List.of(new Models.Disponibilidad(null, inicio, inicio.plusMinutes(duracion), 6))))));
+                    List.of(new Models.Disponibilidad(null, inicio, inicio.plusMinutes(duracion), 6)), tipo))));
+        });
+    }
+
+    @Override
+    public List<Models.TipoPublicacion> tiposPublicacion(String userId) {
+        return operations.execute(() -> {
+            ControllerUser.requireActive(identity, userId);
+            return publications.allowedPublicationTypes().stream().map(mapper::toTipoPublicacion).toList();
         });
     }
 
