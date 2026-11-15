@@ -16,6 +16,25 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class WiredUiControllersTest {
     @Test
+    void muestraElTituloSinCacheYLaContraparteSegunLaIdentidadActiva() {
+        try (var wiring = new SkillSwapApplicationWiring()) {
+            var ui = new WiredUiControllers(wiring);
+            var publication = ui.publicaciones().listarPropias("user-mateo").get(0);
+            ui.sesionDemo().cambiarUsuario("mentor-ana");
+            ui.contrataciones().solicitar("mentor-ana", publication.id(), "Mensaje", "Objetivo",
+                    publication.franjasDisponibles().get(0).id());
+            var freshUi = new WiredUiControllers(wiring);
+            var buyerView = freshUi.contrataciones().listarContrataciones("mentor-ana").get(0);
+            assertEquals(publication.titulo(), buyerView.titulo());
+            assertEquals("Mateo Silva", buyerView.contraparte());
+            freshUi.sesionDemo().cambiarUsuario("user-mateo");
+            var providerView = freshUi.contrataciones().listarContrataciones("user-mateo").get(0);
+            assertEquals(publication.titulo(), providerView.titulo());
+            assertEquals("Ana García", providerView.contraparte());
+        }
+    }
+
+    @Test
     void mantieneLosTiposExplicitosYLosPermisosAlCambiarLaSesionDemo() {
         var controllers = new WiredUiControllers();
         controllers.sesionDemo().cambiarUsuario("mentor-lu");

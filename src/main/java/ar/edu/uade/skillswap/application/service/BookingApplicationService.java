@@ -3,6 +3,7 @@ package ar.edu.uade.skillswap.application.service;
 import ar.edu.uade.skillswap.application.error.ApplicationErrorCode;
 import ar.edu.uade.skillswap.application.error.ApplicationException;
 import ar.edu.uade.skillswap.application.event.DomainEvent;
+import ar.edu.uade.skillswap.application.mapper.BookingApplicationMapper;
 import ar.edu.uade.skillswap.application.model.BookingData;
 import ar.edu.uade.skillswap.application.model.BookingData.BookingCommand;
 import ar.edu.uade.skillswap.application.model.BookingData.BookingView;
@@ -67,7 +68,7 @@ public final class BookingApplicationService implements BookingUseCases {
         String actor = UseCaseSupport.currentUserId(currentUser);
 
         return bookings.findByParticipantUserId(actor).stream()
-                .map(BookingApplicationService::toView)
+                .map(this::toView)
                 .toList();
     }
 
@@ -477,19 +478,11 @@ public final class BookingApplicationService implements BookingUseCases {
         transactions.afterCommit(() -> events.publish(event));
     }
 
-    private static BookingView toView(Booking booking) {
-        return new BookingView(
-                booking.id(),
-                booking.publicationId(),
-                booking.buyerUserId(),
-                booking.providerUserId(),
-                booking.objective(),
-                booking.clientMessage(),
-                booking.slotId(),
-                booking.price().amount(),
-                booking.refund().amount(),
-                booking.status(),
-                booking.createdAt(),
-                booking.paidAt());
+    private BookingView toView(Booking booking) {
+        String title = publications.findById(booking.publicationId())
+                .orElseThrow(() -> new ApplicationException(ApplicationErrorCode.NOT_FOUND,
+                        "No existe la publicación de la contratación"))
+                .title();
+        return BookingApplicationMapper.toView(booking, title);
     }
 }

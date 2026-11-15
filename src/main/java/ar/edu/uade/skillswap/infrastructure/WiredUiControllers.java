@@ -1,7 +1,6 @@
 package ar.edu.uade.skillswap.infrastructure;
 
 import ar.edu.uade.skillswap.application.model.BookingData.BookingView;
-import ar.edu.uade.skillswap.application.model.PublicationData.PublicationView;
 import ar.edu.uade.skillswap.controllers.ContratacionUiController;
 import ar.edu.uade.skillswap.controllers.CalificacionUiController;
 import ar.edu.uade.skillswap.controllers.BusquedaUiController;
@@ -11,9 +10,7 @@ import ar.edu.uade.skillswap.controllers.UiControllers;
 import ar.edu.uade.skillswap.controllers.mapper.UiModelMapper;
 import ar.edu.uade.skillswap.model.Models;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public final class WiredUiControllers implements UiControllers,
         UiControllers.BusquedaController,
@@ -32,7 +29,6 @@ public final class WiredUiControllers implements UiControllers,
 
     private final UiModelMapper mapper = new UiModelMapper();
     private final UiOperationExecutor operations = new UiOperationExecutor();
-    private final Map<String, Models.Publicacion> publicationCache = new HashMap<>();
 
     public WiredUiControllers() {
         this(new SkillSwapApplicationWiring());
@@ -69,7 +65,6 @@ public final class WiredUiControllers implements UiControllers,
     @Override public void cambiarUsuario(String userId) {
         operations.execute(() -> {
             ((DemoCurrentUserProvider) wiring.currentUserProvider()).switchTo(userId);
-            publicationCache.clear();
         });
     }
 
@@ -90,14 +85,12 @@ public final class WiredUiControllers implements UiControllers,
 
     @Override
     public Models.PaginaPublicaciones buscar(Models.FiltrosBusqueda filtros) {
-        Models.PaginaPublicaciones page = searchController.buscar(filtros);
-        page.items().forEach(this::remember);
-        return page;
+        return searchController.buscar(filtros);
     }
 
     @Override
     public List<Models.Publicacion> recomendar(String userId) {
-        return searchController.recomendar(userId).stream().map(this::remember).toList();
+        return searchController.recomendar(userId);
     }
 
     @Override
@@ -107,9 +100,7 @@ public final class WiredUiControllers implements UiControllers,
 
     @Override
     public List<Models.Publicacion> listarPropias(String userId) {
-        return publicationController.listarPropias(userId).stream()
-                .map(this::remember)
-                .toList();
+        return publicationController.listarPropias(userId);
     }
 
     @Override
@@ -121,8 +112,8 @@ public final class WiredUiControllers implements UiControllers,
             Models.Modalidad modalidad,
             int duracion,
             int precio, Models.TipoPublicacion tipo) {
-        return remember(publicationController.crearBorrador(
-                userId, titulo, descripcion, categoria, modalidad, duracion, precio, tipo));
+        return publicationController.crearBorrador(
+                userId, titulo, descripcion, categoria, modalidad, duracion, precio, tipo);
     }
 
     @Override
@@ -134,7 +125,7 @@ public final class WiredUiControllers implements UiControllers,
     public Models.Publicacion crearBorrador(
             String userId,
             Models.DatosBorrador datos) {
-        return remember(publicationController.crearBorrador(userId, datos));
+        return publicationController.crearBorrador(userId, datos);
     }
 
     @Override
@@ -142,8 +133,7 @@ public final class WiredUiControllers implements UiControllers,
             String userId,
             String publicacionId,
             Models.EdicionBorrador datos) {
-        return remember(publicationController.editarBorrador(
-                userId, publicacionId, datos));
+        return publicationController.editarBorrador(userId, publicacionId, datos);
     }
 
     @Override
@@ -151,8 +141,7 @@ public final class WiredUiControllers implements UiControllers,
             String userId,
             String publicacionId,
             Models.EstadoPublicacion estado) {
-        return remember(publicationController.cambiarEstado(
-                userId, publicacionId, estado));
+        return publicationController.cambiarEstado(userId, publicacionId, estado);
     }
 
     @Override
@@ -165,11 +154,6 @@ public final class WiredUiControllers implements UiControllers,
     @Override
     public Models.Perfil verPerfil(String userId) {
         return profileController.verPerfil(userId);
-    }
-
-    private Models.Publicacion remember(Models.Publicacion publication) {
-        publicationCache.put(publication.id(), publication);
-        return publication;
     }
 
     @Override
@@ -212,22 +196,10 @@ public final class WiredUiControllers implements UiControllers,
                 wiring.notificationService().markAllRead());
     }
 
-    private Models.Publicacion toPublicacion(PublicationView view) {
-        Models.Publicacion publication = mapper.toPublicacion(view);
-        publicationCache.put(view.id(), publication);
-        return publication;
-    }
-
     private Models.Contratacion toContratacion(BookingView booking) {
-        Models.Publicacion publication =
-                publicationCache.get(booking.publicationId());
-        String title = publication == null
-                ? booking.publicationId()
-                : publication.titulo();
-        String counterpart = "user-mateo".equals(booking.buyerUserId())
-                ? providerName(booking.providerUserId())
-                : "Mateo Silva";
-        return mapper.toContratacion(booking, title, counterpart);
+        String otherUserId = booking.buyerUserId().equals(usuarioActual())
+                ? booking.providerUserId() : booking.buyerUserId();
+        return mapper.toContratacion(booking, booking.publicationTitle(), providerName(otherUserId));
     }
 
     private String providerName(String authorUserId) {

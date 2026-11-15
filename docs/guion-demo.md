@@ -25,16 +25,16 @@ La primera orden valida compilación y pruebas; la segunda abre la ventana Swing
 6. **Billetera y notificaciones.** **SkillCoins** consulta saldo y ledger; **Acreditar demo** registra un movimiento en el agregado Wallet. **Notificaciones** permite marcar una o todas como leídas.
 7. **Calificar y mostrar el perfil.** Como participante de una contratación completada, usar **Calificar**, ingresar puntuación y comentario y comprobar la reputación del destinatario. Verificar también el rechazo de una calificación duplicada. La sesión de demo no reemplaza autenticación real.
 
-Este guion es una lista de verificaciones pendientes de ejecución visual completa; no constituye evidencia de aceptación del recorrido.
+El recorrido se ejecutó el 15/11/2026 con Lucía como proveedora y Ana como compradora. El [registro visual con capturas](validacion-visual-pr65.md) documenta las acciones, saldos y mensajes observados.
 
 ## Límites de esta demo
 
 La demo integra los servicios y reglas disponibles, pero todavía no es una entrega de producción:
 
 - El formulario de solicitud permite elegir horario e ingresar objetivo y mensaje. Verificar esos datos al recorrer la contratación.
-- El pago debita SkillCoins y los mueve a una wallet de custodia; la finalización libera el saldo al proveedor y la cancelación pagada aplica `StandardRefundPolicy`, devuelve la parte correspondiente al cliente y liquida el remanente al proveedor. Son saldos ficticios y no existe pasarela de pago.
+- El pago actual debita al comprador y acredita directamente al proveedor. No hay custodia ni liberación al completar; esa diferencia respecto del criterio de #19 se debe resolver por separado. Los reembolsos siguen la política disponible. Son saldos ficticios y no existe pasarela de pago.
 - El selector solo admite las tres identidades de demo (`user-mateo`, `mentor-ana`, `mentor-lu`); no es un sistema de autenticación.
 - En memoria, `SynchronousTransactionManager` no aporta rollback ni bloqueo y el estado se pierde al reiniciar. El modo `--persistence=jpa` usa MySQL y `JpaTransactionManager`, con la configuración del README.
-- El botón de calificación está disponible en contrataciones completadas; el recorrido visual completo y la actualización de reputación todavía requieren comprobación manual.
+- El botón de calificación está disponible en contrataciones completadas. El registro visual comprueba la reputación de Lucía en 5,0 con una reseña y el rechazo de duplicados.
 
 La persistencia de #61 ya está integrada en la base y se conserva en esta rama junto con la búsqueda paginada de #71. Los proveedores de email/push siguen siendo mock. Consultar `issue33-integracion-y-validacion.md` para las pruebas de integración, la validación visual y la cobertura, que se reportan por separado.

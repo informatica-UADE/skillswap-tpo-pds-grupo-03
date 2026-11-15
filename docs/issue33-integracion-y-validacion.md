@@ -1,64 +1,45 @@
-# Issue #33 — integración y entrega (sin UML)
+# Issue #33 — integración y validación del PR #65
 
-## Objetivo y base
+Revisión del 15/11/2026 sobre `main` en `e64048c`, con #63/#64 y #75 integrados. El PR conserva los controllers dedicados de perfil, publicaciones y contrataciones de la base y agrega la integración de calificación y sesión demo.
 
-Conectar controllers, casos de uso y adapters y completar contratación/calificación.
-La revisión del 15/11/2026 incorpora main en `e64048c`, que ya contiene
-#63/#64, la actualización de CI #74 y el modelo de organizaciones/desafíos de
-#75. El PR apunta a main y permanece en Draft.
+## Cambios y regresiones
 
-StarUML y su exportación quedan fuera de este trabajo por solicitud de la responsable. No se generan ni editan diagramas en esta revisión.
+- `CalificacionUiController` conecta la vista con Application y conserva autorización, estado completado y unicidad de calificación.
+- `DemoCurrentUserProvider` envuelve el proveedor existente en memoria/JPA y conserva su identidad hasta una selección explícita. Mateo, Ana y Lucía refrescan saludo, pie, saldo y pantalla sin sustituir permisos de Application/Domain.
+- Los contratos y formularios conservan `TipoActor`/`TipoPublicacion` de #75, la búsqueda paginada y los autores reales.
+- La lista de contrataciones muestra título, objetivo, mensaje y estado juntos. Application aporta el título; la fachada no depende de una caché ni fija a Mateo como contraparte.
+- Las pruebas reproducen el layout defectuoso, la lectura sin caché y la contraparte desde ambos participantes. Se conserva el cierre de la fábrica JPA.
 
-## Integración corregida
+## Evidencia de aceptación
 
-- Se conservan PaginaPublicaciones, filtros, paginación y los datos reales del autor de Application.
-- Perfil, publicaciones, búsqueda, contrataciones y calificaciones delegan en sus controllers dedicados; la fachada no duplica reglas ni transiciones.
-- DemoCurrentUserProvider conserva la identidad inyectada hasta que se elige otro usuario de demo. Envuelve el adapter existente tanto en memoria como en JPA, evitando sustituirlo por una identidad fija o hacer un cast incompatible con JPA.
-- El selector admite Mateo, Ana y Lucía. Cambiar identidad refresca saludo, pie lateral, saldo y pantalla; los permisos continúan en Application/Domain.
-- Se conserva el modo --persistence=jpa y el cierre de la fábrica JPA.
-- Los fixtures usan PublicationView.author y ProfileRepository del contrato actual, con el perfil requerido y sin reputaciones inventadas.
-- Los contratos de registro y borrador conservan TipoActor/TipoPublicacion explícitos, incluidos los DTOs, el mapper, el mock y el formulario. La sesión demo conserva los permisos al alternar entre profesionales; el seed distingue mentorías y servicio.
-
-## Validación de la revisión
-
-La prueba específica de sesión pasó con tres ejecuciones: conserva la identidad inyectada, rechaza identidades inválidas sin cambiar la sesión y completa solicitar → aceptar → pagar → iniciar → completar → calificar desde WiredUiControllers sobre MySQL/JPA. También comprueba permisos de publicaciones, saldos de ambos participantes y reputación persistida.
-
-Suite completa histórica del 05/11/2026: `mvn -Pmysql-it test`, **237 pruebas,
-0 fallos, 0 errores y 0 omitidas**, con MySQL 8.4.13.
-
-Validación local posterior a #75: compilación limpia y `mvn test`, **261 pruebas
-detectadas, 222 ejecutadas sin fallos ni errores y 39 de MySQL omitidas**, porque
-ese perfil no se habilitó localmente. La regresión de sesión crea un servicio como
-Lucía, rechaza un desafío no permitido, cambia a Ana y verifica que no se puedan
-listar ni operar publicaciones de otra identidad. Al volver a Lucía se conserva
-el tipo del borrador. La prueba JPA del recorrido con calificación también
-comprueba los tipos de publicaciones al cambiar de usuario.
-
-`git diff --check` está limpio. Los checks de MySQL sobre la nueva cabeza se
-informan por separado en GitHub; la validación visual y la cobertura siguen pendientes.
-
-Las pruebas MySQL usan bases aleatorias aisladas y Flyway V1–V5. Comandos: mvn test y mvn -Pmysql-it test, con las variables documentadas en docs/pruebas-mysql.md. Los resultados históricos de 124 y 237 pruebas corresponden a cortes anteriores y no certifican esta integración.
-
-## Pendientes de aceptación
-
-| Criterio | Estado |
+| Criterio | Resultado |
 | --- | --- |
-| Composición memoria/JPA, mocks y selector | Integrados; prueba específica verificada |
-| Recorrido mediante controllers/casos de uso sobre JPA | Verificado automáticamente; no equivale a interacción visual |
-| Recorrido visual completo en Swing | Pendiente de ejecución y registro manual |
-| Migraciones, rollback, concurrencia y consultas | Cubiertos por la suite de integración; no certifican carga de producción |
-| Informe de decisiones final | Pendiente de completar y entregar |
-| Cobertura 80% Domain/Application | Pendiente de medición |
-| StarUML y PDF | Excluidos de este trabajo; entrega por separado |
+| Composición memoria/JPA y selector | Verificados automáticamente; sin reemplazar autenticación real |
+| Recorrido publicar → solicitar → aceptar → pagar → completar → calificar | Ejecutado en Swing; [registro y siete capturas](validacion-visual-pr65.md) |
+| Identidad, saldo, reputación y notificaciones | Verificados en la UI; objetivo vacío, saldo insuficiente y duplicado rechazados |
+| Pruebas locales | `mvn -Pcoverage clean verify`: 263 detectadas, 224 ejecutadas, 39 MySQL omitidas; cero fallos y errores |
+| Cobertura de líneas | Domain 91,39% (658/720), Application 85,17% (534/627); umbral de 80% separado por capa |
+| Migraciones, rollback, concurrencia, paginación y recorrido JPA | Suite `mysql-it` en MySQL real; consultar el check del SHA final del PR |
+| Informe de diseño | [Fuente actualizada](informe-diseno.md) y [PDF sin UML](../output/pdf/informe-diseno-actualizado.pdf) |
+| UML | Excluido por instrucción de la responsable; `.mdj`, `.puml` y PDF histórico intactos |
+| Aprobación de la cabeza final | Corresponde a la revisión humana; no se sustituye con tests |
 
-La base contiene main con #63 y #75 integrados. Se requieren los checks
-remotos y una aprobación sobre la nueva cabeza; las pruebas locales no reemplazan
-esos controles. Este PR no se presenta como aceptación completa ni se fusiona en
-esta revisión. No se modifican UML ni exportaciones.
+## Reproducción
 
-El diff contra main conserva exclusivamente la integración de sesión y
-calificación, sus pruebas y documentación. Los controllers de perfil,
-publicaciones y contrataciones, junto con el modelo de organizaciones/desafíos,
-ya pertenecen a la base y no se vuelven a presentar como funcionalidad pendiente.
-Los archivos UML de #75 se heredan exactamente de main: no se editan ni se generan
-diagramas y el diff de este PR contra main no agrega cambios UML.
+```powershell
+mvn -Pcoverage clean verify
+powershell -File scripts/coverage-summary.ps1
+mvn exec:java
+```
+
+El perfil opcional `coverage` genera HTML/XML/CSV en `target/site/jacoco` y falla si Domain o Application no alcanza el 80% de líneas. No excluye clases de esas capas. El resumen versionado de esta ejecución está en [cobertura-local.json](evidencia/pr65/cobertura-local.json); las ramas se informan sin imponerles el umbral de líneas.
+
+Con las variables de [pruebas-mysql.md](pruebas-mysql.md), ejecutar `mvn -Pmysql-it,coverage clean verify`. El workflow de MySQL usa ese comando y publica resultados y cobertura. La cobertura local no incluye los tests MySQL omitidos; los resultados de CI corresponden al SHA indicado en GitHub. Las cifras históricas de 124, 237 y 267 pruebas pertenecen a revisiones anteriores.
+
+La validación visual usa memoria. La suite JPA comprueba la misma composición sobre una base aislada y Flyway V1–V5, incluidos permisos, saldos, tipos y reputación persistida; no certifica carga de producción ni todos los intercalados posibles.
+
+## Límites del alcance
+
+El selector, email/push y SkillCoins son de demostración. Memoria no ofrece rollback ni bloqueo. El pago actual transfiere directamente al proveedor: la custodia indicada en #19 es una brecha preexistente y se documenta para resolver por separado. Wallet/Notificacion controllers dedicados (#32), Composite (#37), Facade de perfil (#40) y evaluación CQRS (#42) no se implementan dentro de esta integración.
+
+El PR se prepara para revisión hacia `main`, sin fusionarlo. El diff no agrega cambios UML; los archivos heredados de #75 conservan el contenido de la base.

@@ -325,8 +325,8 @@ public final class SkillSwapView extends JPanel {
                     + booking.fecha().format(DateTimeFormatter.ofPattern("dd/MM · HH:mm")), BODY, MUTED));
             if (!booking.objetivo().isBlank()) text.add(label("Objetivo: " + booking.objetivo(), SMALL, MUTED));
             if (!booking.mensajeCliente().isBlank()) text.add(label("Mensaje: " + booking.mensajeCliente(), SMALL, MUTED));
-            row.add(text);
-            row.add(pill(booking.estado().name(), booking.estado() == EstadoContratacion.COMPLETADA ? TEAL : NAVY_2), BorderLayout.CENTER);
+            text.add(pill(booking.estado().name(), booking.estado() == EstadoContratacion.COMPLETADA ? TEAL : NAVY_2));
+            row.add(text, BorderLayout.CENTER);
 
             JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
             actions.setOpaque(false);
