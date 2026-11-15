@@ -61,6 +61,7 @@ El guion detallado está en [`docs/guion-demo.md`](docs/guion-demo.md). Describe
 - [Modelo editable de clases en StarUML](docs/modelo-skill-swap.mdj), con diagramas de Domain y Application.
 - [Informe de decisiones de diseño](docs/informe-diseno.md) y [versión PDF](output/pdf/informe-diseno-skillswap.pdf).
 - [Auditoría de patrones, GRASP y SOLID](docs/auditoria-patrones-y-grasp.md), con estado verificado en `main` y pendientes de integración.
+- [Trazabilidad de las entregas de Melisa (#13–#21, excepto #16)](docs/trazabilidad-melisa-issues-13-21.md), contrastada con la consigna del TP, el código y sus pruebas.
 
 ## Estructura principal
 
