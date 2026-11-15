@@ -3,7 +3,7 @@ skinparam packageStyle rectangle
 skinparam linetype ortho
 
 package "Presentation" {
-  [UI Controllers] as Presentation
+  [UI Controllers] as UIControllers
 }
 
 package "Application" {
@@ -28,13 +28,21 @@ package "Application" {
     interface DomainEventPublisher
     interface NotificationGateway
   }
+  package "Use case services" {
+    class ProfileApplicationService
+    class PublicationApplicationService
+    class DiscoveryApplicationService
+    class BookingApplicationService
+    class WalletApplicationService
+    class RatingApplicationService
+    class NotificationApplicationService
+  }
   package "Application models" {
     [Commands and queries]
     [Read results]
     [DomainEvent]
     [NotificationMessage]
   }
-  [Use case services] as Services
 }
 
 package "Domain" {
@@ -43,69 +51,155 @@ package "Domain" {
   [Booking]
   [Wallet]
   [Rating]
-  [Policies and strategies]
+  interface RefundPolicy
+  interface RecommendationStrategy
 }
 
 package "Infrastructure" {
-  [JPA repository adapters]
-  [Identity adapter]
-  [Transaction adapter]
-  [Event and notification adapters]
+  class SkillSwapApplicationWiring <<composition root>>
+
+  package "Persistence adapters" {
+    class JpaProfileRepository
+    class JpaPublicationRepository
+    class JpaBookingRepository
+    class JpaWalletRepository
+    class JpaRatingRepository
+    class JpaNotificationRepository
+    class InMemoryProfileRepository
+    class InMemoryPublicationRepository
+    class InMemoryBookingRepository
+    class InMemoryWalletRepository
+    class InMemoryRatingRepository
+    class InMemoryNotificationRepository
+    class JpaTransactionManager
+    class SynchronousTransactionManager
+  }
+
+  package "Identity adapter" {
+    class IdentityProviderAdapter
+  }
+
+  package "Events and notifications" {
+    class InMemoryDomainEventPublisher
+    class NotificationEventObserver
+    class RatingNotificationEventPublisher
+    class NotificationFactory <<Simple Factory>>
+    class EmailNotificationAdapter
+    class PushNotificationAdapter
+    class InAppNotificationAdapter
+    class MockEmailClient
+    class MockPushClient
+  }
 }
 
-Presentation --> ProfileUseCases
-Presentation --> PublicationUseCases
-Presentation --> DiscoveryUseCases
-Presentation --> BookingUseCases
-Presentation --> WalletUseCases
-Presentation --> RatingUseCases
-Presentation --> NotificationUseCases
+UIControllers --> ProfileUseCases
+UIControllers --> PublicationUseCases
+UIControllers --> DiscoveryUseCases
+UIControllers --> BookingUseCases
+UIControllers --> WalletUseCases
+UIControllers --> RatingUseCases
+UIControllers --> NotificationUseCases
 
-ProfileUseCases <|.. Services
-PublicationUseCases <|.. Services
-DiscoveryUseCases <|.. Services
-BookingUseCases <|.. Services
-WalletUseCases <|.. Services
-RatingUseCases <|.. Services
-NotificationUseCases <|.. Services
-Services --> ProfileRepository
-Services --> PublicationRepository
-Services --> BookingRepository
-Services --> WalletRepository
-Services --> RatingRepository
-Services --> NotificationRepository
-Services --> CurrentUserProvider
-Services --> TransactionManager
-Services --> DomainEventPublisher
-Services --> NotificationGateway
-Services --> Profile
-Services --> Publication
-Services --> Booking
-Services --> Wallet
-Services --> Rating
+ProfileUseCases <|.. ProfileApplicationService
+PublicationUseCases <|.. PublicationApplicationService
+DiscoveryUseCases <|.. DiscoveryApplicationService
+BookingUseCases <|.. BookingApplicationService
+WalletUseCases <|.. WalletApplicationService
+RatingUseCases <|.. RatingApplicationService
+NotificationUseCases <|.. NotificationApplicationService
 
-Infrastructure ..|> ProfileRepository
-Infrastructure ..|> PublicationRepository
-Infrastructure ..|> BookingRepository
-Infrastructure ..|> WalletRepository
-Infrastructure ..|> RatingRepository
-Infrastructure ..|> NotificationRepository
-Infrastructure ..|> CurrentUserProvider
-Infrastructure ..|> TransactionManager
-Infrastructure ..|> DomainEventPublisher
-Infrastructure ..|> NotificationGateway
+ProfileApplicationService --> ProfileRepository
+ProfileApplicationService --> CurrentUserProvider
+ProfileApplicationService --> TransactionManager
+PublicationApplicationService --> PublicationRepository
+PublicationApplicationService --> ProfileRepository
+PublicationApplicationService --> CurrentUserProvider
+PublicationApplicationService --> TransactionManager
+DiscoveryApplicationService --> PublicationRepository
+DiscoveryApplicationService --> ProfileRepository
+DiscoveryApplicationService --> CurrentUserProvider
+DiscoveryApplicationService --> RecommendationStrategy
+BookingApplicationService --> BookingRepository
+BookingApplicationService --> PublicationRepository
+BookingApplicationService --> WalletRepository
+BookingApplicationService --> CurrentUserProvider
+BookingApplicationService --> TransactionManager
+BookingApplicationService --> RefundPolicy
+BookingApplicationService --> DomainEventPublisher
+WalletApplicationService --> WalletRepository
+WalletApplicationService --> CurrentUserProvider
+WalletApplicationService --> TransactionManager
+RatingApplicationService --> BookingRepository
+RatingApplicationService --> RatingRepository
+RatingApplicationService --> ProfileRepository
+RatingApplicationService --> CurrentUserProvider
+RatingApplicationService --> TransactionManager
+RatingApplicationService --> DomainEventPublisher
+NotificationApplicationService --> NotificationRepository
+NotificationApplicationService --> CurrentUserProvider
+NotificationApplicationService --> TransactionManager
 
-note bottom of Services
-Concrete services are split by cohesive use-case area.
-The related subissues implement each area's orchestration;
-the domain remains responsible for its invariants.
+JpaProfileRepository ..|> ProfileRepository
+JpaPublicationRepository ..|> PublicationRepository
+JpaBookingRepository ..|> BookingRepository
+JpaWalletRepository ..|> WalletRepository
+JpaRatingRepository ..|> RatingRepository
+JpaNotificationRepository ..|> NotificationRepository
+InMemoryProfileRepository ..|> ProfileRepository
+InMemoryPublicationRepository ..|> PublicationRepository
+InMemoryBookingRepository ..|> BookingRepository
+InMemoryWalletRepository ..|> WalletRepository
+InMemoryRatingRepository ..|> RatingRepository
+InMemoryNotificationRepository ..|> NotificationRepository
+JpaTransactionManager ..|> TransactionManager
+SynchronousTransactionManager ..|> TransactionManager
+IdentityProviderAdapter ..|> CurrentUserProvider
+
+InMemoryDomainEventPublisher ..|> DomainEventPublisher
+RatingNotificationEventPublisher ..|> DomainEventPublisher
+InMemoryDomainEventPublisher --> NotificationEventObserver : booking events
+InMemoryDomainEventPublisher --> RatingNotificationEventPublisher : rating.submitted
+NotificationEventObserver --> ProfileRepository
+NotificationEventObserver --> NotificationFactory
+RatingNotificationEventPublisher --> ProfileRepository
+RatingNotificationEventPublisher --> NotificationFactory
+
+NotificationFactory --> NotificationGateway : creates by channel
+NotificationFactory --> NotificationRepository
+NotificationFactory --> MockEmailClient
+NotificationFactory --> MockPushClient
+EmailNotificationAdapter ..|> NotificationGateway
+PushNotificationAdapter ..|> NotificationGateway
+InAppNotificationAdapter ..|> NotificationGateway
+EmailNotificationAdapter --> MockEmailClient
+PushNotificationAdapter --> MockPushClient
+InAppNotificationAdapter --> NotificationRepository
+
+SkillSwapApplicationWiring ..> ProfileApplicationService : composes
+SkillSwapApplicationWiring ..> PublicationApplicationService
+SkillSwapApplicationWiring ..> DiscoveryApplicationService
+SkillSwapApplicationWiring ..> BookingApplicationService
+SkillSwapApplicationWiring ..> WalletApplicationService
+SkillSwapApplicationWiring ..> RatingApplicationService
+SkillSwapApplicationWiring ..> NotificationApplicationService
+SkillSwapApplicationWiring ..> InMemoryDomainEventPublisher : subscribes observers
+SkillSwapApplicationWiring ..> NotificationEventObserver
+SkillSwapApplicationWiring ..> RatingNotificationEventPublisher
+
+note bottom of InMemoryDomainEventPublisher
+  El wiring suscribe el observador de notificaciones
+  a eventos de contratación y el publicador de calificaciones
+  a rating.submitted. La implementación actual es en memoria.
+end note
+note bottom of JpaTransactionManager
+  El wiring selecciona adaptadores in-memory para la demo
+  o adaptadores JPA y transaccionales para ejecución persistente.
 end note
 note right of PublicationRepository
 searchPublished(SearchQuery): PageResult<Publication>
-filters, order and pagination of the public catalog (#16).
-Executable contract: PublicationSearchContract.
-Every PublicationView includes AuthorView;
-search/recommend read authors with
-ProfileRepository.findByUserIds (one read per page).
+filtra, ordena y pagina el catálogo público (#16).
+PublicationSearchContract verifica el contrato.
+Cada PublicationView incluye AuthorView; búsqueda y
+recomendaciones consultan autores por ProfileRepository.findByUserIds.
 end note
 @enduml
