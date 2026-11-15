@@ -67,7 +67,7 @@ class UiModelMapperTest {
     @Test
     void conservaLosDatosDeLaSolicitud() {
         var view = new BookingView("b1", "p1", "comprador", "proveedor", "Aprender Java",
-                "Hola", "f1", 120, 0, BookingStatus.PENDING, fecha, null);
+                "Hola", "f1", 120, 0, BookingStatus.PENDING, fecha, null, "Java");
 
         assertEquals(new Models.Contratacion("b1", "Java", "Julieta", fecha, 120,
                 Models.EstadoContratacion.PENDIENTE, "Aprender Java", "Hola", "f1"),

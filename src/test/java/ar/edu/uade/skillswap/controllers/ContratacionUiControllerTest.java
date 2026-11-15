@@ -105,7 +105,7 @@ class ContratacionUiControllerTest {
         private RuntimeException failure;
         private BookingView view() {
             return new BookingView("b", "pub", "u1", "u2", "Aprender", "Hola", "slot",
-                    100, 0, status, LocalDateTime.of(2026, 10, 28, 12, 0), null);
+                    100, 0, status, LocalDateTime.of(2026, 10, 28, 12, 0), null, "Publicación");
         }
         private BookingView call(String name, Object input) {
             operation = name; command = input; calls++;

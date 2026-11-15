@@ -20,13 +20,14 @@ public final class BookingData {
     public record BookingView(String id, String publicationId, String buyerUserId,
                               String providerUserId, String objective, String clientMessage, String slotId,
                               int priceInSkillCoins, int refundInSkillCoins,
-                              BookingStatus status, LocalDateTime createdAt, LocalDateTime paidAt) {
+                              BookingStatus status, LocalDateTime createdAt, LocalDateTime paidAt,
+                              String publicationTitle) {
         public BookingView(String id, String publicationId, String buyerUserId,
                            String providerUserId, String objective, String slotId,
                            int priceInSkillCoins, int refundInSkillCoins, BookingStatus status,
-                           LocalDateTime createdAt, LocalDateTime paidAt) {
+                           LocalDateTime createdAt, LocalDateTime paidAt, String publicationTitle) {
             this(id, publicationId, buyerUserId, providerUserId, objective, "", slotId,
-                    priceInSkillCoins, refundInSkillCoins, status, createdAt, paidAt);
+                    priceInSkillCoins, refundInSkillCoins, status, createdAt, paidAt, publicationTitle);
         }
     }
 }

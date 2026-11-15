@@ -66,7 +66,7 @@ docker rm skillswap-mysql-it
 
 ## Integración continua
 
-`.github/workflows/mysql-integration.yml` crea un servicio MySQL separado y ejecuta `mvn -Pmysql-it clean test` en PR hacia `main`. Los resultados locales y los checks remotos se reportan por separado; una ejecución pendiente no equivale a una aprobación. Este cambio no fusiona PR ni modifica UML.
+`.github/workflows/mysql-integration.yml` crea un servicio MySQL separado y ejecuta `mvn -Pmysql-it,coverage clean verify` en PR hacia `main`. Además de los tests, genera cobertura y exige 80% de líneas en Domain y Application por separado. Los resultados locales y los checks remotos se reportan por separado; una ejecución pendiente no equivale a una aprobación. Este cambio no fusiona PR ni modifica UML.
 
 ## Resultado registrado el 02/11/2026
 
@@ -89,4 +89,4 @@ Ese resultado inicial cubría los escenarios existentes hasta ese cambio. La amp
 - Para una captura mediante `exec:java` puede usarse `-Dcom.mysql.cj.disableAbandonedConnectionCleanup=true` como propiedad de Maven: evita que el hilo de limpieza del driver sobreviva al grupo de hilos del plugin después de cerrar las conexiones. Esta opción no se requiere en las pruebas de Surefire.
 - `git diff --check`: limpio.
 
-Pendientes fuera de este alcance: recorrido visual completo de todas las pantallas, integración del selector/calificación de #65, medición de cobertura y carga de producción. Las pruebas no certifican todos los intercalados posibles ni entrega durable de notificaciones externas.
+Esos resultados históricos no certificaban el selector/calificación de #65 ni la cobertura. La revisión del 15/11 registra esa integración, la medición por capa y el recorrido interactivo en [issue33-integracion-y-validacion.md](issue33-integracion-y-validacion.md). Siguen fuera de alcance la carga de producción, todos los intercalados posibles y la entrega durable de notificaciones externas.
