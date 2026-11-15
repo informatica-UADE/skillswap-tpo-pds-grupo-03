@@ -59,6 +59,8 @@ El guion detallado está en [`docs/guion-demo.md`](docs/guion-demo.md). Describe
 ## Diseño y defensa
 
 - [Modelo editable de clases en StarUML](docs/modelo-skill-swap.mdj), con diagramas de Domain y Application.
+- [Auditoría explicativa de los UML](docs/auditoria-uml.md), con la vista macro de arquitectura y la vista micro del dominio.
+- [Trazabilidad de issues #13–#21 y beneficios de Strategy](docs/Docs%20Issue%20Patrones%20Strategy%20.md).
 - [Informe de decisiones de diseño](docs/informe-diseno.md) y [versión PDF](output/pdf/informe-diseno-skillswap.pdf).
 - [Auditoría de patrones, GRASP y SOLID](docs/auditoria-patrones-y-grasp.md), con estado verificado en `main` y pendientes de integración.
 
