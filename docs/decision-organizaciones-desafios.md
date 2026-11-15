@@ -81,6 +81,9 @@ Las pruebas adicionales recorren registro de organización, selección de desaf�
 edición, publicación y rechazo de un tipo no permitido mediante los controllers
 reales. También verifican que omitir el tipo no guarde datos.
 
+Se incorpora también la actualización de CI #74 de main en `9bdd0c8`, sin cambios
+adicionales en Java, recursos o pruebas.
+
 Validación local: `mvn test`, 257 pruebas detectadas, 219 ejecutadas sin fallos ni
 errores y 38 de MySQL omitidas al no habilitar `mysql-it`. La validación de MySQL
 se informa por separado en los checks del PR. `git diff --check` está limpio.
