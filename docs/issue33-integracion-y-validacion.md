@@ -52,3 +52,8 @@ La base se actualiza a main porque #63 ya está integrado. Se requieren los chec
 remotos y una aprobación sobre la nueva cabeza; las pruebas locales no reemplazan
 esos controles. Este PR no se presenta como aceptación completa ni se fusiona en
 esta revisión. No se modifican UML ni exportaciones.
+
+El diff contra main conserva exclusivamente la integración de sesión y
+calificación, sus pruebas y documentación. Los controllers de perfil,
+publicaciones y contrataciones ya pertenecen a la base y no se vuelven a presentar
+como funcionalidad pendiente de integrar desde #63.
