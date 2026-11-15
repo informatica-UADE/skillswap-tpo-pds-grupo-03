@@ -1,0 +1,2 @@
+# Preserve the generated report byte-for-byte on every platform.
+output/pdf/informe-diseno-actualizado.pdf binary
