@@ -11,6 +11,8 @@ import ar.edu.uade.skillswap.application.model.WalletData.MovementView;
 import ar.edu.uade.skillswap.domain.model.BookingStatus;
 import ar.edu.uade.skillswap.domain.model.Modality;
 import ar.edu.uade.skillswap.domain.model.PublicationStatus;
+import ar.edu.uade.skillswap.domain.model.PublicationType;
+import ar.edu.uade.skillswap.domain.model.ActorType;
 import ar.edu.uade.skillswap.model.Models;
 import ar.edu.uade.skillswap.application.model.ProfileData.AvailabilityInput;
 import ar.edu.uade.skillswap.application.model.ProfileData.RegisterCommand;
@@ -27,7 +29,8 @@ public final class UiModelMapper {
         return new RegisterCommand(datos.nombre(), datos.bio(), datos.zonaHoraria(),
                 datos.habilidades(), datos.intereses(), datos.canales().stream()
                     .map(this::toNotificationChannel).collect(Collectors.toSet()),
-                datos.disponibilidad().stream().map(this::toAvailabilityInput).toList());
+                datos.disponibilidad().stream().map(this::toAvailabilityInput).toList(),
+                toActorType(datos.tipoActor()));
     }
 
     public CreateDraftCommand toCreateDraftCommand(Models.DatosBorrador datos) {
@@ -35,7 +38,16 @@ public final class UiModelMapper {
         return new CreateDraftCommand(datos.titulo(), datos.descripcion(), datos.categoria(),
                 toModality(datos.modalidad()), datos.duracionMinutos(), datos.cupos(), datos.precio(),
                 Set.copyOf(datos.etiquetas()),
-                datos.disponibilidad().stream().map(this::toAvailabilityInput).toList());
+                datos.disponibilidad().stream().map(this::toAvailabilityInput).toList(),
+                toPublicationType(datos.tipo()));
+    }
+
+    private ActorType toActorType(Models.TipoActor tipo) {
+        if (tipo == null) throw new IllegalArgumentException("Falta el tipo de actor");
+        return switch (tipo) {
+            case PROFESIONAL -> ActorType.PROFESSIONAL;
+            case ORGANIZACION -> ActorType.ORGANIZATION;
+        };
     }
 
     public EditDraftCommand toEditDraftCommand(String publicacionId, Models.EdicionBorrador datos) {
@@ -80,7 +92,24 @@ public final class UiModelMapper {
                 false, view.availability().stream()
                     .map(slot -> new Models.FranjaDisponibilidad(slot.id(), slot.startsAt(), slot.endsAt(),
                             slot.capacity() - slot.reserved()))
-                    .toList());
+                    .toList(), toTipoPublicacion(view.type()));
+    }
+
+    public Models.TipoPublicacion toTipoPublicacion(PublicationType type) {
+        return switch (type) {
+            case MENTORSHIP -> Models.TipoPublicacion.MENTORIA;
+            case SERVICE -> Models.TipoPublicacion.SERVICIO;
+            case CHALLENGE -> Models.TipoPublicacion.DESAFIO;
+        };
+    }
+
+    public PublicationType toPublicationType(Models.TipoPublicacion tipo) {
+        if (tipo == null) throw new IllegalArgumentException("Falta el tipo de publicación");
+        return switch (tipo) {
+            case MENTORIA -> PublicationType.MENTORSHIP;
+            case SERVICIO -> PublicationType.SERVICE;
+            case DESAFIO -> PublicationType.CHALLENGE;
+        };
     }
 
     public Models.Contratacion toContratacion(BookingView view, String titulo, String contraparte) {

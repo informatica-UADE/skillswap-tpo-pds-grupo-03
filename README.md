@@ -19,7 +19,7 @@ No se necesitan variables de entorno ni credenciales para ejecutar el modo en me
 ## Obtener el proyecto
 
 ```bash
-git clone https://github.com/tomasbondUade/skillswap-tpo-pds-grupo-03.git
+git clone https://github.com/informatica-UADE/skillswap-tpo-pds-grupo-03.git
 cd skillswap-tpo-pds-grupo-03
 ```
 
@@ -75,14 +75,14 @@ src/main/java/ar/edu/uade/skillswap/
 └── ui/           # Interfaz Java Swing
 ```
 
-Esta rama incorpora adaptadores JPA y migraciones Flyway V1–V3. La suite de integración utiliza la unidad JPA y el punto de composición de la aplicación contra MySQL real; los pasos para ejecutarla, sus escenarios y límites están en [Pruebas de MySQL](docs/pruebas-mysql.md). Se habilita con `mvn -Pmysql-it clean test` y requiere las variables de conexión de pruebas allí documentadas. Sin ese perfil, las pruebas de MySQL se omiten explícitamente.
+Esta rama incorpora adaptadores JPA y migraciones Flyway V1–V5, incluidos los tipos de actor y publicación de #75. La suite de integración utiliza la unidad JPA y el punto de composición de la aplicación contra MySQL real; los pasos para ejecutarla, sus escenarios y límites están en [Pruebas de MySQL](docs/pruebas-mysql.md). Se habilita con `mvn -Pmysql-it clean test` y requiere las variables de conexión de pruebas allí documentadas. Sin ese perfil, las pruebas de MySQL se omiten explícitamente.
 
 
 ## Integración en desarrollo (#33)
 
 La rama `feature/33-integration-report` añade un controller de calificaciones y un selector de usuario de demostración en Swing (Mateo, Ana y Lucía), para ejercitar roles de comprador y proveedor. Esta selección no reemplaza una autenticación real.
 
-**Estado de verificación:** la revisión del 05/11/2026 incorpora la persistencia y la búsqueda actualmente integradas en `main` y resuelve los conflictos con la base de #63. Los resultados históricos de 124 pruebas corresponden a una versión anterior; el registro actualizado está en [docs/issue33-integracion-y-validacion.md](docs/issue33-integracion-y-validacion.md). Siguen pendientes el recorrido visual completo y el reporte de cobertura del 80% en Domain/Application. La rama permanece en Draft.
+**Estado de verificación:** la revisión del 15/11/2026 incorpora `main` en `e64048c`, con #63/#64 y el modelo de organizaciones/desafíos de #75. Se conservan el selector de identidad, los tipos explícitos y las calificaciones. El registro de pruebas está en [docs/issue33-integracion-y-validacion.md](docs/issue33-integracion-y-validacion.md). Siguen pendientes el recorrido visual completo y el reporte de cobertura del 80% en Domain/Application. La rama permanece en Draft.
 
 El detalle de la validación pendiente está en [docs/issue33-integracion-y-validacion.md](docs/issue33-integracion-y-validacion.md). El modelo StarUML y su PDF se entregan por separado; no se modifican en esta rama.
 

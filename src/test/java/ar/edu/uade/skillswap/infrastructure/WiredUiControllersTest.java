@@ -16,10 +16,36 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class WiredUiControllersTest {
     @Test
+    void mantieneLosTiposExplicitosYLosPermisosAlCambiarLaSesionDemo() {
+        var controllers = new WiredUiControllers();
+        controllers.sesionDemo().cambiarUsuario("mentor-lu");
+        assertEquals(List.of(Models.TipoPublicacion.MENTORIA, Models.TipoPublicacion.SERVICIO),
+                controllers.publicaciones().tiposPublicacion("mentor-lu"));
+        assertEquals(Models.TipoPublicacion.SERVICIO,
+                controllers.publicaciones().listarPropias("mentor-lu").get(0).tipo());
+        var draft = controllers.publicaciones().crearBorrador("mentor-lu", "Revisión de portfolio",
+                "Servicio de revisión", "Diseño", Modalidad.REMOTA, 60, 100, Models.TipoPublicacion.SERVICIO);
+        assertEquals(Models.TipoPublicacion.SERVICIO, draft.tipo());
+        var forbidden = assertThrows(PresentationException.class, () -> controllers.publicaciones()
+                .crearBorrador("mentor-lu", "Desafío", "Descripción", "Diseño", Modalidad.REMOTA,
+                        60, 100, Models.TipoPublicacion.DESAFIO));
+        assertEquals(Models.CodigoError.PERMISOS, forbidden.error().codigo());
+        controllers.sesionDemo().cambiarUsuario("mentor-ana");
+        assertTrue(controllers.publicaciones().listarPropias("mentor-ana").stream()
+                .noneMatch(item -> item.id().equals(draft.id())));
+        var mismatch = assertThrows(PresentationException.class,
+                () -> controllers.publicaciones().tiposPublicacion("mentor-lu"));
+        assertEquals(Models.CodigoError.PERMISOS, mismatch.error().codigo());
+        controllers.sesionDemo().cambiarUsuario("mentor-lu");
+        assertEquals(Models.TipoPublicacion.SERVICIO, controllers.publicaciones().listarPropias("mentor-lu")
+                .stream().filter(item -> item.id().equals(draft.id())).findFirst().orElseThrow().tipo());
+    }
+
+    @Test
     void conectaLasNuevasOperacionesSinCambiarLaFachadaDeLaUi() {
         var controllers = new WiredUiControllers();
         var draft = controllers.publicaciones().crearBorrador("user-mateo", "Java",
-                "Mentoría", "Tecnología", Modalidad.REMOTA, 60, 100);
+                "Mentoría", "Tecnología", Modalidad.REMOTA, 60, 100, Models.TipoPublicacion.MENTORIA);
         var updated = controllers.publicaciones().editarBorrador("user-mateo", draft.id(),
                 new Models.EdicionBorrador("Java avanzado", "Descripción editada", "Tecnología",
                         Modalidad.HIBRIDA, 60, 6, java.util.List.of("Java")));
@@ -35,7 +61,7 @@ class WiredUiControllersTest {
     void conectaLaCreacionDePerfilYTraduceElConflictoDelUsuarioDemo() {
         var controllers = new WiredUiControllers();
         var input = new Models.NuevoPerfil("Otro nombre", "Bio", "UTC", java.util.List.of(),
-                java.util.List.of(), java.util.Set.of(), java.util.List.of());
+                java.util.List.of(), java.util.Set.of(), java.util.List.of(), Models.TipoActor.PROFESIONAL);
         var conflict = assertThrows(PresentationException.class,
                 () -> controllers.perfiles().crearPerfil("user-mateo", input));
         assertEquals(Models.CodigoError.CONFLICTO, conflict.error().codigo());
@@ -48,7 +74,8 @@ class WiredUiControllersTest {
         var search = assertThrows(PresentationException.class, () -> controllers.busqueda().buscar(null));
         assertEquals(Models.CodigoError.VALIDACION, search.error().codigo());
         var publication = assertThrows(PresentationException.class, () -> controllers.publicaciones()
-                .crearBorrador("user-mateo", "Mentoría", "Descripción", "Tecnología", null, 60, 100));
+                .crearBorrador("user-mateo", "Mentoría", "Descripción", "Tecnología", null, 60, 100,
+                        Models.TipoPublicacion.MENTORIA));
         assertEquals(Models.CodigoError.VALIDACION, publication.error().codigo());
         var wallet = assertThrows(PresentationException.class,
                 () -> controllers.wallet().acreditarDemo("user-mateo", -10));
@@ -87,7 +114,7 @@ class WiredUiControllersTest {
     void presentaLasTransicionesInvalidasComoErroresDeEstado() {
         var controllers = new WiredUiControllers();
         var draft = controllers.publicaciones().crearBorrador("user-mateo", "Mentoría",
-                "Descripción", "Tecnología", Modalidad.REMOTA, 60, 100);
+                "Descripción", "Tecnología", Modalidad.REMOTA, 60, 100, Models.TipoPublicacion.MENTORIA);
 
         var exception = assertThrows(PresentationException.class,
                 () -> controllers.publicaciones().cambiarEstado("user-mateo", draft.id(),
@@ -220,11 +247,45 @@ class WiredUiControllersTest {
             .allMatch(Models.Notificacion::leida));
         }
 
+    @Test
+    void ofreceLosTiposDelUsuarioYCreaElBorradorDelTipoElegido() {
+        var controllers = new WiredUiControllers();
+
+        assertEquals(List.of(Models.TipoPublicacion.MENTORIA, Models.TipoPublicacion.SERVICIO),
+                controllers.publicaciones().tiposPublicacion("user-mateo"));
+        var service = controllers.publicaciones().crearBorrador("user-mateo", "Revisión de CV",
+                "Correcciones y sugerencias.", "Tecnología", Modalidad.REMOTA, 60, 90,
+                Models.TipoPublicacion.SERVICIO);
+        var withoutType = assertThrows(PresentationException.class, () -> controllers.publicaciones()
+                .crearBorrador("user-mateo", "Mentoría Java", "Sesión práctica.", "Tecnología",
+                        Modalidad.REMOTA, 60, 90, null));
+
+        assertEquals(Models.TipoPublicacion.SERVICIO, service.tipo());
+        assertEquals(Models.CodigoError.VALIDACION, withoutType.error().codigo());
+        assertTrue(controllers.publicaciones().listarPropias("user-mateo").stream()
+                .anyMatch(item -> item.id().equals(service.id())
+                        && item.tipo() == Models.TipoPublicacion.SERVICIO));
+    }
+
+    @Test
+    void rechazaUnTipoQueElUsuarioNoPuedeCrearComoPermisos() {
+        var controllers = new WiredUiControllers();
+        int before = controllers.publicaciones().listarPropias("user-mateo").size();
+
+        var error = assertThrows(PresentationException.class, () -> controllers.publicaciones().crearBorrador(
+                "user-mateo", "Hackatón", "Desafío abierto.", "Tecnología", Modalidad.REMOTA, 60, 90,
+                Models.TipoPublicacion.DESAFIO));
+
+        assertEquals(Models.CodigoError.PERMISOS, error.error().codigo());
+        assertEquals(before, controllers.publicaciones().listarPropias("user-mateo").size());
+    }
+
         @Test
         void creaBorradoresPublicablesConDisponibilidadValida() {
         var controllers = new WiredUiControllers();
         var draft = controllers.publicaciones().crearBorrador("user-mateo", "Mentoría de integración",
-            "Práctica de arquitectura y testing.", "Tecnología", Modalidad.REMOTA, 60, 120);
+            "Práctica de arquitectura y testing.", "Tecnología", Modalidad.REMOTA, 60, 120,
+            Models.TipoPublicacion.MENTORIA);
 
         var published = controllers.publicaciones().cambiarEstado("user-mateo", draft.id(),
             Models.EstadoPublicacion.PUBLICADA);

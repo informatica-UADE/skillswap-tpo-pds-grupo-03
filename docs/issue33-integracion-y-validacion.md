@@ -3,10 +3,9 @@
 ## Objetivo y base
 
 Conectar controllers, casos de uso y adapters y completar contratación/calificación.
-La revisión del 15/11/2026 incorpora main en `9bdd0c8`, con #63/#64 integrados
-mediante `103fd9b` y la actualización de CI #74. El PR pasa a apuntar a main y
-permanece en Draft. #75 se corrige en su propia rama y todavía no forma parte de
-main; su modelo de organizaciones/desafíos deberá incorporarse aquí cuando se integre.
+La revisión del 15/11/2026 incorpora main en `e64048c`, que ya contiene
+#63/#64, la actualización de CI #74 y el modelo de organizaciones/desafíos de
+#75. El PR apunta a main y permanece en Draft.
 
 StarUML y su exportación quedan fuera de este trabajo por solicitud de la responsable. No se generan ni editan diagramas en esta revisión.
 
@@ -18,6 +17,7 @@ StarUML y su exportación quedan fuera de este trabajo por solicitud de la respo
 - El selector admite Mateo, Ana y Lucía. Cambiar identidad refresca saludo, pie lateral, saldo y pantalla; los permisos continúan en Application/Domain.
 - Se conserva el modo --persistence=jpa y el cierre de la fábrica JPA.
 - Los fixtures usan PublicationView.author y ProfileRepository del contrato actual, con el perfil requerido y sin reputaciones inventadas.
+- Los contratos de registro y borrador conservan TipoActor/TipoPublicacion explícitos, incluidos los DTOs, el mapper, el mock y el formulario. La sesión demo conserva los permisos al alternar entre profesionales; el seed distingue mentorías y servicio.
 
 ## Validación de la revisión
 
@@ -26,15 +26,18 @@ La prueba específica de sesión pasó con tres ejecuciones: conserva la identid
 Suite completa histórica del 05/11/2026: `mvn -Pmysql-it test`, **237 pruebas,
 0 fallos, 0 errores y 0 omitidas**, con MySQL 8.4.13.
 
-Validación local del 15/11/2026: `mvn clean test`, **231 pruebas detectadas,
-194 ejecutadas sin fallos ni errores y 37 de MySQL omitidas**, porque ese perfil
-no se habilitó localmente. Los conflictos de UiControllers y WiredUiControllers
-se resuelven conservando calificación, sesión demo y delegación a los controllers
-de main. La actualización posterior de CI #74 no cambia código Java ni recursos.
+Validación local posterior a #75: compilación limpia y `mvn test`, **261 pruebas
+detectadas, 222 ejecutadas sin fallos ni errores y 39 de MySQL omitidas**, porque
+ese perfil no se habilitó localmente. La regresión de sesión crea un servicio como
+Lucía, rechaza un desafío no permitido, cambia a Ana y verifica que no se puedan
+listar ni operar publicaciones de otra identidad. Al volver a Lucía se conserva
+el tipo del borrador. La prueba JPA del recorrido con calificación también
+comprueba los tipos de publicaciones al cambiar de usuario.
+
 `git diff --check` está limpio. Los checks de MySQL sobre la nueva cabeza se
 informan por separado en GitHub; la validación visual y la cobertura siguen pendientes.
 
-Las pruebas MySQL usan bases aleatorias aisladas y Flyway V1–V4. Comandos: mvn test y mvn -Pmysql-it test, con las variables documentadas en docs/pruebas-mysql.md. Los resultados históricos de 124 pruebas corresponden al corte anterior del 02/11 y no certifican esta integración.
+Las pruebas MySQL usan bases aleatorias aisladas y Flyway V1–V5. Comandos: mvn test y mvn -Pmysql-it test, con las variables documentadas en docs/pruebas-mysql.md. Los resultados históricos de 124 y 237 pruebas corresponden a cortes anteriores y no certifican esta integración.
 
 ## Pendientes de aceptación
 
@@ -48,12 +51,14 @@ Las pruebas MySQL usan bases aleatorias aisladas y Flyway V1–V4. Comandos: mvn
 | Cobertura 80% Domain/Application | Pendiente de medición |
 | StarUML y PDF | Excluidos de este trabajo; entrega por separado |
 
-La base se actualiza a main porque #63 ya está integrado. Se requieren los checks
+La base contiene main con #63 y #75 integrados. Se requieren los checks
 remotos y una aprobación sobre la nueva cabeza; las pruebas locales no reemplazan
 esos controles. Este PR no se presenta como aceptación completa ni se fusiona en
 esta revisión. No se modifican UML ni exportaciones.
 
 El diff contra main conserva exclusivamente la integración de sesión y
 calificación, sus pruebas y documentación. Los controllers de perfil,
-publicaciones y contrataciones ya pertenecen a la base y no se vuelven a presentar
-como funcionalidad pendiente de integrar desde #63.
+publicaciones y contrataciones, junto con el modelo de organizaciones/desafíos,
+ya pertenecen a la base y no se vuelven a presentar como funcionalidad pendiente.
+Los archivos UML de #75 se heredan exactamente de main: no se editan ni se generan
+diagramas y el diff de este PR contra main no agrega cambios UML.

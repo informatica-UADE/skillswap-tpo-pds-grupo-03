@@ -120,9 +120,14 @@ public final class WiredUiControllers implements UiControllers,
             String categoria,
             Models.Modalidad modalidad,
             int duracion,
-            int precio) {
+            int precio, Models.TipoPublicacion tipo) {
         return remember(publicationController.crearBorrador(
-                userId, titulo, descripcion, categoria, modalidad, duracion, precio));
+                userId, titulo, descripcion, categoria, modalidad, duracion, precio, tipo));
+    }
+
+    @Override
+    public List<Models.TipoPublicacion> tiposPublicacion(String userId) {
+        return publicationController.tiposPublicacion(userId);
     }
 
     @Override

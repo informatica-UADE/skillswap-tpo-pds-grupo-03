@@ -25,14 +25,15 @@ class PerfilUiControllerTest {
         var input = new Models.NuevoPerfil("Julieta", "Bio", "America/Argentina/Buenos_Aires",
                 List.of("Java"), List.of("Diseño"), Set.of(Models.CanalNotificacion.EMAIL,
                 Models.CanalNotificacion.PUSH, Models.CanalNotificacion.IN_APP),
-                List.of(new Models.Disponibilidad("slot", start, start.plusHours(1), 2)));
+                List.of(new Models.Disponibilidad("slot", start, start.plusHours(1), 2)), Models.TipoActor.PROFESIONAL);
 
         var result = controller.crearPerfil(" u1 ", input);
 
         assertEquals(new RegisterCommand("Julieta", "Bio", "America/Argentina/Buenos_Aires",
                 List.of("Java"), List.of("Diseño"), Set.of(NotificationChannelType.EMAIL,
                 NotificationChannelType.PUSH, NotificationChannelType.IN_APP),
-                List.of(new AvailabilityInput("slot", start, start.plusHours(1), 2))), service.command);
+                List.of(new AvailabilityInput("slot", start, start.plusHours(1), 2)),
+                ar.edu.uade.skillswap.domain.model.ActorType.PROFESSIONAL), service.command);
         assertEquals(1, service.registrations);
         assertEquals("u1", result.id());
         assertEquals("Resultado del servicio", result.nombre());
@@ -80,7 +81,7 @@ class PerfilUiControllerTest {
     }
 
     private Models.NuevoPerfil input() {
-        return new Models.NuevoPerfil("Julieta", "Bio", "UTC", List.of(), List.of(), Set.of(), List.of());
+        return new Models.NuevoPerfil("Julieta", "Bio", "UTC", List.of(), List.of(), Set.of(), List.of(), Models.TipoActor.PROFESIONAL);
     }
 
     private void assertCode(Models.CodigoError expected, Runnable action) {
@@ -105,7 +106,8 @@ class PerfilUiControllerTest {
             return view();
         }
         private ProfileView view() {
-            return new ProfileView("perfil-1", "u1", "Resultado del servicio", "Bio de salida", "UTC",
+            return new ProfileView("perfil-1", "u1", ar.edu.uade.skillswap.domain.model.ActorType.PROFESSIONAL,
+                    "Resultado del servicio", "Bio de salida", "UTC",
                     List.of("SQL"), List.of(), Set.of(), List.of(), 4.5, 3, true);
         }
         @Override public ProfileView update(UpdateCommand command) { throw new AssertionError("No debe actualizar"); }
