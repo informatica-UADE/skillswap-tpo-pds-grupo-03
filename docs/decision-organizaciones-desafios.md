@@ -66,7 +66,7 @@ La única regla que distingue a los tipos es quién puede crear cada uno.
 | `ProfileApplicationServiceTest` | Registro de una organización, tipo en la vista y comando sin tipo rechazado. |
 | `PublicationApplicationServiceTest` | Tipo elegido permitido y rechazado (`FORBIDDEN`), tipo obligatorio, opciones del usuario actual y usuario sin perfil. |
 | `ActorAndPublicationTypeMapperTest` | Ida y vuelta de ambos tipos entre dominio y entidades JPA. |
-| `WiredUiControllersTest` | Opciones del usuario de la demo, borrador del tipo elegido, sin tipo como `VALIDACION`, tipo en "Mis publicaciones" y tipo no permitido como `PERMISOS` sin crear nada. |
+| `SkillSwapUiControllersTest` | Opciones del usuario de la demo, borrador del tipo elegido, sin tipo como `VALIDACION`, tipo en "Mis publicaciones" y tipo no permitido como `PERMISOS` sin crear nada. |
 | `MockSkillSwapControllersTest` / `UiModelMapperTest` | El mock ofrece y conserva el tipo; conversión de los tres tipos entre Application y la UI. |
 | `MySqlPersistenceIntegrationTest` | Organización y desafío en MySQL real, incluida la búsqueda; migración desde V4 que completa filas existentes y rechaza filas sin tipo o con un tipo inválido. |
 

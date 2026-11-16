@@ -1,11 +1,12 @@
 package ar.edu.uade.skillswap.ui;
 
 import ar.edu.uade.skillswap.infrastructure.SkillSwapApplicationWiring;
-import ar.edu.uade.skillswap.infrastructure.WiredUiControllers;
+import ar.edu.uade.skillswap.infrastructure.SkillSwapUiControllers;
 import org.junit.jupiter.api.Test;
 
 import javax.swing.JButton;
 import javax.swing.JLabel;
+import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import java.awt.Component;
 import java.awt.Container;
@@ -20,7 +21,7 @@ class SkillSwapViewTest {
     @Test
     void elEstadoNoOcultaTituloObjetivoNiMensajeDeLaContratacion() throws Exception {
         try (var wiring = new SkillSwapApplicationWiring()) {
-            var ui = new WiredUiControllers(wiring);
+            var ui = SkillSwapUiControllers.from(wiring);
             var publication = ui.publicaciones().listarPropias("user-mateo").get(0);
             ui.sesionDemo().cambiarUsuario("mentor-ana");
             ui.contrataciones().solicitar("mentor-ana", publication.id(), "Mensaje visible", "Objetivo visible",
@@ -46,7 +47,7 @@ class SkillSwapViewTest {
     @Test
     void elNombreDelUsuarioAbreSuPerfilPublicoDesdeTarjetasDetalleYContratacionesYVuelve() throws Exception {
         try (var wiring = new SkillSwapApplicationWiring()) {
-            var ui = new WiredUiControllers(wiring);
+            var ui = SkillSwapUiControllers.from(wiring);
             var publication = ui.publicaciones().listarPropias("user-mateo").get(0);
             ui.sesionDemo().cambiarUsuario("mentor-ana");
             ui.contrataciones().solicitar("mentor-ana", publication.id(), "", "Objetivo",
@@ -79,6 +80,23 @@ class SkillSwapViewTest {
                 assertTrue(hasLabel(view, "Publicaciones activas · Página 1 de 1"));
                 click(view, "← Volver");
                 assertTrue(hasLabel(view, "Detalle"));
+            });
+        }
+    }
+
+    @Test
+    void elRecuadroDelPerfilActivoEsElQueCambiaDePerfilEnLaDemo() throws Exception {
+        try (var wiring = new SkillSwapApplicationWiring()) {
+            var ui = SkillSwapUiControllers.from(wiring);
+            SwingUtilities.invokeAndWait(() -> {
+                var view = new SkillSwapView(ui);
+                var switcher = descendants(view).stream().filter(JPanel.class::isInstance).map(JPanel.class::cast)
+                        .filter(panel -> "Cambiar de perfil".equals(panel.getToolTipText())).toList();
+                assertEquals(1, switcher.size());
+                assertTrue(descendants(switcher.get(0)).stream().filter(JLabel.class::isInstance)
+                        .anyMatch(label -> "Mateo Silva".equals(((JLabel) label).getText())));
+                assertTrue(switcher.get(0).getMouseListeners().length > 0);
+                assertTrue(buttons(view).stream().noneMatch(button -> button.getText().contains("Cambiar usuario")));
             });
         }
     }

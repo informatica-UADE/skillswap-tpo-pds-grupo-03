@@ -3,6 +3,7 @@ package ar.edu.uade.skillswap.infrastructure;
 import ar.edu.uade.skillswap.application.port.out.ProfileRepository;
 import ar.edu.uade.skillswap.domain.model.Profile;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +30,14 @@ public final class InMemoryProfileRepository implements ProfileRepository {
         return userIds.stream().distinct()
                 .map(profiles::get)
                 .filter(Objects::nonNull)
+                .toList();
+    }
+
+    @Override
+    public List<Profile> findActive() {
+        return profiles.values().stream()
+                .filter(Profile::active)
+                .sorted(Comparator.comparing(Profile::displayName).thenComparing(Profile::userId))
                 .toList();
     }
 

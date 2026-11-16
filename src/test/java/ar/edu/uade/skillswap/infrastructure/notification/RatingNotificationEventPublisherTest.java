@@ -170,6 +170,7 @@ class RatingNotificationEventPublisherTest {
 
     private static class InMemoryProfileRepository
             implements ProfileRepository {
+        @Override public List<Profile> findActive() { throw new AssertionError("No debe listar perfiles"); }
 
         private final Map<String, Profile> profiles = new HashMap<>();
 

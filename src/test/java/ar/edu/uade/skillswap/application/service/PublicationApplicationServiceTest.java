@@ -170,6 +170,7 @@ class PublicationApplicationServiceTest {
         Map<String, Profile> byUser = new HashMap<>();
         for (Profile profile : profiles) byUser.put(profile.userId(), profile);
         return new ProfileRepository() {
+            @Override public List<Profile> findActive() { throw new AssertionError("No debe listar perfiles"); }
             @Override public Optional<Profile> findByUserId(String userId) { return Optional.ofNullable(byUser.get(userId)); }
             @Override public Optional<Profile> findByUserIdForUpdate(String userId) { return findByUserId(userId); }
             @Override public List<Profile> findByUserIds(Collection<String> ids) {
@@ -220,9 +221,6 @@ class PublicationApplicationServiceTest {
         }
         @Override public List<Publication> findPublished() {
             return items.stream().filter(item -> item.status() == PublicationStatus.PUBLISHED).toList();
-        }
-        @Override public PageResult<Publication> searchPublished(SearchQuery query) {
-            return new PageResult<>(List.of(), query.page(), query.size(), 0);
         }
         @Override public PageResult<Publication> findPublishedByAuthor(String authorUserId, int page, int size) {
             return new PageResult<>(List.of(), page, size, 0);

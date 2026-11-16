@@ -16,15 +16,12 @@ import static org.junit.jupiter.api.Assertions.*;
 class ContratacionUiControllerTest {
     private final Spy service = new Spy();
     private ContratacionUiController controller(String actor) {
-        return new ContratacionUiController(service, () -> actor, new UiOperationExecutor(),
-                view -> new Models.Contratacion(view.id(), "Mentoría", "Mentor", "mentor", view.createdAt(),
-                        view.priceInSkillCoins(), new ar.edu.uade.skillswap.controllers.mapper.UiModelMapper()
-                        .toEstadoContratacion(view.status()), view.objective(), view.clientMessage(), view.slotId()));
+        return new ContratacionUiController(service, () -> actor, new UiOperationExecutor());
     }
 
     @Test void delegaLasOperacionesYConvierteLaSalida() {
         var controller = controller("u1");
-        assertEquals("Mentoría", controller.solicitar("u1", " pub ", "Hola", " Aprender ", " slot ").titulo());
+        assertEquals("Publicación", controller.solicitar("u1", " pub ", "Hola", " Aprender ", " slot ").titulo());
         assertEquals(new RequestCommand("pub", "Hola", "Aprender", "slot"), service.command);
         controller.aceptar("u1", " b "); assertEquals("accept", service.operation);
         controller.rechazar("u1", "b", " Motivo "); assertEquals(new RejectCommand("b", "Motivo"), service.command);
@@ -37,6 +34,16 @@ class ContratacionUiControllerTest {
         controller.completar("u1", "b"); assertEquals("complete", service.operation);
         assertEquals(9, service.calls);
         assertEquals(1, controller.listarContrataciones("u1").size());
+    }
+
+    @Test void laContraparteEsLaOtraParteSegunElUsuarioActivo() {
+        var asBuyer = controller("u1").listarContrataciones("u1").get(0);
+        assertEquals("Ana García", asBuyer.contraparte());
+        assertEquals("u2", asBuyer.contraparteId());
+
+        var asProvider = controller("u2").listarContrataciones("u2").get(0);
+        assertEquals("Mateo Silva", asProvider.contraparte());
+        assertEquals("u1", asProvider.contraparteId());
     }
 
     @Test void rechazaSuplantacionYFaltaDeIdentidadAntesDeDelegar() {
@@ -75,15 +82,22 @@ class ContratacionUiControllerTest {
 
     @Test void avanzarRespetaEstadosYParticipantes() {
         var controller = controller("u1");
+        var provider = controller("u2");
         service.status = BookingStatus.PENDING;
         assertFalse(controller.puedeAvanzar("u1", "b"));
-        assertTrue(controller("u2").puedeAvanzar("u2", "b"));
+        assertTrue(provider.puedeAvanzar("u2", "b"));
         controller.avanzar("u1", "b"); assertEquals("accept", service.operation);
         service.status = BookingStatus.ACCEPTED;
+        assertTrue(controller.puedeAvanzar("u1", "b"));
+        assertFalse(provider.puedeAvanzar("u2", "b"));
         controller.avanzar("u1", "b"); assertEquals("pay", service.operation);
         service.status = BookingStatus.CONFIRMED;
+        assertFalse(controller.puedeAvanzar("u1", "b"));
+        assertTrue(provider.puedeAvanzar("u2", "b"));
         controller.avanzar("u1", "b"); assertEquals("start", service.operation);
         service.status = BookingStatus.IN_PROGRESS;
+        assertTrue(controller.puedeAvanzar("u1", "b"));
+        assertFalse(provider.puedeAvanzar("u2", "b"));
         controller.avanzar("u1", "b"); assertEquals("complete", service.operation);
         service.status = BookingStatus.COMPLETED;
         assertFalse(controller.puedeAvanzar("u1", "b"));
@@ -105,7 +119,8 @@ class ContratacionUiControllerTest {
         private RuntimeException failure;
         private BookingView view() {
             return new BookingView("b", "pub", "u1", "u2", "Aprender", "Hola", "slot",
-                    100, 0, status, LocalDateTime.of(2026, 10, 28, 12, 0), null, "Publicación");
+                    100, 0, status, LocalDateTime.of(2026, 10, 28, 12, 0), null, "Publicación",
+                    "Mateo Silva", "Ana García");
         }
         private BookingView call(String name, Object input) {
             operation = name; command = input; calls++;

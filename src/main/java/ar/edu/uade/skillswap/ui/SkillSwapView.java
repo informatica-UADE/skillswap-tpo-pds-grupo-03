@@ -10,6 +10,7 @@ import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.List;
 
 import static ar.edu.uade.skillswap.ui.Theme.*;
@@ -30,19 +31,40 @@ public final class SkillSwapView extends JPanel {
 
     public SkillSwapView(UiControllers controllers) {
         this.controllers=controllers; setLayout(new BorderLayout()); setBackground(BG);
+        if (controllers.sesionDemo() != null) USER_ID = controllers.sesionDemo().usuarioActual();
         actions.run(() -> {
             add(sidebar(),BorderLayout.WEST); add(shell(),BorderLayout.CENTER); showHome();
         });
     }
 
+    /**
+     * En la demo, el recuadro del perfil activo (abajo en la barra lateral) abre el selector de los
+     * perfiles guardados. Sin sesión demo (Mock UI Kit) queda como un recuadro informativo.
+     */
+    private void makeProfileSwitcher(JPanel activeUser) {
+        if (controllers.sesionDemo() == null) return;
+        activeUser.setToolTipText("Cambiar de perfil");
+        activeUser.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        activeUser.add(label("⇅", H3, new Color(177, 200, 216)), BorderLayout.EAST);
+        activeUser.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent event) {
+                actions.run(() -> switchDemoUser());
+            }
+        });
+    }
+
     private void switchDemoUser() {
         if (controllers.sesionDemo() == null) return;
-        String[] options = {"user-mateo", "mentor-ana", "mentor-lu"};
-        String selected = (String) JOptionPane.showInputDialog(this, "Usuario de demostración",
-                "Cambiar identidad", JOptionPane.QUESTION_MESSAGE, null, options, USER_ID);
+        UsuarioDemo[] options = controllers.sesionDemo().usuariosDisponibles().toArray(UsuarioDemo[]::new);
+        UsuarioDemo current = Arrays.stream(options).filter(user -> user.id().equals(USER_ID))
+                .findFirst().orElse(null);
+        UsuarioDemo selected = (UsuarioDemo) JOptionPane.showInputDialog(this,
+                "Elegí el perfil con el que querés seguir la demo", "Cambiar de perfil",
+                JOptionPane.QUESTION_MESSAGE, null, options, current);
         if (selected == null) return;
-        controllers.sesionDemo().cambiarUsuario(selected);
-        USER_ID = selected;
+        controllers.sesionDemo().cambiarUsuario(selected.id());
+        USER_ID = selected.id();
         refreshIdentitySummary();
         showHome();
     }
@@ -79,10 +101,10 @@ public final class SkillSwapView extends JPanel {
         JPanel side=new JPanel(); side.setBackground(NAVY); side.setPreferredSize(new Dimension(228,720)); side.setLayout(new BoxLayout(side,BoxLayout.Y_AXIS)); side.setBorder(new EmptyBorder(24,16,18,16));
         JLabel logo=label("SkillSwap",new Font("SansSerif",Font.BOLD,25),Color.WHITE); logo.setAlignmentX(LEFT_ALIGNMENT); side.add(logo);
         JLabel sub=label("Aprendé. Compartí. Crecé.",SMALL,new Color(177,200,216)); sub.setAlignmentX(LEFT_ALIGNMENT); side.add(sub); side.add(Box.createVerticalStrut(28));
-        side.add(nav("⌂  Inicio",this::showHome)); side.add(nav("⌕  Explorar",this::showExplore)); side.add(nav("▣  Mis publicaciones",this::showListings)); side.add(nav("✓  Contrataciones",this::showContracts)); side.add(nav("◈  SkillCoins",this::showWallet)); side.add(nav("●  Notificaciones",this::showNotifications)); side.add(nav("♙  Mi perfil",this::showProfile));side.add(nav("⇄  Cambiar usuario demo",this::switchDemoUser)); side.add(Box.createVerticalGlue());
+        side.add(nav("⌂  Inicio",this::showHome)); side.add(nav("⌕  Explorar",this::showExplore)); side.add(nav("▣  Mis publicaciones",this::showListings)); side.add(nav("✓  Contrataciones",this::showContracts)); side.add(nav("◈  SkillCoins",this::showWallet)); side.add(nav("●  Notificaciones",this::showNotifications)); side.add(nav("♙  Mi perfil",this::showProfile)); side.add(Box.createVerticalGlue());
         Perfil profile = controllers.perfiles().verPerfil(USER_ID);
         JPanel user=new JPanel(new BorderLayout(10,0)); user.setOpaque(false); user.setBorder(new EmptyBorder(8,6,4,4)); user.setMaximumSize(new Dimension(Integer.MAX_VALUE,56)); user.setAlignmentX(LEFT_ALIGNMENT);
-        activeUserAvatar=avatar(initials(profile.nombre()),36); user.add(activeUserAvatar,BorderLayout.WEST); JPanel txt=new JPanel();txt.setOpaque(false);txt.setLayout(new BoxLayout(txt,BoxLayout.Y_AXIS));activeUserName=label(profile.nombre(),H3,Color.WHITE);activeUserRole=label(profile.rol(),SMALL,new Color(177,200,216));txt.add(activeUserName);txt.add(activeUserRole);user.add(txt);side.add(user); return side;
+        activeUserAvatar=avatar(initials(profile.nombre()),36); user.add(activeUserAvatar,BorderLayout.WEST); JPanel txt=new JPanel();txt.setOpaque(false);txt.setLayout(new BoxLayout(txt,BoxLayout.Y_AXIS));activeUserName=label(profile.nombre(),H3,Color.WHITE);activeUserRole=label(profile.rol(),SMALL,new Color(177,200,216));txt.add(activeUserName);txt.add(activeUserRole);user.add(txt);makeProfileSwitcher(user);side.add(user); return side;
     }
 
     private JButton nav(String text,Runnable action){JButton b=new JButton(text);b.setMaximumSize(new Dimension(Integer.MAX_VALUE,44));b.setHorizontalAlignment(SwingConstants.LEFT);b.setForeground(new Color(224,234,241));b.setBackground(NAVY);b.setBorder(new EmptyBorder(10,12,10,12));b.setFocusPainted(false);b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));b.addActionListener(uiAction(e->action.run()));return b;}

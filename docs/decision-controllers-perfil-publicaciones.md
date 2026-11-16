@@ -4,8 +4,8 @@
 
 `PerfilUiController` y `PublicacionUiController` implementan las interfaces Java de
 `UiControllers`. Reciben puertos de aplicación y la identidad activa por constructor.
-`WiredUiControllers` conserva la fachada que consume Swing y delega estas operaciones
-en los nuevos controllers.
+Desde #32 la vista los recibe directamente a través de `SkillSwapUiControllers`, sin una
+clase intermedia que delegue (ver [decisión de controllers](decision-controllers-ui.md)).
 
 | Operación de UI | Puerto de aplicación |
 | --- | --- |
