@@ -41,7 +41,9 @@ public final class WiredUiControllers implements UiControllers,
         ratingController = new CalificacionUiController(wiring.ratingService(), wiring.currentUserProvider(), operations);
         bookingController = new ContratacionUiController(wiring.bookingService(),
                 wiring.currentUserProvider(), operations, this::toContratacion);
-        publicationController = new PublicacionUiController(wiring.publicationService(), wiring.currentUserProvider(), operations);
+        publicationController = new PublicacionUiController(
+                wiring.publicationService(), wiring.publicationService(),
+                wiring.currentUserProvider(), operations);
     }
 
     @Override

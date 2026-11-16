@@ -258,16 +258,6 @@ class BookingApplicationServiceTest {
                 }
 
                 @Override
-                public PageResult<Publication> searchPublished(SearchQuery query) {
-                    List<Publication> items = findPublished();
-                    return new PageResult<>(
-                            items.stream().limit(query.size()).toList(),
-                            query.page(),
-                            query.size(),
-                            items.size());
-                }
-
-                @Override
                 public Publication save(Publication value) {
                     publications.put(value.id(), value);
                     return value;

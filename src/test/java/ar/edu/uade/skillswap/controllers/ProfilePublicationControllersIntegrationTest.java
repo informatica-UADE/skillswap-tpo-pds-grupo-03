@@ -1,5 +1,7 @@
 package ar.edu.uade.skillswap.controllers;
 
+import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchQuery;
+import ar.edu.uade.skillswap.application.service.DiscoveryApplicationService;
 import ar.edu.uade.skillswap.application.service.ProfileApplicationService;
 import ar.edu.uade.skillswap.application.service.PublicationApplicationService;
 import ar.edu.uade.skillswap.controllers.error.PresentationException;
@@ -8,6 +10,7 @@ import ar.edu.uade.skillswap.infrastructure.InMemoryPublicationRepository;
 import ar.edu.uade.skillswap.infrastructure.SynchronousTransactionManager;
 import ar.edu.uade.skillswap.infrastructure.UiOperationExecutor;
 import ar.edu.uade.skillswap.model.Models;
+import ar.edu.uade.skillswap.domain.model.RecentPopularityStrategy;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -24,8 +27,10 @@ class ProfilePublicationControllersIntegrationTest {
     private final SynchronousTransactionManager transactions = new SynchronousTransactionManager();
     private final PerfilUiController profiles = new PerfilUiController(new ProfileApplicationService(
             profileRepository, () -> actor, transactions), () -> actor, new UiOperationExecutor());
-    private final PublicacionUiController publications = new PublicacionUiController(new PublicationApplicationService(
-            publicationRepository, profileRepository, () -> actor, transactions), () -> actor, new UiOperationExecutor());
+    private final PublicationApplicationService publicationService = new PublicationApplicationService(
+            publicationRepository, profileRepository, () -> actor, transactions);
+    private final PublicacionUiController publications = new PublicacionUiController(
+            publicationService, publicationService, () -> actor, new UiOperationExecutor());
 
     @Test
     void registraUnaOrganizacionYCreaEditaYPublicaSuDesafioDesdeLosControllers() {
@@ -45,6 +50,10 @@ class ProfilePublicationControllersIntegrationTest {
         assertEquals(Models.EstadoPublicacion.PUBLICADA, published.estado());
         assertCode(Models.CodigoError.PERMISOS, () -> publications.crearBorrador("u1", draft()));
         assertEquals(1, publications.listarPropias("u1").size());
+        var catalog = new DiscoveryApplicationService(publicationRepository, publicationRepository,
+                profileRepository, () -> actor, new RecentPopularityStrategy())
+                .search(new SearchQuery("", null, null, null, null, null, null, null, 0, 20));
+        assertTrue(catalog.items().stream().anyMatch(item -> item.id().equals(challenge.id())));
     }
 
     @Test
