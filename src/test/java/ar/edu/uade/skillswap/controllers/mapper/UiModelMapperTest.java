@@ -69,11 +69,13 @@ class UiModelMapperTest {
     @Test
     void conservaLosDatosDeLaSolicitud() {
         var view = new BookingView("b1", "p1", "comprador", "proveedor", "Aprender Java",
-                "Hola", "f1", 120, 0, BookingStatus.PENDING, fecha, null, "Java");
+                "Hola", "f1", 120, 0, BookingStatus.PENDING, fecha, null, "Java", "Mateo", "Julieta");
 
         assertEquals(new Models.Contratacion("b1", "Java", "Julieta", "proveedor", fecha, 120,
                 Models.EstadoContratacion.PENDIENTE, "Aprender Java", "Hola", "f1"),
-                mapper.toContratacion(view, "Java", "Julieta", "proveedor"));
+                mapper.toContratacion(view, "comprador"));
+        assertEquals("Mateo", mapper.toContratacion(view, "proveedor").contraparte());
+        assertEquals("comprador", mapper.toContratacion(view, "proveedor").contraparteId());
     }
 
     @Test

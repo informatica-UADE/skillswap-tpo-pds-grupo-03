@@ -213,6 +213,7 @@ class PublicProfileFacadeTest {
     }
 
     private final class Profiles extends TransactionalDouble implements ProfileRepository {
+        @Override public List<Profile> findActive() { throw new AssertionError("No debe listar perfiles"); }
         private final Map<String, Profile> byUserId = new HashMap<>();
 
         void add(Profile profile) {

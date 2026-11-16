@@ -2,7 +2,6 @@ package ar.edu.uade.skillswap.infrastructure;
 
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchQuery;
 import ar.edu.uade.skillswap.application.model.PageResult;
-import ar.edu.uade.skillswap.application.model.DiscoveryData.AuthorView;
 import ar.edu.uade.skillswap.application.model.PublicationData.PublicationView;
 import ar.edu.uade.skillswap.application.mapper.PublicationApplicationMapper;
 import ar.edu.uade.skillswap.application.port.out.ProfileRepository;
@@ -107,12 +106,6 @@ public final class InMemoryPublicationRepository implements PublicationRepositor
                 .distinct()
                 .sorted(String.CASE_INSENSITIVE_ORDER)
                 .toList();
-    }
-
-    @Override
-    public Optional<AuthorView> findAuthor(String userId) {
-        return profiles.findByUserId(userId)
-                .map(profile -> new AuthorView(profile.userId(), profile.displayName(), profile.reputation()));
     }
 
     @Override

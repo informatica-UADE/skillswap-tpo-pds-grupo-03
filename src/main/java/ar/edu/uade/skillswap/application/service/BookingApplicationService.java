@@ -15,11 +15,13 @@ import ar.edu.uade.skillswap.application.port.in.BookingUseCases;
 import ar.edu.uade.skillswap.application.port.out.BookingRepository;
 import ar.edu.uade.skillswap.application.port.out.CurrentUserProvider;
 import ar.edu.uade.skillswap.application.port.out.DomainEventPublisher;
+import ar.edu.uade.skillswap.application.port.out.ProfileRepository;
 import ar.edu.uade.skillswap.application.port.out.PublicationRepository;
 import ar.edu.uade.skillswap.application.port.out.TransactionManager;
 import ar.edu.uade.skillswap.application.port.out.WalletRepository;
 import ar.edu.uade.skillswap.domain.model.Booking;
 import ar.edu.uade.skillswap.domain.model.BookingStatus;
+import ar.edu.uade.skillswap.domain.model.Profile;
 import ar.edu.uade.skillswap.domain.model.Publication;
 import ar.edu.uade.skillswap.domain.model.SkillCoins;
 import ar.edu.uade.skillswap.domain.model.Wallet;
@@ -30,6 +32,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Coordinates the booking lifecycle.
@@ -39,6 +43,7 @@ public final class BookingApplicationService implements BookingUseCases {
 
     private final BookingRepository bookings;
     private final PublicationRepository publications;
+    private final ProfileRepository profiles;
     private final WalletRepository wallets;
     private final CurrentUserProvider currentUser;
     private final TransactionManager transactions;
@@ -48,6 +53,7 @@ public final class BookingApplicationService implements BookingUseCases {
     public BookingApplicationService(
             BookingRepository bookings,
             PublicationRepository publications,
+            ProfileRepository profiles,
             WalletRepository wallets,
             CurrentUserProvider currentUser,
             TransactionManager transactions,
@@ -56,6 +62,7 @@ public final class BookingApplicationService implements BookingUseCases {
 
         this.bookings = Objects.requireNonNull(bookings);
         this.publications = Objects.requireNonNull(publications);
+        this.profiles = Objects.requireNonNull(profiles);
         this.wallets = Objects.requireNonNull(wallets);
         this.currentUser = Objects.requireNonNull(currentUser);
         this.transactions = Objects.requireNonNull(transactions);
@@ -67,8 +74,10 @@ public final class BookingApplicationService implements BookingUseCases {
     public List<BookingView> listMyBookings() {
         String actor = UseCaseSupport.currentUserId(currentUser);
 
-        return bookings.findByParticipantUserId(actor).stream()
-                .map(this::toView)
+        List<Booking> mine = bookings.findByParticipantUserId(actor);
+        Map<String, String> names = displayNames(mine);
+        return mine.stream()
+                .map(booking -> toView(booking, names))
                 .toList();
     }
 
@@ -479,10 +488,29 @@ public final class BookingApplicationService implements BookingUseCases {
     }
 
     private BookingView toView(Booking booking) {
+        return toView(booking, displayNames(List.of(booking)));
+    }
+
+    private BookingView toView(Booking booking, Map<String, String> names) {
         String title = publications.findById(booking.publicationId())
                 .orElseThrow(() -> new ApplicationException(ApplicationErrorCode.NOT_FOUND,
                         "No existe la publicación de la contratación"))
                 .title();
-        return BookingApplicationMapper.toView(booking, title);
+        return BookingApplicationMapper.toView(booking, title, nameOf(names, booking.buyerUserId()),
+                nameOf(names, booking.providerUserId()));
+    }
+
+    /** Nombres visibles de todos los participantes, leídos en una sola consulta de perfiles. */
+    private Map<String, String> displayNames(List<Booking> items) {
+        return profiles.findByUserIds(items.stream()
+                        .flatMap(booking -> Stream.of(booking.buyerUserId(), booking.providerUserId()))
+                        .collect(Collectors.toSet()))
+                .stream()
+                .collect(Collectors.toMap(Profile::userId, Profile::displayName, (first, second) -> first));
+    }
+
+    /** Un participante sin perfil (no debería existir por la FK) se muestra con su identificador. */
+    private static String nameOf(Map<String, String> names, String userId) {
+        return names.getOrDefault(userId, userId);
     }
 }

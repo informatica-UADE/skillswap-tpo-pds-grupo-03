@@ -112,7 +112,7 @@ Se mantienen separadas, como en el resto del proyecto: el dominio no depende de 
 | `MySqlPublicProfileQueriesTest` | Integración con MySQL real y las migraciones de Flyway (perfil `mysql-it`) | Las mismas consultas sobre el esquema real, con claves foráneas e índices. |
 
 | `PerfilUiControllerTest` | Unitaria de Presentation, con dobles de los puertos | Convierte la consulta (usuario, página, tamaño) y la vista; no exige el usuario activo; valida antes de llamar al puerto; traduce `NOT_FOUND` a `NO_ENCONTRADO`. "Mi perfil" muestra el rol y los proyectos completados reales. |
-| `WiredUiControllersTest` | Integración de Presentation con Application y repositorios en memoria | El autor de una publicación se identifica por `proveedorId`; después de un ciclo completo (solicitar, aceptar, pagar, iniciar, completar, calificar) el perfil público muestra la contratación completada, la reputación y la reseña, y "Mi perfil" del cliente cuenta la completada. |
+| `SkillSwapUiControllersTest` | Integración de Presentation con Application y repositorios en memoria | El autor de una publicación se identifica por `proveedorId`; después de un ciclo completo (solicitar, aceptar, pagar, iniciar, completar, calificar) el perfil público muestra la contratación completada, la reputación y la reseña, y "Mi perfil" del cliente cuenta la completada. |
 | `SkillSwapViewTest` | Prueba de la pantalla Swing | El nombre abre el perfil público desde una tarjeta de Inicio (sin entrar al detalle), desde Contrataciones y desde el detalle de una publicación, y "← Volver" regresa a la pantalla de origen. |
 | `PresentationContractsTest` | Contrato de los DTO | `PublicProfileData` y `Models.PerfilPublico` solo contienen datos simples y otros DTO. |
 
@@ -134,9 +134,9 @@ Se conectó después de #65:
 - Para llegar al perfil, la vista necesita el id del otro usuario: `Models.Publicacion` suma `proveedorId` y `Models.Contratacion` suma `contraparteId`. Antes solo traían el nombre.
 - "Mi perfil" y el Inicio dejan de mostrar valores fijos: `ProfileView` suma `completedBookings` (las mismas dos consultas de `BookingRepository`, dentro de la transacción de `ProfileApplicationService`) y el rol sale del tipo de actor ("Profesional" u "Organización"). "Mi perfil" no pasa por la Facade porque el titular ve su perfil aunque esté dado de baja.
 
-### Por qué `DiscoveryUseCases.author()` no pasa por la Facade
+### El nombre de la contraparte no pasa por la Facade
 
-`WiredUiControllers` usa `author()` para mostrar el nombre de la contraparte en Contrataciones. No es una segunda entrada al perfil público: es un dato de alguien con quien ya existe una contratación, y se tiene que mostrar aunque esa persona haya dado de baja su perfil. Canalizarlo por la Facade haría fallar la lista con perfiles inactivos y haría cuatro consultas por fila para obtener un nombre.
+Contrataciones muestra el nombre de la otra parte, que se tiene que ver aunque esa persona haya dado de baja su perfil; canalizarlo por la Facade haría fallar la lista con perfiles inactivos y haría cuatro consultas por fila. Hasta #32 se resolvía con `DiscoveryUseCases.author()`, una consulta por contratación; desde #32 `BookingView` trae los nombres de ambas partes, leídos en una sola consulta de perfiles, y `author()` se eliminó (ver [decisión de controllers](decision-controllers-ui.md)).
 
 ## Contrato del caso de uso
 

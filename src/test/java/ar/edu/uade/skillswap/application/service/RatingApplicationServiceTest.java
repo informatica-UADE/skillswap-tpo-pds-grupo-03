@@ -179,6 +179,7 @@ class RatingApplicationServiceTest {
         }
 
         private final class ProfileStore implements ProfileRepository {
+        @Override public List<Profile> findActive() { throw new AssertionError("No debe listar perfiles"); }
 
             @Override
             public Optional<Profile> findByUserId(String userId) {

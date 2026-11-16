@@ -4,6 +4,7 @@ import ar.edu.uade.skillswap.application.error.*;
 import ar.edu.uade.skillswap.application.model.BookingData.*;
 import ar.edu.uade.skillswap.application.port.in.BookingUseCases;
 import ar.edu.uade.skillswap.application.port.out.CurrentUserProvider;
+import ar.edu.uade.skillswap.controllers.mapper.UiModelMapper;
 import ar.edu.uade.skillswap.model.Models;
 import java.util.List;
 import java.util.Objects;
@@ -14,20 +15,19 @@ public final class ContratacionUiController implements UiControllers.Contratacio
     private final BookingUseCases bookings;
     private final CurrentUserProvider identity;
     private final ControllerExecutor operations;
-    private final Function<BookingView, Models.Contratacion> toUi;
+    private final UiModelMapper mapper = new UiModelMapper();
 
     public ContratacionUiController(BookingUseCases bookings, CurrentUserProvider identity,
-            ControllerExecutor operations, Function<BookingView, Models.Contratacion> toUi) {
+            ControllerExecutor operations) {
         this.bookings = Objects.requireNonNull(bookings);
         this.identity = Objects.requireNonNull(identity);
         this.operations = Objects.requireNonNull(operations);
-        this.toUi = Objects.requireNonNull(toUi);
     }
 
     @Override public List<Models.Contratacion> listarContrataciones(String userId) {
         return operations.execute(() -> {
             ControllerUser.requireActive(identity, userId);
-            return bookings.listMyBookings().stream().map(toUi).toList();
+            return bookings.listMyBookings().stream().map(this::toUi).toList();
         });
     }
 
@@ -38,7 +38,7 @@ public final class ContratacionUiController implements UiControllers.Contratacio
             ControllerUser.required(publicacionId, "Falta la publicación");
             ControllerUser.required(objetivo, "Falta el objetivo");
             ControllerUser.required(franjaId, "Falta la franja");
-            return toUi.apply(bookings.request(new RequestCommand(publicacionId.trim(),
+            return toUi(bookings.request(new RequestCommand(publicacionId.trim(),
                     mensajeCliente, objetivo.trim(), franjaId.trim())));
         });
     }
@@ -51,7 +51,7 @@ public final class ContratacionUiController implements UiControllers.Contratacio
             ControllerUser.requireActive(identity, userId);
             String bookingId = requiredId(id);
             ControllerUser.required(motivo, "Falta el motivo del rechazo");
-            return toUi.apply(bookings.reject(new RejectCommand(bookingId, motivo.trim())));
+            return toUi(bookings.reject(new RejectCommand(bookingId, motivo.trim())));
         });
     }
     @Override public Models.Contratacion pagar(String userId, String id) {
@@ -65,7 +65,7 @@ public final class ContratacionUiController implements UiControllers.Contratacio
             ControllerUser.requireActive(identity, userId);
             String bookingId = requiredId(id);
             ControllerUser.required(motivo, "Falta el motivo de la cancelación");
-            return toUi.apply(bookings.cancel(new CancelCommand(bookingId, motivo.trim())));
+            return toUi(bookings.cancel(new CancelCommand(bookingId, motivo.trim())));
         });
     }
     @Override public Models.Contratacion proponerReprogramacion(String userId, String id, String franjaId) {
@@ -73,7 +73,7 @@ public final class ContratacionUiController implements UiControllers.Contratacio
             ControllerUser.requireActive(identity, userId);
             String bookingId = requiredId(id);
             ControllerUser.required(franjaId, "Falta la nueva franja");
-            return toUi.apply(bookings.proposeReschedule(new RescheduleCommand(bookingId, franjaId.trim())));
+            return toUi(bookings.proposeReschedule(new RescheduleCommand(bookingId, franjaId.trim())));
         });
     }
     @Override public Models.Contratacion aceptarReprogramacion(String userId, String id) {
@@ -101,7 +101,7 @@ public final class ContratacionUiController implements UiControllers.Contratacio
                 case COMPLETED, REJECTED, CANCELLED -> throw new ApplicationException(
                         ApplicationErrorCode.INVALID_STATE, "La contratación no admite más avances");
             };
-            return toUi.apply(updated);
+            return toUi(updated);
         });
     }
 
@@ -111,10 +111,8 @@ public final class ContratacionUiController implements UiControllers.Contratacio
             BookingView booking = findMine(requiredId(id));
             String actor = userId.trim();
             return switch (booking.status()) {
-                case PENDING -> booking.providerUserId().equals(actor);
-                case ACCEPTED -> booking.buyerUserId().equals(actor);
-                case CONFIRMED, IN_PROGRESS -> booking.buyerUserId().equals(actor)
-                        || booking.providerUserId().equals(actor);
+                case PENDING, CONFIRMED -> booking.providerUserId().equals(actor);
+                case ACCEPTED, IN_PROGRESS -> booking.buyerUserId().equals(actor);
                 case COMPLETED, REJECTED, CANCELLED -> false;
             };
         });
@@ -124,8 +122,13 @@ public final class ContratacionUiController implements UiControllers.Contratacio
             Function<BookingCommand, BookingView> action) {
         return operations.execute(() -> {
             ControllerUser.requireActive(identity, userId);
-            return toUi.apply(action.apply(new BookingCommand(requiredId(id))));
+            return toUi(action.apply(new BookingCommand(requiredId(id))));
         });
+    }
+
+    /** La contraparte es la otra parte respecto del usuario activo, ya validado en cada operación. */
+    private Models.Contratacion toUi(BookingView booking) {
+        return mapper.toContratacion(booking, identity.currentUserId().trim());
     }
 
     private BookingView findMine(String id) {

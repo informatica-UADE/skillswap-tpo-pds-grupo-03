@@ -1,6 +1,5 @@
 package ar.edu.uade.skillswap.infrastructure.persistence.repository;
 
-import ar.edu.uade.skillswap.application.model.DiscoveryData.AuthorView;
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchOrder;
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchQuery;
 import ar.edu.uade.skillswap.application.model.PageResult;
@@ -30,7 +29,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 
 /** JPA read adapter for catalog projections; it never materializes Publication aggregates. */
@@ -91,24 +89,6 @@ public final class JpaPublicationQueryAdapter extends JpaRepositorySupport imple
                         String.class)
                 .setParameter("status", PublicationStatus.PUBLISHED.name())
                 .getResultList());
-    }
-
-    @Override
-    public Optional<AuthorView> findAuthor(String userId) {
-        Objects.requireNonNull(userId, "Falta el ID del autor");
-        return query(em -> {
-            List<Object[]> rows = em.createQuery(
-                            "SELECT p.userId, p.displayName, p.reputation "
-                                    + "FROM ProfileEntity p WHERE p.userId = :userId",
-                            Object[].class)
-                    .setParameter("userId", userId)
-                    .setMaxResults(1)
-                    .getResultList();
-            if (rows.isEmpty()) return Optional.empty();
-            Object[] row = rows.get(0);
-            return Optional.of(new AuthorView(
-                    (String) row[0], (String) row[1], ((BigDecimal) row[2]).doubleValue()));
-        });
     }
 
     private static PublicationView toView(

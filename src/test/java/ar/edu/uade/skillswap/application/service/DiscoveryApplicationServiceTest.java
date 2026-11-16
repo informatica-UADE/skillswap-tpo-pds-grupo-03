@@ -232,9 +232,6 @@ class DiscoveryApplicationServiceTest {
         @Override public List<String> categories() {
             return published.stream().map(Publication::category).distinct().sorted().toList();
         }
-        @Override public Optional<ar.edu.uade.skillswap.application.model.DiscoveryData.AuthorView> findAuthor(String userId) {
-            return Optional.of(new ar.edu.uade.skillswap.application.model.DiscoveryData.AuthorView(userId, "Nombre " + userId, 0));
-        }
         @Override public PageResult<Publication> findPublishedByAuthor(String authorUserId, int page, int size) {
             return new PageResult<>(List.of(), page, size, 0);
         }
@@ -243,6 +240,7 @@ class DiscoveryApplicationServiceTest {
 
     /** Registra las lecturas en lote para verificar que no se consulta un perfil por resultado. */
     private static final class StubProfiles implements ProfileRepository {
+        @Override public List<Profile> findActive() { throw new AssertionError("No debe listar perfiles"); }
         private final Map<String, Profile> byUserId;
         private int batchCalls;
         private final List<String> requestedUserIds = new ArrayList<>();

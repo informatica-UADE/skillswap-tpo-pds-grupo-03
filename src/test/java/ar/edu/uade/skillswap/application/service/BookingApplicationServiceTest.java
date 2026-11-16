@@ -7,6 +7,7 @@ import ar.edu.uade.skillswap.application.model.BookingData.BookingCommand;
 import ar.edu.uade.skillswap.application.port.out.BookingRepository;
 import ar.edu.uade.skillswap.application.port.out.CurrentUserProvider;
 import ar.edu.uade.skillswap.application.port.out.DomainEventPublisher;
+import ar.edu.uade.skillswap.application.port.out.ProfileRepository;
 import ar.edu.uade.skillswap.application.port.out.PublicationRepository;
 import ar.edu.uade.skillswap.application.port.out.WalletRepository;
 import ar.edu.uade.skillswap.domain.model.ActorType;
@@ -14,6 +15,7 @@ import ar.edu.uade.skillswap.domain.model.AvailabilitySlot;
 import ar.edu.uade.skillswap.domain.model.Booking;
 import ar.edu.uade.skillswap.domain.model.BookingStatus;
 import ar.edu.uade.skillswap.domain.model.Modality;
+import ar.edu.uade.skillswap.domain.model.Profile;
 import ar.edu.uade.skillswap.domain.model.Publication;
 import ar.edu.uade.skillswap.domain.model.PublicationType;
 import ar.edu.uade.skillswap.domain.model.SkillCoins;
@@ -25,10 +27,13 @@ import ar.edu.uade.skillswap.application.port.out.TransactionManager;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
@@ -146,12 +151,43 @@ class BookingApplicationServiceTest {
         assertEquals(1, fixture.publishedEvents.size());
     }
 
+    @Test
+    void listaLasContratacionesConElNombreDeAmbasPartesEnUnaSolaLecturaDePerfiles() {
+        Fixture fixture = new Fixture();
+        fixture.actor = "buyer";
+
+        var mine = fixture.service.listMyBookings();
+
+        assertEquals(1, mine.size());
+        assertEquals("Mateo Silva", mine.get(0).buyerDisplayName());
+        assertEquals("Ana García", mine.get(0).providerDisplayName());
+        assertEquals(List.of(Set.of("buyer", "provider")), fixture.profileReads);
+    }
+
+    @Test
+    void unaParteSinPerfilSeMuestraConSuIdentificador() {
+        Fixture fixture = new Fixture();
+        fixture.bookings.put(fixture.booking.id(), Booking.request(fixture.publication, "sin-perfil", "",
+                "Practicar", fixture.publication.availability().get(0).id(), new SkillCoins(20)));
+        fixture.actor = "provider";
+
+        var mine = fixture.service.listMyBookings();
+
+        assertEquals("sin-perfil", mine.get(0).buyerDisplayName());
+        assertEquals("Ana García", mine.get(0).providerDisplayName());
+    }
+
+    private static Profile profile(String userId, String name) {
+        return Profile.register(userId, ActorType.PROFESSIONAL, name, "", "UTC", Set.of(), Set.of(), Set.of());
+    }
+
     private static final class Fixture {
 
         private final List<DomainEvent> publishedEvents = new ArrayList<>();
         private final Map<String, Booking> bookings = new HashMap<>();
         private final Map<String, Publication> publications = new HashMap<>();
         private final Map<String, Wallet> wallets = new HashMap<>();
+        private final List<Collection<String>> profileReads = new ArrayList<>();
 
         private final ImmediateTransactionManager transactions =
                 new ImmediateTransactionManager();
@@ -305,9 +341,28 @@ class BookingApplicationServiceTest {
                     (ignoredBooking, cancelledAt, sessionStartsAt) ->
                             SkillCoins.zero();
 
+            ProfileRepository profileRepository = new ProfileRepository() {
+                @Override public List<Profile> findActive() { throw new AssertionError("No debe listar perfiles"); }
+                private final Map<String, Profile> profiles = Map.of(
+                        "buyer", profile("buyer", "Mateo Silva"), "provider", profile("provider", "Ana García"));
+
+                @Override public Optional<Profile> findByUserId(String userId) {
+                    throw new AssertionError("Los nombres se leen en lote");
+                }
+                @Override public Optional<Profile> findByUserIdForUpdate(String userId) {
+                    throw new AssertionError("No debe bloquear perfiles");
+                }
+                @Override public List<Profile> findByUserIds(Collection<String> userIds) {
+                    profileReads.add(Set.copyOf(userIds));
+                    return userIds.stream().map(profiles::get).filter(Objects::nonNull).toList();
+                }
+                @Override public Profile save(Profile profile) { throw new AssertionError("No debe guardar perfiles"); }
+            };
+
             service = new BookingApplicationService(
                     bookingRepository,
                     publicationRepository,
+                    profileRepository,
                     walletRepository,
                     currentUser,
                     transactions,
