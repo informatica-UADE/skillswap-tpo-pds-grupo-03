@@ -26,32 +26,32 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class NotificationEventObserverTest {
     @Test
     void notifiesOnlyTheOtherBookingParticipantAndAllowsMultipleObservers() {
-        EntityManagerFactory database = H2Database.factory("observer");
-        var transactions = new JpaTransactionManager(database);
-        var repository = new JpaNotificationRepository(transactions);
-        var publisher = new InMemoryDomainEventPublisher();
-        var profiles = new JpaProfileRepository(transactions);
-        transactions.required(() -> profiles.save(Profile.register("provider", ActorType.PROFESSIONAL, "Ana", "",
-                "UTC", List.of(), List.of(), Set.of(NotificationChannelType.IN_APP), List.of())));
-        var factory = new NotificationFactory(repository, new MockEmailClient(), new MockPushClient());
-        var observer = new NotificationEventObserver(profiles, factory);
-        var secondObserverCalls = new AtomicInteger();
-        publisher.subscribe("booking.requested", observer::onEvent);
-        publisher.subscribe("booking.requested", event -> secondObserverCalls.incrementAndGet());
+        try (EntityManagerFactory database = H2Database.factory("observer")) {
+            var transactions = new JpaTransactionManager(database);
+            var repository = new JpaNotificationRepository(transactions);
+            var publisher = new InMemoryDomainEventPublisher();
+            var profiles = new JpaProfileRepository(transactions);
+            transactions.required(() -> profiles.save(Profile.register("provider", ActorType.PROFESSIONAL, "Ana", "",
+                    "UTC", List.of(), List.of(), Set.of(NotificationChannelType.IN_APP), List.of())));
+            var factory = new NotificationFactory(repository, new MockEmailClient(), new MockPushClient());
+            var observer = new NotificationEventObserver(profiles, factory);
+            var secondObserverCalls = new AtomicInteger();
+            publisher.subscribe("booking.requested", observer::onEvent);
+            publisher.subscribe("booking.requested", event -> secondObserverCalls.incrementAndGet());
 
-        transactions.required(() -> {
-            publisher.publish(new DomainEvent("booking.requested", "Booking", "booking-1", "buyer",
-                    LocalDateTime.now(), Map.of(
-                            "buyerUserId", "buyer",
-                            "providerUserId", "provider",
-                            "detail", "Hay una nueva solicitud.")));
-            return null;
-        });
+            transactions.required(() -> {
+                publisher.publish(new DomainEvent("booking.requested", "Booking", "booking-1", "buyer",
+                        LocalDateTime.now(), Map.of(
+                                "buyerUserId", "buyer",
+                                "providerUserId", "provider",
+                                "detail", "Hay una nueva solicitud.")));
+                return null;
+            });
 
-        assertEquals(0, repository.findByRecipientUserId("buyer").size());
-        assertEquals(1, repository.findByRecipientUserId("provider").size());
-        assertEquals(1, secondObserverCalls.get());
-        database.close();
+            assertEquals(0, repository.findByRecipientUserId("buyer").size());
+            assertEquals(1, repository.findByRecipientUserId("provider").size());
+            assertEquals(1, secondObserverCalls.get());
+        }
     }
 
     @Test

@@ -22,7 +22,7 @@ public final class H2Database {
 
     public static EntityManagerFactory factory(String name) {
         String url = "jdbc:h2:mem:" + name + "_" + UUID.randomUUID().toString().replace("-", "")
-                + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
+                + ";MODE=MySQL";
         return Persistence.createEntityManagerFactory("skillswap-persistence", Map.of(
                 "jakarta.persistence.jdbc.driver", "org.h2.Driver",
                 "jakarta.persistence.jdbc.url", url,
@@ -38,8 +38,13 @@ public final class H2Database {
      */
     public static EntityManagerFactory factoryWithDemoCatalog(String name) {
         EntityManagerFactory factory = factory(name);
-        JpaCatalogFixtures.persist(factory, DemoCatalog.tree());
-        return factory;
+        try {
+            JpaCatalogFixtures.persist(factory, DemoCatalog.tree());
+            return factory;
+        } catch (RuntimeException | Error error) {
+            factory.close();
+            throw error;
+        }
     }
 
     /** La aplicación completa, con el catálogo y los datos de demostración, sobre una base nueva. */

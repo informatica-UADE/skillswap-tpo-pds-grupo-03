@@ -8,6 +8,7 @@ import ar.edu.uade.skillswap.infrastructure.identity.MockIdentityClient;
 import ar.edu.uade.skillswap.infrastructure.notification.email.MockEmailClient;
 import ar.edu.uade.skillswap.infrastructure.notification.push.MockPushClient;
 import ar.edu.uade.skillswap.infrastructure.persistence.H2Database;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -15,9 +16,18 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SkillSwapApplicationWiringTest {
+    private Fixture fixture;
+
+    @AfterEach
+    void closeWiring() {
+        if (fixture != null) {
+            fixture.wiring.close();
+        }
+    }
+
     @Test
     void usaElAdapterDeIdentidadYLaFactoryEnUnaSolicitudReal() {
-        var fixture = new Fixture();
+        fixture = new Fixture();
         var publication = fixture.publication();
 
         var booking = fixture.wiring.bookingService().request(new RequestCommand(publication.id(),
@@ -43,7 +53,7 @@ class SkillSwapApplicationWiringTest {
 
     @Test
     void notificaUnaCalificacionEnLosTresCanalesDesdeElFlujoCompleto() {
-        var fixture = new Fixture();
+        fixture = new Fixture();
         var publication = fixture.publication();
         var booking = fixture.wiring.bookingService().request(new RequestCommand(publication.id(),
                 "Mensaje", "Aprender Java", publication.availability().get(0).id()));
