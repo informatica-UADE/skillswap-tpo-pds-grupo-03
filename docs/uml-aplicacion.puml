@@ -44,11 +44,11 @@ package "Application" {
     interface ProfileRepository
     interface PublicationRepository
     interface PublicationQueryPort
-    interface CatalogRepository
     interface BookingRepository
     interface WalletRepository
     interface RatingRepository
     interface NotificationRepository
+    interface CatalogRepository
     interface CurrentUserProvider
     interface TransactionManager
     interface DomainEventPublisher
@@ -73,12 +73,9 @@ package "Domain" {
   interface RecommendationStrategy
   class PricingStrategies
   class StateImplementations
-
-  package "Catalog Composite" {
-    abstract class CatalogItem <<Component>>
-    class CatalogCategory <<Composite>>
-    class CatalogSkill <<Leaf>>
-  }
+  abstract class CatalogItem <<Composite: componente>>
+  class CatalogCategory <<Composite: compuesto>>
+  class CatalogSkill <<Composite: hoja>>
 }
 
 package "Infrastructure" {
@@ -101,12 +98,12 @@ package "Infrastructure" {
   package "JPA adapters" {
     class JpaProfileRepository
     class JpaPublicationRepository
+    class JpaPublicationQueryAdapter
     class JpaBookingRepository
     class JpaWalletRepository
     class JpaRatingRepository
     class JpaNotificationRepository
     class JpaCatalogRepository
-    class JpaPublicationQueryAdapter
     class JpaTransactionManager
   }
 
@@ -150,14 +147,14 @@ ProfileApplicationService --> TransactionManager
 
 PublicationApplicationService --> PublicationRepository
 PublicationApplicationService --> ProfileRepository
-PublicationApplicationService --> CatalogRepository
+PublicationApplicationService --> CatalogRepository : valida la categoría
 PublicationApplicationService --> CurrentUserProvider
 PublicationApplicationService --> TransactionManager
 
 DiscoveryApplicationService --> PublicationRepository
 DiscoveryApplicationService --> PublicationQueryPort
-DiscoveryApplicationService --> CatalogRepository
 DiscoveryApplicationService --> ProfileRepository
+DiscoveryApplicationService --> CatalogRepository : lista y valida categorías
 DiscoveryApplicationService --> CurrentUserProvider
 DiscoveryApplicationService --> RecommendationStrategy
 
@@ -205,13 +202,6 @@ RatingApplicationService ..> Rating
 RatingApplicationService ..> Profile
 WalletApplicationService ..> Wallet
 
-' Composite: categories contain categories or skills through a common component.
-CatalogItem <|-- CatalogCategory
-CatalogItem <|-- CatalogSkill
-CatalogCategory "0..1" *-- "0..*" CatalogItem : children
-DiscoveryApplicationService ..> CatalogItem : traverses categories
-CatalogRepository ..> CatalogCategory : roots
-
 ' Infrastructure adapters implement application output ports.
 InMemoryProfileRepository ..|> ProfileRepository
 JpaProfileRepository ..|> ProfileRepository
@@ -219,8 +209,6 @@ InMemoryPublicationRepository ..|> PublicationRepository
 JpaPublicationRepository ..|> PublicationRepository
 InMemoryPublicationRepository ..|> PublicationQueryPort
 JpaPublicationQueryAdapter ..|> PublicationQueryPort
-InMemoryCatalogRepository ..|> CatalogRepository
-JpaCatalogRepository ..|> CatalogRepository
 InMemoryBookingRepository ..|> BookingRepository
 JpaBookingRepository ..|> BookingRepository
 InMemoryWalletRepository ..|> WalletRepository
@@ -229,6 +217,12 @@ InMemoryRatingRepository ..|> RatingRepository
 JpaRatingRepository ..|> RatingRepository
 InMemoryNotificationRepository ..|> NotificationRepository
 JpaNotificationRepository ..|> NotificationRepository
+InMemoryCatalogRepository ..|> CatalogRepository
+JpaCatalogRepository ..|> CatalogRepository
+CatalogCategory --|> CatalogItem
+CatalogSkill --|> CatalogItem
+CatalogCategory o--> "0..*" CatalogItem : contiene
+CatalogRepository ..> CatalogCategory : reconstruye el árbol
 SynchronousTransactionManager ..|> TransactionManager
 JpaTransactionManager ..|> TransactionManager
 IdentityProviderAdapter ..|> CurrentUserProvider
@@ -309,7 +303,6 @@ contrataciones completadas (conteos) y últimas calificaciones
 en una transacción de lectura; no agrega reglas de negocio.
 Contrato ejecutable: PublicProfileQueriesContract.
 end note
-
 note right of CatalogRepository
   Catálogo jerárquico (#37), fijo y cargado por la migración V6.
   findRootCategories() arma CatalogCategory/CatalogSkill.
