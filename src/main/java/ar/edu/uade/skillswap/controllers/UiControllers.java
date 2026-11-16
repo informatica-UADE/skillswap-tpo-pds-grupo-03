@@ -12,7 +12,8 @@ public interface UiControllers {
     interface BusquedaController {
         PaginaPublicaciones buscar(FiltrosBusqueda filtros);
         List<Publicacion> recomendar(String userId);
-        List<String> categorias();
+        /** Categorías del catálogo en preorden, con su nivel para mostrar la jerarquía. */
+        List<Categoria> categorias();
     }
 
     interface PublicacionController {

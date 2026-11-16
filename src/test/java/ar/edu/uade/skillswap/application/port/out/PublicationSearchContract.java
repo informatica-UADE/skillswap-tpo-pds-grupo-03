@@ -26,6 +26,10 @@ import org.junit.jupiter.api.Test;
  * (en memoria, JPA) lo extiende e implementa {@link #createRepository}, que debe dejar persistidos
  * exactamente los datos recibidos. Si una implementación no pasa este contrato, la búsqueda se
  * comporta distinto según el almacenamiento.
+ *
+ * <p>Las categorías son las del catálogo de demostración (#37): {@code DemoCatalog} en memoria y la
+ * migración V6 en MySQL. Así la clave foránea de la categoría se cumple y el filtro por rama tiene
+ * una jerarquía real: Tecnología &gt; Desarrollo de software &gt; Arquitectura de software.
  */
 public abstract class PublicationSearchContract {
     protected static final LocalDateTime T0 = LocalDateTime.of(2026, 10, 1, 10, 0);
@@ -108,14 +112,63 @@ public abstract class PublicationSearchContract {
         assertEquals(2, repository.searchPublished(blank).totalElements());
     }
 
-    @Test
-    void filtraPorCategoriaExactaSinDistinguirMayusculas() {
-        var repository = repositoryWith(List.of(
-                pub("exact").category("Tecnología").build(),
-                pub("longer").category("Tecnología aplicada").build(),
-                pub("other").category("Diseño").build()), List.of());
+    // ---------- Categoría del catálogo jerárquico (#37) ----------
 
-        assertEquals(List.of("exact"), ids(repository.searchPublished(query().category("tecnología").build())));
+    @Test
+    void filtraPorUnaCategoriaYTodaSuRamaSinDistinguirMayusculas() {
+        var repository = repositoryWith(branchScenario(), List.of());
+
+        assertEquals(Set.of("root", "child", "grandchild", "career", "tagged"),
+                Set.copyOf(ids(repository.searchPublished(query().category("tecnología").build()))));
+        assertEquals(Set.of("child", "grandchild", "tagged"),
+                Set.copyOf(ids(repository.searchPublished(query().category("Desarrollo de software").build()))));
+        assertEquals(List.of("other"), ids(repository.searchPublished(query().category("DISEÑO").build())));
+    }
+
+    @Test
+    void unaSubcategoriaNoIncluyeASuPadreNiASusHermanas() {
+        var repository = repositoryWith(branchScenario(), List.of());
+
+        assertEquals(List.of("grandchild"),
+                ids(repository.searchPublished(query().category("Arquitectura de software").build())));
+        assertEquals(List.of("career"),
+                ids(repository.searchPublished(query().category("Carrera en tecnología").build())));
+    }
+
+    @Test
+    void laRamaSePaginaYSeCuentaEnLaConsulta() {
+        var repository = repositoryWith(branchScenario(), List.of());
+
+        PageResult<Publication> first = repository.searchPublished(query().category("Tecnología").page(0, 2).build());
+        PageResult<Publication> last = repository.searchPublished(query().category("Tecnología").page(2, 2).build());
+
+        assertEquals(5, first.totalElements());
+        assertEquals(2, first.items().size());
+        assertEquals(1, last.items().size());
+    }
+
+    @Test
+    void unaCategoriaQueNoEstaEnElCatalogoNoDevuelveResultados() {
+        var repository = repositoryWith(branchScenario(), List.of());
+
+        PageResult<Publication> none = repository.searchPublished(query().category("Astrología").build());
+
+        assertTrue(none.items().isEmpty());
+        assertEquals(0, none.totalElements());
+    }
+
+    /**
+     * Publicaciones en distintos niveles de la rama Tecnología, una con una habilidad de la rama como
+     * etiqueta aunque su categoría sea de otra rama, y una fuera de la rama.
+     */
+    private static List<Publication> branchScenario() {
+        return List.of(
+                pub("root").category("Tecnología").build(),
+                pub("child").category("Desarrollo de software").build(),
+                pub("grandchild").category("Arquitectura de software").build(),
+                pub("career").category("Carrera en tecnología").build(),
+                pub("tagged").category("Productividad").tags("java").build(),
+                pub("other").category("Diseño").build());
     }
 
     @Test
@@ -342,7 +395,7 @@ public abstract class PublicationSearchContract {
         private String author = "provider";
         private String title;
         private String description;
-        private String category = "General";
+        private String category = "Productividad";
         private Modality modality = Modality.REMOTE;
         private int price = 100;
         private Set<String> tags = Set.of();

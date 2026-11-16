@@ -12,6 +12,9 @@ import ar.edu.uade.skillswap.application.model.PageResult;
 import ar.edu.uade.skillswap.controllers.error.PresentationException;
 import ar.edu.uade.skillswap.domain.model.Modality;
 import ar.edu.uade.skillswap.infrastructure.UiOperationExecutor;
+import ar.edu.uade.skillswap.application.model.CatalogData.CatalogItemKind;
+import ar.edu.uade.skillswap.application.model.CatalogData.CatalogNodeView;
+import ar.edu.uade.skillswap.application.port.in.CatalogUseCases;
 import ar.edu.uade.skillswap.model.Models;
 import ar.edu.uade.skillswap.model.Models.FiltrosBusqueda;
 import java.util.List;
@@ -19,8 +22,9 @@ import org.junit.jupiter.api.Test;
 
 class BusquedaUiControllerTest {
     private final DiscoverySpy discovery = new DiscoverySpy();
+    private final CatalogSpy catalog = new CatalogSpy();
     private final BusquedaUiController controller =
-            new BusquedaUiController(discovery, () -> "user-1", new UiOperationExecutor());
+            new BusquedaUiController(discovery, catalog, () -> "user-1", new UiOperationExecutor());
 
     @Test
     void convierteTodosLosFiltrosElOrdenYLaPaginaALaEntradaDeAplicacion() {
@@ -99,8 +103,39 @@ class BusquedaUiControllerTest {
     }
 
     @Test
-    void lasCategoriasEmpiezanConTodas() {
-        assertEquals(List.of("Todas", "Diseño", "Tecnología"), controller.categorias());
+    void lasCategoriasSonLasDelCatalogoEnPreordenConSuNivelYSinHabilidades() {
+        catalog.tree = List.of(
+                new CatalogNodeView("tecnologia", "Tecnología", CatalogItemKind.CATEGORY, List.of(
+                        new CatalogNodeView("backend", "Backend", CatalogItemKind.CATEGORY, List.of(
+                                new CatalogNodeView("java", "Java", CatalogItemKind.SKILL, List.of()))),
+                        new CatalogNodeView("carrera", "Carrera", CatalogItemKind.SKILL, List.of()))),
+                new CatalogNodeView("diseno", "Diseño", CatalogItemKind.CATEGORY, List.of()));
+
+        assertEquals(List.of(new Models.Categoria("Tecnología", 0), new Models.Categoria("Backend", 1),
+                new Models.Categoria("Diseño", 0)), controller.categorias());
+        assertEquals("    Backend", controller.categorias().get(1).toString());
+        assertEquals(0, discovery.calls);
+    }
+
+    @Test
+    void lasCategoriasNoRequierenUsuarioActivoYTraducenErrores() {
+        var anonymous = new BusquedaUiController(discovery, catalog, () -> null, new UiOperationExecutor());
+        assertEquals(List.of(), anonymous.categorias());
+
+        catalog.failure = new IllegalStateException("El catálogo guardado es inválido");
+        var error = assertThrows(PresentationException.class, controller::categorias);
+        assertEquals(Models.CodigoError.ESTADO, error.error().codigo());
+    }
+
+    /** Doble del caso de uso del catálogo. */
+    private static final class CatalogSpy implements CatalogUseCases {
+        private List<CatalogNodeView> tree = List.of();
+        private RuntimeException failure;
+
+        @Override public List<CatalogNodeView> viewCatalog() {
+            if (failure != null) throw failure;
+            return tree;
+        }
     }
 
     @Test
@@ -123,7 +158,7 @@ class BusquedaUiControllerTest {
         var blank = assertThrows(PresentationException.class, () -> controller.recomendar(" "));
         assertEquals(Models.CodigoError.VALIDACION, blank.error().codigo());
 
-        var anonymous = new BusquedaUiController(discovery, () -> null, new UiOperationExecutor());
+        var anonymous = new BusquedaUiController(discovery, catalog, () -> null, new UiOperationExecutor());
         var unauthenticated = assertThrows(PresentationException.class, () -> anonymous.recomendar("user-1"));
         assertEquals(Models.CodigoError.NO_AUTENTICADO, unauthenticated.error().codigo());
 

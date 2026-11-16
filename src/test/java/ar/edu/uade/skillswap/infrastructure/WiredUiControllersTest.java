@@ -336,6 +336,45 @@ class WiredUiControllersTest {
         assertEquals(before, controllers.publicaciones().listarPropias("user-mateo").size());
     }
 
+    @Test
+    void elCatalogoOrdenaLasCategoriasYLaBusquedaPorUnaRamaIncluyeSubcategorias() {
+        var controllers = new WiredUiControllers();
+        assertEquals(new Models.Categoria("Tecnología", 0), controllers.busqueda().categorias().get(0));
+        assertEquals(new Models.Categoria("Arquitectura de software", 2), controllers.busqueda().categorias().get(2));
+
+        var draft = controllers.publicaciones().crearBorrador("user-mateo", "Revisión de arquitectura",
+                "Repaso de dependencias y casos de uso.", "arquitectura de software", Modalidad.REMOTA, 60, 120,
+                Models.TipoPublicacion.MENTORIA);
+        assertEquals("Arquitectura de software", draft.categoria());
+        controllers.publicaciones().cambiarEstado("user-mateo", draft.id(), Models.EstadoPublicacion.PUBLICADA);
+
+        assertTrue(ids(controllers, "Tecnología").contains(draft.id()));
+        assertTrue(ids(controllers, "Desarrollo de software").contains(draft.id()));
+        assertFalse(ids(controllers, "Carrera en tecnología").contains(draft.id()));
+        assertFalse(ids(controllers, "Diseño").contains(draft.id()));
+    }
+
+    @Test
+    void unaCategoriaFueraDelCatalogoSeInformaComoValidacion() {
+        var controllers = new WiredUiControllers();
+
+        var onSearch = assertThrows(PresentationException.class, () -> controllers.busqueda().buscar(
+                new FiltrosBusqueda("", "Astrología", null, 0, "Relevancia")));
+        var onCreate = assertThrows(PresentationException.class, () -> controllers.publicaciones().crearBorrador(
+                "user-mateo", "Carta natal", "Lectura", "Astrología", Modalidad.REMOTA, 60, 120,
+                Models.TipoPublicacion.MENTORIA));
+
+        assertEquals(Models.CodigoError.VALIDACION, onSearch.error().codigo());
+        assertEquals(Models.CodigoError.VALIDACION, onCreate.error().codigo());
+        assertTrue(controllers.publicaciones().listarPropias("user-mateo").stream()
+                .noneMatch(item -> item.titulo().equals("Carta natal")));
+    }
+
+    private static List<String> ids(WiredUiControllers controllers, String category) {
+        return controllers.busqueda().buscar(new FiltrosBusqueda("", category, null, 0, "Relevancia")).items()
+                .stream().map(Models.Publicacion::id).toList();
+    }
+
         @Test
         void creaBorradoresPublicablesConDisponibilidadValida() {
         var controllers = new WiredUiControllers();

@@ -9,6 +9,8 @@ import ar.edu.uade.skillswap.domain.model.Publication;
 import ar.edu.uade.skillswap.domain.model.StatusHistoryEntry;
 import ar.edu.uade.skillswap.infrastructure.persistence.JpaRepositorySupport;
 import ar.edu.uade.skillswap.infrastructure.persistence.JpaTransactionManager;
+import ar.edu.uade.skillswap.infrastructure.persistence.entity.CatalogCategoryEntity;
+import ar.edu.uade.skillswap.infrastructure.persistence.entity.CatalogSkillEntity;
 import ar.edu.uade.skillswap.infrastructure.persistence.entity.ProfileEntity;
 import ar.edu.uade.skillswap.infrastructure.persistence.entity.PublicationAvailabilityEntity;
 import ar.edu.uade.skillswap.infrastructure.persistence.entity.PublicationEntity;
@@ -16,6 +18,7 @@ import ar.edu.uade.skillswap.infrastructure.persistence.entity.PublicationStatus
 import ar.edu.uade.skillswap.infrastructure.persistence.entity.PublicationTagEntity;
 import ar.edu.uade.skillswap.infrastructure.persistence.mapper.PublicationMapper;
 
+import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
@@ -110,6 +113,7 @@ public final class JpaPublicationRepository extends JpaRepositorySupport
 
         return query(em -> {
             CriteriaBuilder cb = em.getCriteriaBuilder();
+            Optional<String> branchPath = categoryPath(em, search);
 
             CriteriaQuery<PublicationEntity> resultQuery =
                     cb.createQuery(PublicationEntity.class);
@@ -117,7 +121,7 @@ public final class JpaPublicationRepository extends JpaRepositorySupport
                     resultQuery.from(PublicationEntity.class);
             Root<ProfileEntity> author = resultQuery.from(ProfileEntity.class);
             Predicate[] predicates = buildPredicates(
-                    cb, resultQuery, publication, author, search);
+                    cb, resultQuery, publication, author, search, branchPath);
             resultQuery.select(publication)
                     .where(predicates)
                     .orderBy(orderBy(cb, publication, author, search.order()));
@@ -140,7 +144,7 @@ public final class JpaPublicationRepository extends JpaRepositorySupport
 
             countQuery.select(cb.countDistinct(countRoot))
                     .where(buildPredicates(
-                            cb, countQuery, countRoot, countAuthor, search));
+                            cb, countQuery, countRoot, countAuthor, search, branchPath));
 
             long total = em.createQuery(countQuery).getSingleResult();
 
@@ -187,12 +191,26 @@ public final class JpaPublicationRepository extends JpaRepositorySupport
         }
     }
 
+    /**
+     * Ruta materializada de la categoría pedida, para filtrar su rama completa (#37). Es una sola
+     * fila: no se carga el catálogo. Vacía si no se filtra por categoría o si no existe.
+     */
+    private static Optional<String> categoryPath(EntityManager em, SearchQuery search) {
+        if (search.category() == null || search.category().isBlank()) return Optional.empty();
+        return em.createQuery("SELECT c.path FROM CatalogCategoryEntity c WHERE LOWER(c.name) = LOWER(:name)",
+                        String.class)
+                .setParameter("name", search.category().trim())
+                .getResultStream()
+                .findFirst();
+    }
+
     private Predicate[] buildPredicates(
             CriteriaBuilder cb,
             CriteriaQuery<?> criteria,
             Root<PublicationEntity> publication,
             Root<ProfileEntity> author,
-            SearchQuery search) {
+            SearchQuery search,
+            Optional<String> branchPath) {
 
         List<Predicate> predicates = new ArrayList<>();
 
@@ -217,9 +235,9 @@ public final class JpaPublicationRepository extends JpaRepositorySupport
         }
 
         if (search.category() != null && !search.category().isBlank()) {
-            predicates.add(cb.equal(
-                    cb.lower(publication.get("category")),
-                    search.category().toLowerCase(Locale.ROOT)));
+            predicates.add(branchPath
+                    .map(path -> inCategoryBranch(cb, criteria, publication, path))
+                    .orElseGet(cb::disjunction));
         }
 
         if (search.modality() != null) {
@@ -284,6 +302,35 @@ public final class JpaPublicationRepository extends JpaRepositorySupport
         return orders;
     }
 
+    /**
+     * Una publicación pertenece a la rama si su categoría es la elegida o una descendiente, o si
+     * alguna de sus etiquetas es una habilidad de esa rama. Ambas condiciones se resuelven con
+     * subconsultas sobre la ruta materializada, dentro de la misma consulta paginada.
+     */
+    private static Predicate inCategoryBranch(CriteriaBuilder cb, CriteriaQuery<?> criteria,
+                                              Root<PublicationEntity> publication, String path) {
+        String branch = likeEscape(path) + "%";
+        var branchCategories = criteria.subquery(String.class);
+        Root<CatalogCategoryEntity> category = branchCategories.from(CatalogCategoryEntity.class);
+        branchCategories.select(category.get("name")).where(cb.like(category.get("path"), branch, '\\'));
+
+        var branchSkillTags = criteria.subquery(Integer.class);
+        Root<PublicationTagEntity> tag = branchSkillTags.from(PublicationTagEntity.class);
+        Root<CatalogSkillEntity> skill = branchSkillTags.from(CatalogSkillEntity.class);
+        Root<CatalogCategoryEntity> owner = branchSkillTags.from(CatalogCategoryEntity.class);
+        branchSkillTags.select(cb.literal(1)).where(
+                cb.equal(tag.get("publication").get("id"), publication.get("id")),
+                cb.equal(cb.lower(tag.get("id").get("tag")), cb.lower(skill.get("name"))),
+                cb.equal(skill.get("categoryId"), owner.get("id")),
+                cb.like(owner.get("path"), branch, '\\'));
+
+        return cb.or(publication.get("category").in(branchCategories), cb.exists(branchSkillTags));
+    }
+
+    private static String likeEscape(String value) {
+        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+    }
+
     private static String containsPattern(String value) {
         String escaped = value.toLowerCase(Locale.ROOT)
                 .replace("\\", "\\\\")
@@ -312,7 +359,7 @@ public final class JpaPublicationRepository extends JpaRepositorySupport
         managed.setType(publication.type().name());
         managed.setTitle(publication.title());
         managed.setDescription(publication.description());
-        managed.setCategory(publication.category());
+        managed.setCategory(PublicationMapper.categoryColumn(publication.category()));
         managed.setModality(publication.modality().name());
         managed.setDurationMinutes(publication.durationMinutes());
         managed.setCapacity(publication.capacity());

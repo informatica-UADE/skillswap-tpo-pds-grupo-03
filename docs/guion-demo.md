@@ -18,7 +18,7 @@ La primera orden valida compilación y pruebas; la segunda abre la ventana Swing
 ## Recorrido disponible
 
 1. **Inicio y recomendaciones.** Mostrar el inicio, las recomendaciones y las categorías.
-2. **Explorar una mentoría.** Abrir **Explorar**, filtrar por texto/categoría/orden y entrar en el detalle de una publicación.
+2. **Explorar una mentoría.** Abrir **Explorar**, filtrar por texto/categoría/orden y entrar en el detalle de una publicación. El combo de categorías muestra el catálogo jerárquico con sangría: elegir **Tecnología** incluye sus subcategorías, y **Diseño UX** encuentra la publicación de Lucía por sus habilidades (#37).
 3. **Solicitar.** Presionar **Solicitar mentoría**. La solicitud real de aplicación aparece en **Contrataciones** como `PENDIENTE`; se puede cancelar como comprador.
 4. **Gestionar una contratación.** Las acciones de transición aparecen según el participante activo. Usar **Cambiar usuario demo** para seleccionar al proveedor de la solicitud y aceptarla; volver a Mateo para pagar y alternar al participante autorizado para iniciar/completar. Comprobar que el saludo, nombre, avatar y rol del pie lateral corresponden a cada identidad y que el saldo del encabezado coincide con **SkillCoins**. Después de pagar, completar, cancelar o acreditar, volver a comparar ambos saldos.
 5. **Publicar.** Abrir **Mis publicaciones**, crear un borrador con título, descripción y categoría, y presionar **Publicar**. El controller agrega una franja demo válida y la publicación pasa a estar disponible en búsqueda.

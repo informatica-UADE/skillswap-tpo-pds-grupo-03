@@ -1,6 +1,8 @@
 package ar.edu.uade.skillswap.controllers.mapper;
 
 import ar.edu.uade.skillswap.application.model.BookingData.BookingView;
+import ar.edu.uade.skillswap.application.model.CatalogData.CatalogItemKind;
+import ar.edu.uade.skillswap.application.model.CatalogData.CatalogNodeView;
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchOrder;
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchQuery;
 import ar.edu.uade.skillswap.application.model.NotificationData.NotificationView;
@@ -23,6 +25,8 @@ import ar.edu.uade.skillswap.application.model.ProfileData.RegisterCommand;
 import ar.edu.uade.skillswap.application.model.PublicationData.CreateDraftCommand;
 import ar.edu.uade.skillswap.application.model.PublicationData.EditDraftCommand;
 import ar.edu.uade.skillswap.domain.model.NotificationChannelType;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -127,6 +131,19 @@ public final class UiModelMapper {
     public Models.Perfil toPerfil(ProfileView view) {
         return new Models.Perfil(view.userId(), view.displayName(), toRol(view.actorType()), view.biography(),
                 view.skills(), view.reputation(), view.ratingCount(), total(view.completedBookings()));
+    }
+
+    /** Aplana el árbol del catálogo en preorden; las habilidades no son opciones de categoría. */
+    public List<Models.Categoria> toCategorias(List<CatalogNodeView> roots) {
+        List<Models.Categoria> categorias = new ArrayList<>();
+        roots.forEach(root -> addCategorias(root, 0, categorias));
+        return List.copyOf(categorias);
+    }
+
+    private void addCategorias(CatalogNodeView node, int nivel, List<Models.Categoria> categorias) {
+        if (node.kind() != CatalogItemKind.CATEGORY) return;
+        categorias.add(new Models.Categoria(node.name(), nivel));
+        node.children().forEach(child -> addCategorias(child, nivel + 1, categorias));
     }
 
     public PublicProfileQuery toPublicProfileQuery(String perfilUserId, int pagina) {

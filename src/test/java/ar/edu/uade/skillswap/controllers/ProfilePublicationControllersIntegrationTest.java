@@ -4,7 +4,9 @@ import ar.edu.uade.skillswap.application.service.ProfileApplicationService;
 import ar.edu.uade.skillswap.application.service.PublicProfileFacade;
 import ar.edu.uade.skillswap.application.service.PublicationApplicationService;
 import ar.edu.uade.skillswap.controllers.error.PresentationException;
+import ar.edu.uade.skillswap.infrastructure.DemoCatalog;
 import ar.edu.uade.skillswap.infrastructure.InMemoryBookingRepository;
+import ar.edu.uade.skillswap.infrastructure.InMemoryCatalogRepository;
 import ar.edu.uade.skillswap.infrastructure.InMemoryProfileRepository;
 import ar.edu.uade.skillswap.infrastructure.InMemoryPublicationRepository;
 import ar.edu.uade.skillswap.infrastructure.InMemoryRatingRepository;
@@ -23,7 +25,9 @@ import static org.junit.jupiter.api.Assertions.*;
 class ProfilePublicationControllersIntegrationTest {
     private String actor = "u1";
     private final InMemoryProfileRepository profileRepository = new InMemoryProfileRepository();
-    private final InMemoryPublicationRepository publicationRepository = new InMemoryPublicationRepository(profileRepository);
+    private final InMemoryCatalogRepository catalogRepository = new InMemoryCatalogRepository(DemoCatalog.tree());
+    private final InMemoryPublicationRepository publicationRepository =
+            new InMemoryPublicationRepository(profileRepository, catalogRepository);
     private final SynchronousTransactionManager transactions = new SynchronousTransactionManager();
     private final InMemoryBookingRepository bookingRepository = new InMemoryBookingRepository();
     private final PerfilUiController profiles = new PerfilUiController(new ProfileApplicationService(
@@ -31,7 +35,8 @@ class ProfilePublicationControllersIntegrationTest {
             new PublicProfileFacade(profileRepository, publicationRepository, bookingRepository,
                     new InMemoryRatingRepository(), transactions), () -> actor, new UiOperationExecutor());
     private final PublicacionUiController publications = new PublicacionUiController(new PublicationApplicationService(
-            publicationRepository, profileRepository, () -> actor, transactions), () -> actor, new UiOperationExecutor());
+            publicationRepository, profileRepository, catalogRepository, () -> actor, transactions), () -> actor,
+            new UiOperationExecutor());
 
     @Test
     void registraUnaOrganizacionYCreaEditaYPublicaSuDesafioDesdeLosControllers() {

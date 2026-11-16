@@ -25,6 +25,8 @@
         <class>ar.edu.uade.skillswap.infrastructure.persistence.entity.WalletLedgerEntity</class>
         <class>ar.edu.uade.skillswap.infrastructure.persistence.entity.RatingEntity</class>
         <class>ar.edu.uade.skillswap.infrastructure.persistence.entity.NotificationEntity</class>
+        <class>ar.edu.uade.skillswap.infrastructure.persistence.entity.CatalogCategoryEntity</class>
+        <class>ar.edu.uade.skillswap.infrastructure.persistence.entity.CatalogSkillEntity</class>
         <exclude-unlisted-classes>true</exclude-unlisted-classes>
 
         <properties>

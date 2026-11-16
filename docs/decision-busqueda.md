@@ -24,7 +24,7 @@ La consigna (§4.3) pide buscar publicaciones por texto, categoría, modalidad, 
 | --- | --- |
 | Visibilidad | Solo publicaciones `PUBLISHED`. Solo de autores con perfil activo: se excluyen los dados de baja (decisión del equipo). Un autor sin perfil no puede existir por la FK. |
 | Texto | Contenido en título, descripción, categoría o alguna etiqueta, sin distinguir mayúsculas ni acentos. Máximo 100 caracteres. |
-| Categoría | Igualdad sin distinguir mayúsculas. |
+| Categoría | La categoría elegida y toda su rama del catálogo: subcategorías a cualquier profundidad y publicaciones con una etiqueta que es habilidad de la rama. Sin distinguir mayúsculas ni acentos. Una categoría fuera del catálogo es `VALIDATION`. Ver [decisión del catálogo](decision-catalogo-composite.md) (#37). |
 | Modalidad | Igualdad. |
 | Habilidad | Igualdad (sin mayúsculas ni acentos) con alguna etiqueta de la publicación. |
 | Precio | Precio base dentro de `[mínimo, máximo]`, límites inclusivos. |

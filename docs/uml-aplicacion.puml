@@ -16,6 +16,7 @@ package "Application" {
     interface RatingUseCases
     interface NotificationUseCases
     interface PublicProfileUseCases
+    interface CatalogUseCases
   }
   package "Output ports" {
     interface ProfileRepository
@@ -24,6 +25,7 @@ package "Application" {
     interface WalletRepository
     interface RatingRepository
     interface NotificationRepository
+    interface CatalogRepository
     interface CurrentUserProvider
     interface TransactionManager
     interface DomainEventPublisher
@@ -45,6 +47,7 @@ package "Domain" {
   [Booking]
   [Wallet]
   [Rating]
+  [Catalog composite]
   [Policies and strategies]
 }
 
@@ -63,6 +66,7 @@ Presentation --> WalletUseCases
 Presentation --> RatingUseCases
 Presentation --> NotificationUseCases
 Presentation --> PublicProfileUseCases
+Presentation --> CatalogUseCases
 
 ProfileUseCases <|.. Services
 PublicationUseCases <|.. Services
@@ -71,12 +75,14 @@ BookingUseCases <|.. Services
 WalletUseCases <|.. Services
 RatingUseCases <|.. Services
 NotificationUseCases <|.. Services
+CatalogUseCases <|.. Services
 Services --> ProfileRepository
 Services --> PublicationRepository
 Services --> BookingRepository
 Services --> WalletRepository
 Services --> RatingRepository
 Services --> NotificationRepository
+Services --> CatalogRepository
 Services --> CurrentUserProvider
 Services --> TransactionManager
 Services --> DomainEventPublisher
@@ -86,6 +92,7 @@ Services --> Publication
 Services --> Booking
 Services --> Wallet
 Services --> Rating
+Services --> [Catalog composite]
 
 PublicProfileUseCases <|.. Facade
 Facade --> ProfileRepository
@@ -100,6 +107,7 @@ Infrastructure ..|> BookingRepository
 Infrastructure ..|> WalletRepository
 Infrastructure ..|> RatingRepository
 Infrastructure ..|> NotificationRepository
+Infrastructure ..|> CatalogRepository
 Infrastructure ..|> CurrentUserProvider
 Infrastructure ..|> TransactionManager
 Infrastructure ..|> DomainEventPublisher
@@ -117,6 +125,13 @@ Executable contract: PublicationSearchContract.
 Every PublicationView includes AuthorView;
 search/recommend read authors with
 ProfileRepository.findByUserIds (one read per page).
+end note
+note right of CatalogRepository
+Catálogo jerárquico (#37), fijo y cargado por la migración V6.
+findRootCategories() arma el Composite (CatalogCategory/CatalogSkill)
+con dos consultas; findCategoryName(nombre) valida la categoría
+de búsquedas y publicaciones. La rama se filtra en searchPublished
+con la ruta materializada. Contrato: CatalogRepositoryContract.
 end note
 note bottom of Facade
 Facade (#40): un punto de entrada para el perfil público.

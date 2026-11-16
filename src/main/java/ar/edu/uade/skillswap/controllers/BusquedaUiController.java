@@ -1,12 +1,12 @@
 package ar.edu.uade.skillswap.controllers;
 
+import ar.edu.uade.skillswap.application.port.in.CatalogUseCases;
 import ar.edu.uade.skillswap.application.port.in.DiscoveryUseCases;
 import ar.edu.uade.skillswap.application.port.out.CurrentUserProvider;
 import ar.edu.uade.skillswap.controllers.mapper.UiModelMapper;
 import ar.edu.uade.skillswap.model.Models;
 import java.util.List;
 import java.util.Objects;
-import java.util.stream.Stream;
 
 /**
  * Explore and Home screens: converts the search filters to the use case, returns a page of simple
@@ -14,16 +14,17 @@ import java.util.stream.Stream;
  */
 public final class BusquedaUiController implements UiControllers.BusquedaController {
     static final int CANTIDAD_RECOMENDACIONES = 3;
-    private static final String TODAS = "Todas";
 
     private final DiscoveryUseCases discovery;
+    private final CatalogUseCases catalog;
     private final CurrentUserProvider identity;
     private final ControllerExecutor operations;
     private final UiModelMapper mapper = new UiModelMapper();
 
-    public BusquedaUiController(DiscoveryUseCases discovery, CurrentUserProvider identity,
+    public BusquedaUiController(DiscoveryUseCases discovery, CatalogUseCases catalog, CurrentUserProvider identity,
                                 ControllerExecutor operations) {
         this.discovery = Objects.requireNonNull(discovery);
+        this.catalog = Objects.requireNonNull(catalog);
         this.identity = Objects.requireNonNull(identity);
         this.operations = Objects.requireNonNull(operations);
     }
@@ -43,8 +44,9 @@ public final class BusquedaUiController implements UiControllers.BusquedaControl
         });
     }
 
+    /** Categorías del catálogo (#37), no las que aparecen en las publicaciones; no requiere el usuario activo. */
     @Override
-    public List<String> categorias() {
-        return operations.execute(() -> Stream.concat(Stream.of(TODAS), discovery.categories().stream()).toList());
+    public List<Models.Categoria> categorias() {
+        return operations.execute(() -> mapper.toCategorias(catalog.viewCatalog()));
     }
 }

@@ -33,7 +33,7 @@ public class PublicationEntity {
     @Column(name = "description", columnDefinition = "TEXT", nullable = false)
     private String description;
 
-    @Column(name = "category", length = 150, nullable = false)
+    @Column(name = "category", length = 150)
     private String category;
 
     @Column(name = "modality", length = 20, nullable = false)

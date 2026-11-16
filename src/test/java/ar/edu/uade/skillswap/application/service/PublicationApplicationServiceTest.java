@@ -33,10 +33,12 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class PublicationApplicationServiceTest {
+    private static final FixedCatalog CATALOG = FixedCatalog.withRoots("Tecnología", "Diseño");
+
     @Test
     void createsEditsAndPublishesDraftThroughDomainAggregate() {
         var publications = new InMemoryPublications();
-        var service = new PublicationApplicationService(publications, profilesOf("author-1"), () -> "author-1",
+        var service = new PublicationApplicationService(publications, profilesOf("author-1"), CATALOG, () -> "author-1",
                 new ImmediateTransactionManager());
 
         var created = service.createDraft(command("Java para principiantes"));
@@ -102,7 +104,7 @@ class PublicationApplicationServiceTest {
     @Test
     void noPermiteCrearUnBorradorSinPerfilDeAutor() {
         var publications = new InMemoryPublications();
-        var service = new PublicationApplicationService(publications, profilesOf(), () -> "author-1",
+        var service = new PublicationApplicationService(publications, profilesOf(), CATALOG, () -> "author-1",
                 new ImmediateTransactionManager());
 
         var error = assertThrows(ApplicationException.class, () -> service.createDraft(command("Java")));
@@ -113,7 +115,7 @@ class PublicationApplicationServiceTest {
 
     @Test
     void listarPropiasSinPublicacionesNoRequierePerfil() {
-        var service = new PublicationApplicationService(new InMemoryPublications(), profilesOf(), () -> "author-1",
+        var service = new PublicationApplicationService(new InMemoryPublications(), profilesOf(), CATALOG, () -> "author-1",
                 new ImmediateTransactionManager());
 
         assertEquals(List.of(), service.listMyPublications());
@@ -134,7 +136,7 @@ class PublicationApplicationServiceTest {
                 .availability(List.of(slot()))
                 .build();
         publications.save(existing);
-        var service = new PublicationApplicationService(publications, profilesOf("user-1", "another-author"), () -> "user-1",
+        var service = new PublicationApplicationService(publications, profilesOf("user-1", "another-author"), CATALOG, () -> "user-1",
                 new ImmediateTransactionManager());
 
         var forbidden = assertThrows(ApplicationException.class, () -> service.editDraft(new EditDraftCommand(
@@ -179,6 +181,43 @@ class PublicationApplicationServiceTest {
         };
     }
 
+    // ---------- Categoría del catálogo (#37) ----------
+
+    @Test
+    void guardaLaCategoriaConElNombreQueRegistraElCatalogo() {
+        var publications = new InMemoryPublications();
+        var service = new PublicationApplicationService(publications, profilesOf("author-1"), CATALOG,
+                () -> "author-1", new ImmediateTransactionManager());
+
+        var created = service.createDraft(new CreateDraftCommand("Java", "Sesión práctica", " tecnologia ",
+                Modality.REMOTE, 60, 2, 20, Set.of("Java"), List.of(slotInput()), PublicationType.MENTORSHIP));
+
+        assertEquals("Tecnología", created.category());
+        var edited = service.editDraft(new EditDraftCommand(created.id(), "Java", "Sesión práctica", "DISEÑO",
+                Modality.REMOTE, 60, 2, Set.of("Java")));
+        assertEquals("Diseño", edited.category());
+    }
+
+    @Test
+    void rechazaUnaCategoriaQueNoEstaEnElCatalogoSinModificarNada() {
+        var publications = new InMemoryPublications();
+        var service = new PublicationApplicationService(publications, profilesOf("author-1"), CATALOG,
+                () -> "author-1", new ImmediateTransactionManager());
+
+        var onCreate = assertThrows(ApplicationException.class, () -> service.createDraft(new CreateDraftCommand(
+                "Java", "Sesión práctica", "Astrología", Modality.REMOTE, 60, 2, 20, Set.of(),
+                List.of(slotInput()), PublicationType.MENTORSHIP)));
+        assertEquals(ApplicationErrorCode.VALIDATION, onCreate.code());
+        assertEquals(0, publications.findByAuthorUserId("author-1").size());
+
+        var created = service.createDraft(command("Java"));
+        var onEdit = assertThrows(ApplicationException.class, () -> service.editDraft(new EditDraftCommand(
+                created.id(), "Otro título", "Sesión práctica", "Astrología", Modality.REMOTE, 60, 2, Set.of())));
+        assertEquals(ApplicationErrorCode.VALIDATION, onEdit.code());
+        assertEquals("Java", publications.findById(created.id()).orElseThrow().title());
+        assertEquals("Tecnología", publications.findById(created.id()).orElseThrow().category());
+    }
+
     private static CreateDraftCommand command(String title) {
         return command(title, PublicationType.MENTORSHIP);
     }
@@ -194,7 +233,7 @@ class PublicationApplicationServiceTest {
                 Set.of(), Set.of(), Set.of(), List.of());
         Profile professional = Profile.register("author-1", ActorType.PROFESSIONAL, "Ana", "", "UTC",
                 Set.of(), Set.of(), Set.of());
-        return new PublicationApplicationService(publications, profilesWith(organization, professional),
+        return new PublicationApplicationService(publications, profilesWith(organization, professional), CATALOG,
                 () -> userId, new ImmediateTransactionManager());
     }
 

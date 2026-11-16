@@ -8,6 +8,7 @@ import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchQuery;
 import ar.edu.uade.skillswap.application.model.PageResult;
 import ar.edu.uade.skillswap.application.model.PublicationData.PublicationView;
 import ar.edu.uade.skillswap.application.port.in.DiscoveryUseCases;
+import ar.edu.uade.skillswap.application.port.out.CatalogRepository;
 import ar.edu.uade.skillswap.application.port.out.CurrentUserProvider;
 import ar.edu.uade.skillswap.application.port.out.ProfileRepository;
 import ar.edu.uade.skillswap.application.port.out.PublicationRepository;
@@ -24,26 +25,33 @@ import java.util.stream.Collectors;
 public final class DiscoveryApplicationService implements DiscoveryUseCases {
     private final PublicationRepository publications;
     private final ProfileRepository profiles;
+    private final CatalogRepository catalog;
     private final CurrentUserProvider currentUser;
     private final RecommendationStrategy recommendationStrategy;
 
     public DiscoveryApplicationService(PublicationRepository publications, ProfileRepository profiles,
-                                       CurrentUserProvider currentUser,
+                                       CatalogRepository catalog, CurrentUserProvider currentUser,
                                        RecommendationStrategy recommendationStrategy) {
         this.publications = Objects.requireNonNull(publications);
         this.profiles = Objects.requireNonNull(profiles);
+        this.catalog = Objects.requireNonNull(catalog);
         this.currentUser = Objects.requireNonNull(currentUser);
         this.recommendationStrategy = Objects.requireNonNull(recommendationStrategy);
     }
 
     /**
-     * Valida que haya criterios, delega filtros, orden y paginación en el repositorio y completa
-     * cada resultado con los datos públicos de su autor.
+     * Valida que haya criterios y que la categoría exista en el catálogo, delega filtros, orden y
+     * paginación en el repositorio y completa cada resultado con los datos públicos de su autor.
+     * Una categoría incluye toda su rama del catálogo (#37); el repositorio la resuelve en la consulta.
      */
     @Override
     public PageResult<PublicationView> search(SearchQuery query) {
         if (query == null) {
             throw new ApplicationException(ApplicationErrorCode.VALIDATION, "Faltan los criterios de búsqueda");
+        }
+        if (query.category() != null && catalog.findCategoryName(query.category()).isEmpty()) {
+            throw new ApplicationException(ApplicationErrorCode.VALIDATION,
+                    "La categoría \"" + query.category() + "\" no existe en el catálogo");
         }
         PageResult<Publication> result = publications.searchPublished(query);
         return new PageResult<>(toViews(result.items()), result.page(), result.size(), result.totalElements());
@@ -64,15 +72,6 @@ public final class DiscoveryApplicationService implements DiscoveryUseCases {
                     "El perfil debe estar activo para recibir recomendaciones");
         }
         return toViews(recommendationStrategy.recommend(profile, publications.findPublished(), limit));
-    }
-
-    @Override
-    public List<String> categories() {
-        return publications.findPublished().stream()
-                .map(Publication::category)
-                .distinct()
-                .sorted(String.CASE_INSENSITIVE_ORDER)
-                .toList();
     }
 
     /** Arma las vistas leyendo los perfiles de todos los autores en una sola lectura. */

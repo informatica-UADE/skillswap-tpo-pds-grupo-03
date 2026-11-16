@@ -157,6 +157,24 @@ package "domain.state" {
   class BookingStates.Cancelled <<Singleton enum>>
 }
 
+package "domain.catalog" {
+  abstract class CatalogItem <<Composite: componente>> {
+    - id: String
+    - name: String
+    + parent(): Optional<CatalogCategory>
+    + depth(): int
+    + children(): List<CatalogItem>
+    + stream(): Stream<CatalogItem>
+    + skillNames(): Set<String>
+    + categoryNames(): Set<String>
+    + findCategory(name): Optional<CatalogCategory>
+  }
+  class CatalogCategory <<Composite: compuesto>> {
+    + add(item: CatalogItem): CatalogCategory
+  }
+  class CatalogSkill <<Composite: hoja>>
+}
+
 package "domain.policy" {
   interface RefundPolicy <<Strategy>> {
     + refundFor(booking, cancelledAt, sessionStartsAt): SkillCoins
@@ -190,6 +208,11 @@ Booking --> SkillCoins : precio / reintegro
 Booking "0..*" --> "1" Publication : se origina en
 Rating "0..*" --> "1" Booking : califica contratación
 Rating "0..*" ..> "1" Profile : subjectUserId / reputación derivada
+
+CatalogCategory --|> CatalogItem
+CatalogSkill --|> CatalogItem
+CatalogCategory "0..1" o-- "0..*" CatalogItem : contiene
+Publication "0..*" ..> "0..1" CatalogCategory : categoría (por nombre)
 
 Publication --> PublicationState : estado actual
 Booking --> BookingState : estado actual
@@ -242,6 +265,13 @@ note bottom of Booking
   BookingStates usa enums sin datos propios: cada estado tiene
   una sola instancia inmutable. Booking conserva el estado actual,
   participantes, pagos e historial propios de cada contratación.
+end note
+
+note right of CatalogCategory
+  Composite (#37): la categoría protege el árbol al agregar.
+  Un elemento tiene un solo padre, no hay ciclos, los hermanos
+  no repiten nombre y el nombre de una categoría es único.
+  Hojas y ramas se recorren con las mismas operaciones.
 end note
 
 @enduml

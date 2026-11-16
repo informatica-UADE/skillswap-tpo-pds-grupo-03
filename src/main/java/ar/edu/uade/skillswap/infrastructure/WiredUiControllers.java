@@ -37,7 +37,8 @@ public final class WiredUiControllers implements UiControllers,
 
     public WiredUiControllers(SkillSwapApplicationWiring wiring) {
         this.wiring = Objects.requireNonNull(wiring);
-        searchController = new BusquedaUiController(wiring.discoveryService(), wiring.currentUserProvider(), operations);
+        searchController = new BusquedaUiController(wiring.discoveryService(), wiring.catalogService(),
+                wiring.currentUserProvider(), operations);
         profileController = new PerfilUiController(wiring.profileService(), wiring.publicProfiles(),
                 wiring.currentUserProvider(), operations);
         ratingController = new CalificacionUiController(wiring.ratingService(), wiring.currentUserProvider(), operations);
@@ -96,7 +97,7 @@ public final class WiredUiControllers implements UiControllers,
     }
 
     @Override
-    public List<String> categorias() {
+    public List<Models.Categoria> categorias() {
         return searchController.categorias();
     }
 

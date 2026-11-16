@@ -27,7 +27,8 @@ class InMemoryRepositoriesTest {
 
         assertEquals("Ana", profiles.findByUserId("user-1").orElseThrow().displayName());
 
-        var publications = new InMemoryPublicationRepository(profiles);
+        var publications = new InMemoryPublicationRepository(profiles,
+                new InMemoryCatalogRepository(DemoCatalog.tree()));
         Publication publication = Publication.builder("user-1", ActorType.PROFESSIONAL, PublicationType.MENTORSHIP)
                 .title("Java para principiantes")
                 .description("Mentoría")

@@ -33,11 +33,6 @@ final class DiscoverySpy implements DiscoveryUseCases {
         return recommendations;
     }
 
-    @Override public List<String> categories() {
-        calls++;
-        return List.of("Diseño", "Tecnología");
-    }
-
     @Override public ar.edu.uade.skillswap.application.model.DiscoveryData.AuthorView author(String userId) {
         calls++;
         return new ar.edu.uade.skillswap.application.model.DiscoveryData.AuthorView(

@@ -25,6 +25,22 @@ public final class Models {
     public enum EstadoContratacion { PENDIENTE, ACEPTADA, CONFIRMADA, EN_CURSO, COMPLETADA, RECHAZADA, CANCELADA }
     public enum CanalNotificacion { EMAIL, PUSH, IN_APP }
 
+    /**
+     * Categoría del catálogo jerárquico (#37) con su nivel en el árbol: cero para una categoría raíz.
+     * {@code toString()} la muestra con sangría según el nivel, para los combos de la pantalla.
+     */
+    public record Categoria(String nombre, int nivel) {
+        /** Opción "sin filtro" de Explorar; no es una categoría del catálogo. */
+        public static final Categoria TODAS = new Categoria("Todas", 0);
+
+        public Categoria {
+            if (nombre == null || nombre.isBlank()) throw new IllegalArgumentException("Falta el nombre de la categoría");
+            if (nivel < 0) throw new IllegalArgumentException("El nivel no puede ser negativo");
+        }
+
+        @Override public String toString() { return "    ".repeat(nivel) + nombre; }
+    }
+
     public record Disponibilidad(String id, LocalDateTime inicio, LocalDateTime fin, int cupos) {}
 
     public record NuevoPerfil(String nombre, String bio, String zonaHoraria,
