@@ -18,7 +18,6 @@ import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaPublicatio
 import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaRatingRepository;
 import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaWalletRepository;
 import jakarta.persistence.EntityManagerFactory;
-import ar.edu.uade.skillswap.application.port.in.CatalogUseCases;
 import ar.edu.uade.skillswap.application.port.in.PublicProfileUseCases;
 import ar.edu.uade.skillswap.application.port.out.ProfileRepository;
 import ar.edu.uade.skillswap.application.port.out.PublicationRepository;
@@ -31,7 +30,6 @@ import ar.edu.uade.skillswap.application.service.DiscoveryApplicationService;
 import ar.edu.uade.skillswap.application.service.NotificationApplicationService;
 import ar.edu.uade.skillswap.application.service.ProfileApplicationService;
 import ar.edu.uade.skillswap.application.service.PublicationApplicationService;
-import ar.edu.uade.skillswap.application.service.CatalogApplicationService;
 import ar.edu.uade.skillswap.application.service.PublicProfileFacade;
 import ar.edu.uade.skillswap.application.service.RatingApplicationService;
 import ar.edu.uade.skillswap.application.service.WalletApplicationService;
@@ -85,7 +83,6 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
     private final WalletApplicationService walletService;
     private final NotificationApplicationService notificationService;
     private final PublicProfileUseCases publicProfiles;
-    private final CatalogUseCases catalogService;
 
     public SkillSwapApplicationWiring() {
         this(new MockIdentityClient("user-mateo"), new MockEmailClient(), new MockPushClient());
@@ -172,7 +169,6 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
                 transactions);
         discoveryService = new DiscoveryApplicationService(
                 publications, publicationQueries, profiles, catalog, currentUser, recommendationStrategy);
-        catalogService = new CatalogApplicationService(catalog, transactions);
         bookingService = new BookingApplicationService(bookings, publications, profiles, wallets,
                 currentUser, transactions, refundPolicy, events);
         ratingService = new RatingApplicationService(bookings, ratings, profiles, currentUser, transactions, events);
@@ -332,10 +328,6 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
 
     public RatingApplicationService ratingService() {
         return ratingService;
-    }
-
-    public CatalogUseCases catalogService() {
-        return catalogService;
     }
 
     public PublicProfileUseCases publicProfiles() {

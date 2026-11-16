@@ -3,6 +3,7 @@ package ar.edu.uade.skillswap.application.service;
 import ar.edu.uade.skillswap.application.error.ApplicationErrorCode;
 import ar.edu.uade.skillswap.application.error.ApplicationException;
 import ar.edu.uade.skillswap.application.mapper.PublicationApplicationMapper;
+import ar.edu.uade.skillswap.application.model.DiscoveryData.CategoryView;
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchQuery;
 import ar.edu.uade.skillswap.application.model.PageResult;
 import ar.edu.uade.skillswap.application.model.PublicationData.PublicationView;
@@ -12,6 +13,8 @@ import ar.edu.uade.skillswap.application.port.out.CurrentUserProvider;
 import ar.edu.uade.skillswap.application.port.out.ProfileRepository;
 import ar.edu.uade.skillswap.application.port.out.PublicationQueryPort;
 import ar.edu.uade.skillswap.application.port.out.PublicationRepository;
+import ar.edu.uade.skillswap.domain.catalog.CatalogCategory;
+import ar.edu.uade.skillswap.domain.catalog.CatalogItem;
 import ar.edu.uade.skillswap.domain.model.Profile;
 import ar.edu.uade.skillswap.domain.model.Publication;
 import ar.edu.uade.skillswap.domain.model.RecommendationStrategy;
@@ -74,6 +77,19 @@ public final class DiscoveryApplicationService implements DiscoveryUseCases {
                     "El perfil debe estar activo para recibir recomendaciones");
         }
         return toViews(recommendationStrategy.recommend(profile, publications.findPublished(), limit));
+    }
+
+    /**
+     * Recorre el Composite en preorden: las habilidades no son filtros de categoría y la profundidad
+     * la da el propio árbol.
+     */
+    @Override
+    public List<CategoryView> categories() {
+        return catalog.findRootCategories().stream()
+                .flatMap(CatalogItem::stream)
+                .filter(CatalogCategory.class::isInstance)
+                .map(category -> new CategoryView(category.name(), category.depth()))
+                .toList();
     }
 
     /** Arma las vistas leyendo los perfiles de todos los autores en una sola lectura. */

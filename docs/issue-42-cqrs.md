@@ -14,7 +14,7 @@ La separación es a nivel de contratos y adaptadores, no de procesos ni almacena
   agregados. Las invariantes y transiciones siguen delegadas a `Publication`; los cambios son
   transaccionales.
 - **Lectura del catálogo:** la búsqueda usa `PublicationQueryPort`. La lista de categorías ya no
-  sale de las publicaciones: la da el catálogo jerárquico (`CatalogUseCases`, #37), y filtrar por una
+  sale de las publicaciones: la da el catálogo jerárquico (`DiscoveryUseCases.categories()` sobre `CatalogRepository`, #37), y filtrar por una
   categoría incluye toda su rama. El adaptador JPA devuelve `PublicationView`, aplica filtros, orden,
   conteo y paginación en la base.
 - **Recomendaciones:** continúan usando agregados y `RecommendationStrategy`, ya que la estrategia

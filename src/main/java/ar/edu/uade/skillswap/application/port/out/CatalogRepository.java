@@ -7,7 +7,7 @@ import java.util.Optional;
 /**
  * Puerto de salida del catálogo jerárquico (#37). El catálogo es fijo: lo carga una migración y
  * Application solo lo consulta. Filtrar publicaciones por una rama no usa este puerto: lo resuelve
- * {@link PublicationRepository#searchPublished} en la consulta paginada.
+ * {@link PublicationQueryPort#searchPublished} en la consulta paginada.
  */
 public interface CatalogRepository {
     /** Árbol completo, con las categorías raíz y sus hijos en el orden de presentación. */

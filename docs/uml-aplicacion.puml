@@ -16,7 +16,6 @@ package "Application" {
     interface RatingUseCases
     interface NotificationUseCases
     interface PublicProfileUseCases
-    interface CatalogUseCases
   }
   package "Output ports" {
     interface ProfileRepository
@@ -66,7 +65,6 @@ Presentation --> WalletUseCases
 Presentation --> RatingUseCases
 Presentation --> NotificationUseCases
 Presentation --> PublicProfileUseCases
-Presentation --> CatalogUseCases
 
 ProfileUseCases <|.. Services
 PublicationUseCases <|.. Services
@@ -75,7 +73,6 @@ BookingUseCases <|.. Services
 WalletUseCases <|.. Services
 RatingUseCases <|.. Services
 NotificationUseCases <|.. Services
-CatalogUseCases <|.. Services
 Services --> ProfileRepository
 Services --> PublicationRepository
 Services --> BookingRepository

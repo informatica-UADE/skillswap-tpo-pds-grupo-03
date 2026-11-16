@@ -1,6 +1,5 @@
 package ar.edu.uade.skillswap.controllers;
 
-import ar.edu.uade.skillswap.application.port.in.CatalogUseCases;
 import ar.edu.uade.skillswap.application.port.in.DiscoveryUseCases;
 import ar.edu.uade.skillswap.application.port.out.CurrentUserProvider;
 import ar.edu.uade.skillswap.controllers.mapper.UiModelMapper;
@@ -16,15 +15,13 @@ public final class BusquedaUiController implements UiControllers.BusquedaControl
     static final int CANTIDAD_RECOMENDACIONES = 3;
 
     private final DiscoveryUseCases discovery;
-    private final CatalogUseCases catalog;
     private final CurrentUserProvider identity;
     private final ControllerExecutor operations;
     private final UiModelMapper mapper = new UiModelMapper();
 
-    public BusquedaUiController(DiscoveryUseCases discovery, CatalogUseCases catalog, CurrentUserProvider identity,
+    public BusquedaUiController(DiscoveryUseCases discovery, CurrentUserProvider identity,
                                 ControllerExecutor operations) {
         this.discovery = Objects.requireNonNull(discovery);
-        this.catalog = Objects.requireNonNull(catalog);
         this.identity = Objects.requireNonNull(identity);
         this.operations = Objects.requireNonNull(operations);
     }
@@ -47,6 +44,6 @@ public final class BusquedaUiController implements UiControllers.BusquedaControl
     /** Categorías del catálogo (#37), no las que aparecen en las publicaciones; no requiere el usuario activo. */
     @Override
     public List<Models.Categoria> categorias() {
-        return operations.execute(() -> mapper.toCategorias(catalog.viewCatalog()));
+        return operations.execute(() -> mapper.toCategorias(discovery.categories()));
     }
 }

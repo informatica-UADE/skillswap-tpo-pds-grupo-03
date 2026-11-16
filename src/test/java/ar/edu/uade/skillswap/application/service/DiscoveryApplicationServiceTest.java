@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import ar.edu.uade.skillswap.application.error.ApplicationErrorCode;
 import ar.edu.uade.skillswap.application.error.ApplicationException;
+import ar.edu.uade.skillswap.application.model.DiscoveryData.CategoryView;
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchOrder;
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchQuery;
 import ar.edu.uade.skillswap.application.model.PageResult;
@@ -16,6 +17,8 @@ import ar.edu.uade.skillswap.application.model.PublicationData.PublicationView;
 import ar.edu.uade.skillswap.application.port.out.ProfileRepository;
 import ar.edu.uade.skillswap.application.port.out.PublicationRepository;
 import ar.edu.uade.skillswap.application.port.out.PublicationQueryPort;
+import ar.edu.uade.skillswap.domain.catalog.CatalogCategory;
+import ar.edu.uade.skillswap.domain.catalog.CatalogSkill;
 import ar.edu.uade.skillswap.domain.model.ActorType;
 import ar.edu.uade.skillswap.domain.model.AvailabilitySlot;
 import ar.edu.uade.skillswap.domain.model.Modality;
@@ -153,6 +156,20 @@ class DiscoveryApplicationServiceTest {
 
         assertEquals(ApplicationErrorCode.VALIDATION, error.code());
         assertNull(publications.receivedQuery);
+    }
+
+    @Test
+    void lasCategoriasSonLasDelCatalogoEnPreordenConSuProfundidadYSinHabilidades() {
+        var backend = new CatalogCategory("backend", "Backend").add(new CatalogSkill("java", "Java"));
+        var technology = new CatalogCategory("tecnologia", "Tecnología").add(backend)
+                .add(new CatalogSkill("carrera", "Carrera"));
+        var publications = new StubPublications(List.of(), emptyPage());
+        var service = new DiscoveryApplicationService(publications, publications, new StubProfiles(List.of()),
+                new FixedCatalog(technology, new CatalogCategory("diseno", "Diseño")), () -> null,
+                strategyReturningFirst());
+
+        assertEquals(List.of(new CategoryView("Tecnología", 0), new CategoryView("Backend", 1),
+                new CategoryView("Diseño", 0)), service.categories());
     }
 
     private static DiscoveryApplicationService service(StubPublications publications, ProfileRepository profiles) {

@@ -1,5 +1,6 @@
 package ar.edu.uade.skillswap.controllers;
 
+import ar.edu.uade.skillswap.application.model.DiscoveryData.CategoryView;
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchQuery;
 import ar.edu.uade.skillswap.application.model.PageResult;
 import ar.edu.uade.skillswap.application.model.ProfileData.AvailabilityView;
@@ -20,6 +21,8 @@ final class DiscoverySpy implements DiscoveryUseCases {
     int calls;
     PageResult<PublicationView> page = new PageResult<>(List.of(), 0, 20, 0);
     List<PublicationView> recommendations = List.of();
+    List<CategoryView> categories = List.of();
+    RuntimeException categoriesFailure;
 
     @Override public PageResult<PublicationView> search(SearchQuery query) {
         calls++;
@@ -31,6 +34,12 @@ final class DiscoverySpy implements DiscoveryUseCases {
         calls++;
         this.limit = limit;
         return recommendations;
+    }
+
+    @Override public List<CategoryView> categories() {
+        calls++;
+        if (categoriesFailure != null) throw categoriesFailure;
+        return categories;
     }
 
     static PublicationView view(String id, String authorName, double reputation) {

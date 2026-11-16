@@ -39,11 +39,12 @@ El problema real es jerárquico: una categoría contiene subcategorías y habili
 ```
 SkillSwapView ──▶ BusquedaController / PublicacionController (Presentation, Models.Categoria)
                         │
-          ┌─────────────┼──────────────────────────────┐
-          ▼             ▼                              ▼
-  CatalogUseCases   DiscoveryUseCases           PublicationCommandUseCases (Application, puertos de entrada)
-          │             │  valida la categoría         │ valida y normaliza la categoría
-          ▼             ▼                              ▼
+                        ├──────────────────────────────┐
+                        ▼                              ▼
+                 DiscoveryUseCases              PublicationCommandUseCases (Application, puertos de entrada)
+                        │ lista las categorías          │ valida y normaliza la categoría
+                        │ y valida la del filtro        │
+                        ▼                              ▼
   CatalogRepository ◀───┴──────────────────────────────┘                  (puerto de salida)
           │                     PublicationQueryPort.searchPublished   ─▶ filtra la rama en SQL
           ▼
@@ -54,25 +55,24 @@ SkillSwapView ──▶ BusquedaController / PublicacionController (Presentation
 
 | Caso de uso | Service | Responsabilidad | No hace |
 | --- | --- | --- | --- |
-| Consultar el catálogo | `CatalogApplicationService.viewCatalog()` | Lee el árbol en una transacción de lectura y lo convierte en `CatalogNodeView`. | No arma la jerarquía (la arma el repositorio con las reglas del dominio) ni la aplana para la pantalla (eso es de Presentation). |
+| Listar las categorías para filtrar y publicar | `DiscoveryApplicationService.categories()` | Lee el árbol y lo recorre con `stream()` del Composite: devuelve cada categoría en preorden con su `depth()`, sin las habilidades. | No arma la jerarquía (la arma el repositorio con las reglas del dominio) ni decide cómo se muestra la sangría (eso es de Presentation). |
 | Buscar publicaciones por categoría | `DiscoveryApplicationService.search()` | Rechaza una categoría que no está en el catálogo y delega filtros, orden y paginación. | No recorre el árbol ni filtra en memoria: la rama la resuelve la consulta. |
 | Crear y editar un borrador | `PublicationApplicationService.createDraft/editDraft()` | Valida que la categoría exista y la pasa al agregado con el nombre del catálogo, en la misma transacción que guarda. | No decide si una publicación puede publicarse sin categoría: eso es del agregado `Publication`. |
 
-`DiscoveryUseCases.categories()` se eliminó: la lista sale del catálogo, no de las publicaciones.
+`DiscoveryUseCases.categories()` sigue existiendo, pero ahora devuelve las categorías del catálogo con su profundidad, no las que aparecen en las publicaciones. No se creó un caso de uso aparte para el catálogo: listar categorías para filtrar es parte de descubrir publicaciones, y `DiscoveryApplicationService` ya depende de `CatalogRepository` para validar el filtro.
 
 ## Rol de cada componente
 
 | Componente | Clases | Rol en este problema |
 | --- | --- | --- |
 | Entidades de dominio | `CatalogItem`, `CatalogCategory`, `CatalogSkill` | Representan el árbol y protegen sus invariantes (ver la tabla siguiente). |
-| DTO de Application | `CatalogData.CatalogNodeView`, `CatalogItemKind` | Árbol de solo lectura para Presentation. No contiene entidades. |
+| DTO de Application | `DiscoveryData.CategoryView(name, depth)` | Una categoría con su profundidad. No contiene entidades ni las habilidades, que la pantalla no usa. |
 | DTO de Presentation | `Models.Categoria(nombre, nivel)` | Una opción de categoría con su nivel; `toString()` agrega la sangría. `Categoria.TODAS` es la opción "sin filtro" de Explorar. |
-| Puerto de entrada | `CatalogUseCases` | Contrato del caso de uso "consultar el catálogo". |
-| Service | `CatalogApplicationService` | Orquesta la lectura (ver la tabla anterior). |
-| Mapper de Application | `CatalogApplicationMapper` | Convierte el Composite en vistas con la misma recursión para hojas y ramas. |
+| Puerto de entrada | `DiscoveryUseCases.categories()` | Contrato de la consulta de categorías (ver la tabla anterior). |
+| Service | `DiscoveryApplicationService` | Recorre el Composite y arma las vistas. |
 | Puerto de salida | `CatalogRepository` | `findRootCategories()` y `findCategoryName(nombre)`. Definido en Application, la capa que lo necesita. |
 | Infrastructure | `JpaCatalogRepository`, `CatalogMapper`, `CatalogCategoryEntity`, `CatalogSkillEntity`, `InMemoryCatalogRepository`, `DemoCatalog`, migración V6 | Persisten y reconstruyen el árbol; el filtro por rama vive en el lado de consulta (#42): `JpaPublicationQueryAdapter` e `InMemoryPublicationRepository`. |
-| Controller | `BusquedaUiController.categorias()` | Llama al caso de uso y aplana el árbol en preorden con `UiModelMapper.toCategorias`; descarta las habilidades. No exige usuario activo porque no modifica información. |
+| Controller | `BusquedaUiController.categorias()` | Llama al caso de uso y convierte cada `CategoryView` en `Models.Categoria` con `UiModelMapper.toCategorias`. No exige usuario activo porque no modifica información. |
 
 ### Dónde vive cada regla
 
@@ -117,14 +117,14 @@ La redundancia entre `parent_id` y `path` la controla `CatalogMapper`: si no coi
 - **Traducción en Presentation:** `UiErrorMapper` convierte `VALIDATION` en `VALIDACION` y la `IllegalStateException` en `ESTADO`.
 - **Producción con HTTP:** el TP no expone una API REST. Si la expusiera, el mapeo sería `VALIDATION` → 400 y el catálogo guardado inválido → 500, porque es un error del servidor y no un conflicto de estado del cliente.
 - **Transacciones:**
-  - `viewCatalog()` hace sus dos consultas en una transacción de lectura;
+  - `categories()` lee el árbol sin transacción explícita: el repositorio hace sus dos consultas con el mismo `EntityManager`, y el catálogo solo cambia por migración;
   - crear y editar validan la categoría dentro de la misma transacción que guarda la publicación;
   - la búsqueda valida la categoría y luego consulta, sin transacción explícita. Es aceptable porque el catálogo solo cambia por migración.
 
 ## Interfaces y lo que no se agregó
 
 - **`CatalogRepository`:** necesidad real; Application no conoce JPA y hay dos implementaciones (memoria y JPA).
-- **`CatalogUseCases`:** Presentation depende del contrato, igual que con el resto de los casos de uso.
+- **Un caso de uso, un service y un DTO propios del catálogo:** no se agregaron. Solo servirían para listar categorías, que ya es parte de `DiscoveryUseCases`, y obligarían a mandar a la pantalla un árbol con habilidades que no usa.
 - **Casos de uso de alta y edición del catálogo:** no se agregaron porque la consigna no define quién administra el catálogo; agregarlos obligaba a inventar un rol y sus permisos.
 - **Un repositorio por nodo, un `SkillRepository` o un Visitor:** no resuelven nada del problema.
 - **Caché del catálogo:** no se agregó; son dos consultas sobre tablas chicas.
@@ -135,14 +135,13 @@ La redundancia entre `parent_id` y `path` la controla `CatalogMapper`: si no coi
 | Prueba | Tipo | Cubre |
 | --- | --- | --- |
 | `CatalogCompositeTest` | Unitaria de Domain | Recorrido igual para hoja y rama; habilidades y categorías de un subárbol; padre y profundidad; búsqueda sin mayúsculas ni acentos; hijos inmodificables desde afuera; ciclos, doble padre, hermanos repetidos, categoría repetida en otra rama; datos obligatorios. |
-| `CatalogApplicationServiceTest` | Unitaria de Application con un doble del puerto | El árbol se devuelve como vistas anidadas y en orden, en una transacción. |
-| `PublicationApplicationServiceTest`, `DiscoveryApplicationServiceTest` | Unitarias de Application con dobles | La categoría se guarda con el nombre del catálogo; una categoría inexistente es `VALIDATION` sin guardar ni consultar publicaciones. |
+| `PublicationApplicationServiceTest`, `DiscoveryApplicationServiceTest` | Unitarias de Application con dobles | La categoría se guarda con el nombre del catálogo; una categoría inexistente es `VALIDATION` sin guardar ni consultar publicaciones; las categorías se listan en preorden con su profundidad y sin habilidades. |
 | `CatalogRepositoryContract` | Contrato del puerto de salida | Árbol completo con orden y niveles; cada lectura es un árbol nuevo; categorías de cualquier nivel por nombre; una habilidad no es una categoría. |
 | `InMemoryCatalogRepositoryTest`, `JpaCatalogRepositoryTest` | Contrato en memoria y JPA sobre H2 | Que ambos almacenamientos se comporten igual. |
 | `CatalogMapperTest` | Unitaria de Infrastructure | Filas inválidas: padre o categoría inexistente, ciclo, ruta desactualizada, nombres repetidos. |
 | `PublicationSearchContract` | Contrato de la búsqueda (memoria y MySQL) | Filtro por rama a cualquier profundidad, por etiqueta de una habilidad de la rama, sin incluir padres ni hermanas, con paginación y total en la consulta, y categoría inexistente sin resultados. |
 | `MySqlCatalogRepositoryTest` | Integración con MySQL real y Flyway | El árbol de V6 coincide con `DemoCatalog`; comparación sin acentos; la FK rechaza una categoría inexistente y acepta `NULL`; la migración conserva categorías anteriores y deja en `NULL` los borradores vacíos. |
-| `BusquedaUiControllerTest` | Unitaria de Presentation | Aplana el árbol en preorden con su nivel y sin habilidades; no exige usuario activo; traduce errores. |
+| `BusquedaUiControllerTest` | Unitaria de Presentation | Convierte las categorías con su nivel y la sangría; no exige usuario activo; traduce errores. |
 | `SkillSwapUiControllersTest` | Integración de Presentation con Application | Crear en una subcategoría y encontrarla al buscar por sus ancestros; categoría fuera del catálogo como `VALIDACION` al buscar y al crear. |
 | `SkillSwapViewTest` | Pantalla Swing | Inicio muestra solo el primer nivel; el combo de Explorar muestra la sangría; filtrar por "Diseño UX" encuentra la publicación etiquetada con sus habilidades. |
 
@@ -159,6 +158,6 @@ La redundancia entre `parent_id` y `path` la controla `CatalogMapper`: si no coi
 
 | Caso de uso | Puerto | Entrada | Salida | Errores | Efectos | Transacción |
 | --- | --- | --- | --- | --- | --- | --- |
-| Consultar el catálogo | `CatalogUseCases.viewCatalog()` | — | `List<CatalogNodeView>`: raíces con subcategorías y habilidades en orden de presentación | Catálogo guardado inválido (`IllegalStateException`) | Ninguno | Una de lectura (dos consultas) |
+| Listar categorías | `DiscoveryUseCases.categories()` | — | `List<CategoryView>`: categorías en preorden con su profundidad | Catálogo guardado inválido (`IllegalStateException`) | Ninguno | Sin transacción explícita (dos consultas con el mismo `EntityManager`) |
 | Buscar publicaciones | `DiscoveryUseCases.search(SearchQuery)` | Criterios; la categoría, si viene, debe existir | Página de publicaciones de la rama | `VALIDATION` si la categoría no existe | Ninguno | Lecturas sin transacción explícita |
-| Crear / editar borrador | `PublicationUseCases.createDraft` / `editDraft` | Comando con la categoría | `PublicationView` con el nombre de la categoría del catálogo | `VALIDATION` si la categoría no existe; los errores de antes | Guarda la publicación | Una, con la validación incluida |
+| Crear / editar borrador | `PublicationCommandUseCases.createDraft` / `editDraft` | Comando con la categoría | `PublicationView` con el nombre de la categoría del catálogo | `VALIDATION` si la categoría no existe; los errores de antes | Guarda la publicación | Una, con la validación incluida |

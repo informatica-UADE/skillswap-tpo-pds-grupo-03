@@ -1,11 +1,11 @@
 package ar.edu.uade.skillswap.infrastructure.persistence.repository;
 
+import static ar.edu.uade.skillswap.application.port.out.CatalogRepositoryContract.describe;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import ar.edu.uade.skillswap.application.mapper.CatalogApplicationMapper;
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchQuery;
 import ar.edu.uade.skillswap.domain.catalog.CatalogCategory;
 import ar.edu.uade.skillswap.infrastructure.DemoCatalog;
@@ -76,7 +76,7 @@ class MySqlCatalogRepositoryTest {
     void laMigracionCargaElMismoArbolQueElCatalogoDeDemostracion() {
         var catalog = new JpaCatalogRepository(transactions("latest"));
 
-        assertEquals(views(DemoCatalog.tree()), views(catalog.findRootCategories()));
+        assertEquals(describe(DemoCatalog.tree()), describe(catalog.findRootCategories()));
         assertEquals(Optional.of("Tecnología"), catalog.findCategoryName("tecnologia"));
         assertEquals(Optional.of("Diseño UX"), catalog.findCategoryName("DISENO ux"));
     }
@@ -118,7 +118,7 @@ class MySqlCatalogRepositoryTest {
         CatalogCategory preserved = roots.get(roots.size() - 1);
         assertEquals("Fotografía analógica", preserved.name());
         assertTrue(preserved.id().startsWith("anterior-"));
-        assertEquals(views(DemoCatalog.tree()), views(roots.subList(0, roots.size() - 1)));
+        assertEquals(describe(DemoCatalog.tree()), describe(roots.subList(0, roots.size() - 1)));
         assertEquals("", publications.findById("vacia").orElseThrow().category());
         assertEquals(List.of("anterior"), publicationQueries.searchPublished(new SearchQuery(null,
                 "Fotografía analógica", null, null, null, null, null, null, 0, 10)).items().stream()
@@ -153,10 +153,6 @@ class MySqlCatalogRepositoryTest {
                 + "modality,duration_minutes,capacity,base_price,status,created_at) VALUES ('" + id
                 + "','ana','MENTORSHIP','Título " + id + "','Descripción','" + category
                 + "','REMOTE',60,1,100,'PUBLISHED',NOW())";
-    }
-
-    private static List<?> views(List<CatalogCategory> roots) {
-        return roots.stream().map(CatalogApplicationMapper::toView).toList();
     }
 
     private static String requireEnvironment(String name) {

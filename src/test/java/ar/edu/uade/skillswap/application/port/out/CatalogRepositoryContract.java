@@ -3,9 +3,8 @@ package ar.edu.uade.skillswap.application.port.out;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import ar.edu.uade.skillswap.application.mapper.CatalogApplicationMapper;
-import ar.edu.uade.skillswap.application.model.CatalogData.CatalogNodeView;
 import ar.edu.uade.skillswap.domain.catalog.CatalogCategory;
+import ar.edu.uade.skillswap.domain.catalog.CatalogItem;
 import ar.edu.uade.skillswap.domain.catalog.CatalogSkill;
 import java.util.List;
 import java.util.Optional;
@@ -30,7 +29,7 @@ public abstract class CatalogRepositoryContract {
 
     @Test
     void reconstruyeElArbolCompletoConSuOrdenYSusNivelesAnidados() {
-        assertEquals(views(tree()), views(repository.findRootCategories()));
+        assertEquals(describe(tree()), describe(repository.findRootCategories()));
     }
 
     @Test
@@ -38,7 +37,7 @@ public abstract class CatalogRepositoryContract {
         CatalogCategory read = repository.findRootCategories().get(0);
         read.add(new CatalogCategory("agregada", "Agregada afuera"));
 
-        assertEquals(views(tree()), views(repository.findRootCategories()));
+        assertEquals(describe(tree()), describe(repository.findRootCategories()));
     }
 
     @Test
@@ -67,7 +66,14 @@ public abstract class CatalogRepositoryContract {
         return List.of(technology, design, new CatalogCategory("negocios", "Negocios"));
     }
 
-    private static List<CatalogNodeView> views(List<CatalogCategory> roots) {
-        return roots.stream().map(CatalogApplicationMapper::toView).toList();
+    /**
+     * El árbol como texto, en preorden: una línea por elemento con su sangría, tipo, id y nombre.
+     * Las entidades del Composite no definen igualdad, así que se comparan así.
+     */
+    public static List<String> describe(List<CatalogCategory> roots) {
+        return roots.stream().flatMap(CatalogItem::stream)
+                .map(item -> "  ".repeat(item.depth()) + (item instanceof CatalogSkill ? "habilidad " : "categoría ")
+                        + item.id() + " " + item.name())
+                .toList();
     }
 }
