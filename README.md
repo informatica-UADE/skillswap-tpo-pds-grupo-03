@@ -87,7 +87,7 @@ src/main/java/ar/edu/uade/skillswap/
 └── ui/           # Interfaz Java Swing
 ```
 
-Esta rama incorpora adaptadores JPA y migraciones Flyway V1–V5, incluidos los tipos de actor y publicación de #75. La suite de integración utiliza la unidad JPA y el punto de composición de la aplicación contra MySQL real; los pasos para ejecutarla, sus escenarios y límites están en [Pruebas de MySQL](docs/pruebas-mysql.md). Se habilita con `mvn -Pmysql-it clean test` y requiere las variables de conexión de pruebas allí documentadas. Sin ese perfil, las pruebas de MySQL se omiten explícitamente.
+Esta rama incorpora adaptadores JPA y migraciones Flyway V1–V6, incluidos los tipos de actor y publicación de #75 y el catálogo jerárquico de categorías de #37. La suite de integración utiliza la unidad JPA y el punto de composición de la aplicación contra MySQL real; los pasos para ejecutarla, sus escenarios y límites están en [Pruebas de MySQL](docs/pruebas-mysql.md). Se habilita con `mvn -Pmysql-it clean test` y requiere las variables de conexión de pruebas allí documentadas. Sin ese perfil, las pruebas de MySQL se omiten explícitamente.
 
 
 ## Integración y validación (#33)

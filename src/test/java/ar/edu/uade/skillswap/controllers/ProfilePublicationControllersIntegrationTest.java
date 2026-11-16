@@ -6,7 +6,9 @@ import ar.edu.uade.skillswap.application.service.ProfileApplicationService;
 import ar.edu.uade.skillswap.application.service.PublicProfileFacade;
 import ar.edu.uade.skillswap.application.service.PublicationApplicationService;
 import ar.edu.uade.skillswap.controllers.error.PresentationException;
+import ar.edu.uade.skillswap.infrastructure.DemoCatalog;
 import ar.edu.uade.skillswap.infrastructure.InMemoryBookingRepository;
+import ar.edu.uade.skillswap.infrastructure.InMemoryCatalogRepository;
 import ar.edu.uade.skillswap.infrastructure.InMemoryProfileRepository;
 import ar.edu.uade.skillswap.infrastructure.InMemoryPublicationRepository;
 import ar.edu.uade.skillswap.infrastructure.InMemoryRatingRepository;
@@ -26,7 +28,9 @@ import static org.junit.jupiter.api.Assertions.*;
 class ProfilePublicationControllersIntegrationTest {
     private String actor = "u1";
     private final InMemoryProfileRepository profileRepository = new InMemoryProfileRepository();
-    private final InMemoryPublicationRepository publicationRepository = new InMemoryPublicationRepository(profileRepository);
+    private final InMemoryCatalogRepository catalogRepository = new InMemoryCatalogRepository(DemoCatalog.tree());
+    private final InMemoryPublicationRepository publicationRepository =
+            new InMemoryPublicationRepository(profileRepository, catalogRepository);
     private final SynchronousTransactionManager transactions = new SynchronousTransactionManager();
     private final InMemoryBookingRepository bookingRepository = new InMemoryBookingRepository();
     private final PerfilUiController profiles = new PerfilUiController(new ProfileApplicationService(
@@ -34,7 +38,7 @@ class ProfilePublicationControllersIntegrationTest {
             new PublicProfileFacade(profileRepository, publicationRepository, bookingRepository,
                     new InMemoryRatingRepository(), transactions), () -> actor, new UiOperationExecutor());
     private final PublicationApplicationService publicationService = new PublicationApplicationService(
-            publicationRepository, profileRepository, () -> actor, transactions);
+            publicationRepository, profileRepository, catalogRepository, () -> actor, transactions);
     private final PublicacionUiController publications = new PublicacionUiController(
             publicationService, publicationService, () -> actor, new UiOperationExecutor());
 
@@ -57,7 +61,7 @@ class ProfilePublicationControllersIntegrationTest {
         assertCode(Models.CodigoError.PERMISOS, () -> publications.crearBorrador("u1", draft()));
         assertEquals(1, publications.listarPropias("u1").size());
         var catalog = new DiscoveryApplicationService(publicationRepository, publicationRepository,
-                profileRepository, () -> actor, new RecentPopularityStrategy())
+                profileRepository, catalogRepository, () -> actor, new RecentPopularityStrategy())
                 .search(new SearchQuery("", null, null, null, null, null, null, null, 0, 20));
         assertTrue(catalog.items().stream().anyMatch(item -> item.id().equals(challenge.id())));
     }

@@ -12,7 +12,8 @@ class InMemoryPublicationSearchTest extends PublicationSearchContract {
     protected PublicationQueryPort createRepository(List<Publication> publications, List<Profile> profiles) {
         var profileRepository = new InMemoryProfileRepository();
         profiles.forEach(profileRepository::save);
-        var publicationRepository = new InMemoryPublicationRepository(profileRepository);
+        var publicationRepository = new InMemoryPublicationRepository(profileRepository,
+                new InMemoryCatalogRepository(DemoCatalog.tree()));
         publications.forEach(publicationRepository::save);
         return publicationRepository;
     }

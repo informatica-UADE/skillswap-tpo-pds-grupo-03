@@ -14,7 +14,8 @@ class InMemoryPublicProfileQueriesTest extends PublicProfileQueriesContract {
                                               List<Booking> bookings, List<Rating> ratings) {
         var profileRepository = new InMemoryProfileRepository();
         profiles.forEach(profileRepository::save);
-        var publicationRepository = new InMemoryPublicationRepository(profileRepository);
+        var publicationRepository = new InMemoryPublicationRepository(profileRepository,
+                new InMemoryCatalogRepository(DemoCatalog.tree()));
         publications.forEach(publicationRepository::save);
         var bookingRepository = new InMemoryBookingRepository();
         bookings.forEach(bookingRepository::save);

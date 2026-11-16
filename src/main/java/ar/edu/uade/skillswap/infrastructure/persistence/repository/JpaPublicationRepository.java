@@ -150,7 +150,7 @@ public final class JpaPublicationRepository extends JpaRepositorySupport
         managed.setType(publication.type().name());
         managed.setTitle(publication.title());
         managed.setDescription(publication.description());
-        managed.setCategory(publication.category());
+        managed.setCategory(PublicationMapper.categoryColumn(publication.category()));
         managed.setModality(publication.modality().name());
         managed.setDurationMinutes(publication.durationMinutes());
         managed.setCapacity(publication.capacity());

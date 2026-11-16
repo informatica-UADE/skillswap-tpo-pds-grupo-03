@@ -1,6 +1,7 @@
 package ar.edu.uade.skillswap.infrastructure;
 
 import ar.edu.uade.skillswap.application.port.out.BookingRepository;
+import ar.edu.uade.skillswap.application.port.out.CatalogRepository;
 import ar.edu.uade.skillswap.application.model.NotificationMessage;
 import ar.edu.uade.skillswap.application.port.out.NotificationRepository;
 import ar.edu.uade.skillswap.domain.model.ActorType;
@@ -9,6 +10,7 @@ import ar.edu.uade.skillswap.infrastructure.config.FlywayConfig;
 import ar.edu.uade.skillswap.infrastructure.config.HibernateConfig;
 import ar.edu.uade.skillswap.infrastructure.persistence.JpaTransactionManager;
 import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaBookingRepository;
+import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaCatalogRepository;
 import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaNotificationRepository;
 import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaProfileRepository;
 import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaPublicationRepository;
@@ -57,8 +59,6 @@ import java.util.UUID;
 
 /** Composition root shared by the in-memory demo and the JPA execution mode. */
 public final class SkillSwapApplicationWiring implements AutoCloseable {
-    private record InMemoryPublicationAdapters(InMemoryPublicationRepository repository) {}
-
     private final BookingRepository bookings;
     private final WalletRepository wallets;
     private final NotificationRepository notifications;
@@ -96,19 +96,25 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
     public SkillSwapApplicationWiring(MockIdentityClient identityClient,
                                       MockEmailClient emailClient, MockPushClient pushClient,
                                       ProfileRepository profiles) {
-        this(identityClient, emailClient, pushClient, profiles, inMemoryPublicationAdapters(profiles),
-                new InMemoryBookingRepository(),
+        this(identityClient, emailClient, pushClient, profiles, new InMemoryCatalogRepository(DemoCatalog.tree()));
+    }
+
+    private SkillSwapApplicationWiring(MockIdentityClient identityClient,
+                                       MockEmailClient emailClient, MockPushClient pushClient,
+                                       ProfileRepository profiles, InMemoryCatalogRepository catalog) {
+        this(identityClient, emailClient, pushClient, profiles, catalog,
+                new InMemoryPublicationRepository(profiles, catalog), new InMemoryBookingRepository(),
                 new InMemoryWalletRepository(), new InMemoryRatingRepository(),
                 new InMemoryNotificationRepository(), new SynchronousTransactionManager(), () -> {});
     }
 
+    /** En memoria, el mismo repositorio atiende la escritura de agregados y la consulta del catálogo. */
     private SkillSwapApplicationWiring(MockIdentityClient identityClient,
             MockEmailClient emailClient, MockPushClient pushClient, ProfileRepository profiles,
-            InMemoryPublicationAdapters publicationAdapters, BookingRepository bookings,
+            CatalogRepository catalog, InMemoryPublicationRepository publications, BookingRepository bookings,
             WalletRepository wallets, RatingRepository ratings, NotificationRepository notifications,
             TransactionManager transactions, Runnable closeResources) {
-        this(identityClient, emailClient, pushClient, profiles,
-                publicationAdapters.repository(), publicationAdapters.repository(),
+        this(identityClient, emailClient, pushClient, profiles, catalog, publications, publications,
                 bookings, wallets, ratings, notifications, transactions, closeResources);
     }
 
@@ -126,8 +132,8 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
         try {
             var tx = new JpaTransactionManager(factory);
             return new SkillSwapApplicationWiring(identity, email, push,
-                    new JpaProfileRepository(tx), new JpaPublicationRepository(tx),
-                    new JpaPublicationQueryAdapter(tx),
+                    new JpaProfileRepository(tx), new JpaCatalogRepository(tx),
+                    new JpaPublicationRepository(tx), new JpaPublicationQueryAdapter(tx),
                     new JpaBookingRepository(tx), new JpaWalletRepository(tx),
                     new JpaRatingRepository(tx), new JpaNotificationRepository(tx), tx,
                     () -> { if (factory.isOpen()) factory.close(); });
@@ -139,11 +145,12 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
 
     private SkillSwapApplicationWiring(MockIdentityClient identityClient,
             MockEmailClient emailClient, MockPushClient pushClient, ProfileRepository profiles,
-            PublicationRepository publications, PublicationQueryPort publicationQueries,
+            CatalogRepository catalog, PublicationRepository publications, PublicationQueryPort publicationQueries,
             BookingRepository bookings, WalletRepository wallets,
             RatingRepository ratings, NotificationRepository notifications,
             TransactionManager transactions, Runnable closeResources) {
         this.profiles = Objects.requireNonNull(profiles);
+        Objects.requireNonNull(catalog);
         this.publications = Objects.requireNonNull(publications);
         this.publicationQueries = Objects.requireNonNull(publicationQueries);
         this.bookings = Objects.requireNonNull(bookings);
@@ -158,9 +165,10 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
         ratingNotifications = new RatingNotificationEventPublisher(profiles, factory);
 
         profileService = new ProfileApplicationService(profiles, bookings, currentUser, transactions);
-        publicationService = new PublicationApplicationService(publications, profiles, currentUser, transactions);
+        publicationService = new PublicationApplicationService(publications, profiles, catalog, currentUser,
+                transactions);
         discoveryService = new DiscoveryApplicationService(
-                publications, publicationQueries, profiles, currentUser, recommendationStrategy);
+                publications, publicationQueries, profiles, catalog, currentUser, recommendationStrategy);
         bookingService = new BookingApplicationService(bookings, publications, profiles, wallets,
                 currentUser, transactions, refundPolicy, events);
         ratingService = new RatingApplicationService(bookings, ratings, profiles, currentUser, transactions, events);
@@ -170,10 +178,6 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
 
         subscribeNotifications();
         transactions.required(() -> { seedDemoData(); return null; });
-    }
-
-    private static InMemoryPublicationAdapters inMemoryPublicationAdapters(ProfileRepository profiles) {
-        return new InMemoryPublicationAdapters(new InMemoryPublicationRepository(profiles));
     }
 
     @Override

@@ -42,4 +42,7 @@ public final class DiscoveryData {
             }
         }
     }
+
+    /** Categoría del catálogo para los filtros de búsqueda, con su profundidad en el árbol (cero = raíz). */
+    public record CategoryView(String name, int depth) {}
 }

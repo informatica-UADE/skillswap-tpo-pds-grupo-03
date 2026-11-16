@@ -2,9 +2,11 @@ package ar.edu.uade.skillswap.ui;
 
 import ar.edu.uade.skillswap.infrastructure.SkillSwapApplicationWiring;
 import ar.edu.uade.skillswap.infrastructure.SkillSwapUiControllers;
+import ar.edu.uade.skillswap.model.Models.Categoria;
 import org.junit.jupiter.api.Test;
 
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
@@ -80,6 +82,38 @@ class SkillSwapViewTest {
                 assertTrue(hasLabel(view, "Publicaciones activas · Página 1 de 1"));
                 click(view, "← Volver");
                 assertTrue(hasLabel(view, "Detalle"));
+            });
+        }
+    }
+
+    @Test
+    void explorarMuestraElCatalogoConSangriaYFiltraPorUnaRamaIncluyendoSusHabilidades() throws Exception {
+        try (var wiring = new SkillSwapApplicationWiring()) {
+            var ui = SkillSwapUiControllers.from(wiring);
+            SwingUtilities.invokeAndWait(() -> {
+                var view = new SkillSwapView(ui);
+                List<String> homeCategories = buttons(view).stream().map(JButton::getText)
+                        .filter(text -> List.of("Tecnología", "Desarrollo de software", "Diseño", "Diseño UX",
+                                "Creatividad", "Negocios", "Productividad").contains(text)).toList();
+                assertEquals(List.of("Tecnología", "Diseño", "Creatividad", "Negocios", "Productividad"),
+                        homeCategories);
+
+                click(view, "⌕  Explorar");
+                JComboBox<?> categories = descendants(view).stream().filter(JComboBox.class::isInstance)
+                        .map(JComboBox.class::cast).filter(combo -> combo.getItemAt(0) == Categoria.TODAS)
+                        .findFirst().orElseThrow();
+                List<String> shown = new ArrayList<>();
+                for (int index = 0; index < categories.getItemCount(); index++) {
+                    shown.add(categories.getItemAt(index).toString());
+                }
+                assertEquals(List.of("Todas", "Tecnología", "    Desarrollo de software",
+                        "        Arquitectura de software", "    Carrera en tecnología", "Diseño", "    Diseño UX",
+                        "Creatividad", "Negocios", "Productividad"), shown);
+
+                categories.setSelectedIndex(shown.indexOf("    Diseño UX"));
+                click(view, "Buscar");
+                assertTrue(hasLabel(view, "1 resultados · Página 1 de 1"));
+                assertTrue(hasLabel(view, "<html><div style='width:210px'>Diseño de portfolio para perfiles digitales</div></html>"));
             });
         }
     }

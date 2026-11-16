@@ -13,8 +13,9 @@ La separación es a nivel de contratos y adaptadores, no de procesos ni almacena
 - **Escritura:** los casos de uso de publicación usan `PublicationRepository` para cargar y guardar
   agregados. Las invariantes y transiciones siguen delegadas a `Publication`; los cambios son
   transaccionales.
-- **Lectura del catálogo:** la búsqueda y categorías usan
-  `PublicationQueryPort`. El adaptador JPA devuelve `PublicationView`, aplica filtros, orden,
+- **Lectura del catálogo:** la búsqueda usa `PublicationQueryPort`. La lista de categorías ya no
+  sale de las publicaciones: la da el catálogo jerárquico (`DiscoveryUseCases.categories()` sobre `CatalogRepository`, #37), y filtrar por una
+  categoría incluye toda su rama. El adaptador JPA devuelve `PublicationView`, aplica filtros, orden,
   conteo y paginación en la base.
 - **Recomendaciones:** continúan usando agregados y `RecommendationStrategy`, ya que la estrategia
   de dominio opera sobre `Profile` y `Publication`. No se incorporó una segunda proyección de
@@ -34,7 +35,7 @@ La separación es a nivel de contratos y adaptadores, no de procesos ni almacena
 | `application.port.in.PublicationCommandUseCases` | Contratos de creación, edición y cambio de estado. |
 | `application.port.in.PublicationQueryUseCases` | Consultas de publicaciones propias y tipos permitidos. |
 | `application.port.out.PublicationRepository` | Persistencia/carga de agregados y paginación existente de publicaciones del perfil público; no contiene la búsqueda del catálogo. |
-| `application.port.out.PublicationQueryPort` | Búsqueda paginada y categorías; las publicaciones proyectadas incluyen los datos públicos de su autor. |
+| `application.port.out.PublicationQueryPort` | Búsqueda paginada (una categoría incluye su rama del catálogo, #37); las publicaciones proyectadas incluyen los datos públicos de su autor. |
 | `infrastructure.persistence.repository.JpaPublicationQueryAdapter` | Proyección JPA paginada para el catálogo. |
 | `infrastructure.InMemoryPublicationRepository` | Implementación en memoria de los puertos de agregado y consulta. |
 

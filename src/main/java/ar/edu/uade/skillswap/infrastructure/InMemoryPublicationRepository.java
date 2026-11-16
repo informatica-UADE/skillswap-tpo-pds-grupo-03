@@ -7,6 +7,7 @@ import ar.edu.uade.skillswap.application.mapper.PublicationApplicationMapper;
 import ar.edu.uade.skillswap.application.port.out.ProfileRepository;
 import ar.edu.uade.skillswap.application.port.out.PublicationQueryPort;
 import ar.edu.uade.skillswap.application.port.out.PublicationRepository;
+import ar.edu.uade.skillswap.domain.catalog.CatalogCategory;
 import ar.edu.uade.skillswap.domain.model.AvailabilitySlot;
 import ar.edu.uade.skillswap.domain.model.Profile;
 import ar.edu.uade.skillswap.domain.model.Publication;
@@ -19,6 +20,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -26,14 +28,17 @@ import java.util.stream.Collectors;
 /**
  * In-memory publication repository used as infrastructure seed for the application layer.
  * The search reads author profiles through the {@link ProfileRepository} port: it is the in-memory
- * equivalent of the join with the profiles table that the JPA query performs.
+ * equivalent of the join with the profiles table that the JPA query performs. The category filter
+ * covers the whole branch of the catalog (#37), like the JPA query over the materialized path.
  */
 public final class InMemoryPublicationRepository implements PublicationRepository, PublicationQueryPort {
     private final Map<String, Publication> publications = new HashMap<>();
     private final ProfileRepository profiles;
+    private final InMemoryCatalogRepository catalog;
 
-    public InMemoryPublicationRepository(ProfileRepository profiles) {
+    public InMemoryPublicationRepository(ProfileRepository profiles, InMemoryCatalogRepository catalog) {
         this.profiles = Objects.requireNonNull(profiles, "Falta el repositorio de perfiles");
+        this.catalog = Objects.requireNonNull(catalog, "Falta el catálogo");
     }
 
     @Override
@@ -86,7 +91,7 @@ public final class InMemoryPublicationRepository implements PublicationRepositor
                 .stream()
                 .collect(Collectors.toMap(Profile::userId, Function.identity()));
         List<Publication> matches = published.stream()
-                .filter(matches(query, authors))
+                .filter(matches(query, authors, branchOf(query)))
                 .sorted(orderFor(query, authors))
                 .toList();
 
@@ -100,21 +105,18 @@ public final class InMemoryPublicationRepository implements PublicationRepositor
     }
 
     @Override
-    public List<String> categories() {
-        return findPublished().stream()
-                .map(Publication::category)
-                .distinct()
-                .sorted(String.CASE_INSENSITIVE_ORDER)
-                .toList();
-    }
-
-    @Override
     public Publication save(Publication publication) {
         publications.put(publication.id(), publication);
         return publication;
     }
 
-    private static Predicate<Publication> matches(SearchQuery query, Map<String, Profile> authors) {
+    /** Rama del catálogo pedida en la búsqueda; vacía si no se filtra por categoría o si no existe. */
+    private Optional<CatalogCategory> branchOf(SearchQuery query) {
+        return isBlank(query.category()) ? Optional.empty() : catalog.findCategory(query.category());
+    }
+
+    private static Predicate<Publication> matches(SearchQuery query, Map<String, Profile> authors,
+                                                  Optional<CatalogCategory> branch) {
         String text = normalize(query.text());
         String skill = normalize(query.skill());
         Predicate<Publication> activeAuthor = item -> authors.containsKey(item.authorUserId())
@@ -125,7 +127,7 @@ public final class InMemoryPublicationRepository implements PublicationRepositor
                 || normalize(item.category()).contains(text)
                 || item.tags().stream().anyMatch(tag -> normalize(tag).contains(text));
         Predicate<Publication> byCategory = item -> isBlank(query.category())
-                || item.category().equalsIgnoreCase(query.category());
+                || branch.map(category -> inBranch(item, category)).orElse(false);
         Predicate<Publication> byModality = item -> query.modality() == null || item.modality() == query.modality();
         Predicate<Publication> bySkill = item -> skill.isBlank()
                 || item.tags().stream().anyMatch(tag -> normalize(tag).equals(skill));
@@ -135,6 +137,18 @@ public final class InMemoryPublicationRepository implements PublicationRepositor
         Predicate<Publication> byReputation = item -> query.minimumReputation() == null
                 || authors.get(item.authorUserId()).reputation() >= query.minimumReputation();
         return activeAuthor.and(byText).and(byCategory).and(byModality).and(bySkill).and(byPrice).and(byReputation);
+    }
+
+    /** La categoría es de la rama o alguna etiqueta es una habilidad de la rama. */
+    private static boolean inBranch(Publication item, CatalogCategory branch) {
+        Set<String> categories = normalized(branch.categoryNames());
+        Set<String> skills = normalized(branch.skillNames());
+        return categories.contains(normalize(item.category()))
+                || item.tags().stream().map(InMemoryPublicationRepository::normalize).anyMatch(skills::contains);
+    }
+
+    private static Set<String> normalized(Set<String> names) {
+        return names.stream().map(InMemoryPublicationRepository::normalize).collect(Collectors.toSet());
     }
 
     private static Comparator<Publication> orderFor(SearchQuery query, Map<String, Profile> authors) {

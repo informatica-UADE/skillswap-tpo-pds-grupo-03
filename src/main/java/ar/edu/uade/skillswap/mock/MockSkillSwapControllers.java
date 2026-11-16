@@ -102,7 +102,11 @@ public final class MockSkillSwapControllers implements UiControllers,
     }
 
     @Override public List<Publicacion> recomendar(String userId) { return buscar(new FiltrosBusqueda("", "Todas", null, 0, "Relevancia")).items().stream().limit(3).toList(); }
-    @Override public List<String> categorias() { return List.of("Todas", "Tecnología", "Diseño", "Creatividad", "Negocios", "Productividad"); }
+    @Override public List<Categoria> categorias() {
+        return List.of(new Categoria("Tecnología", 0), new Categoria("Desarrollo de software", 1),
+                new Categoria("Carrera en tecnología", 1), new Categoria("Diseño", 0), new Categoria("Creatividad", 0),
+                new Categoria("Negocios", 0), new Categoria("Productividad", 0));
+    }
     @Override public List<Publicacion> listarPropias(String userId) {
         return publicaciones.stream().filter(p -> userId.equals(autores.get(p.id()))).toList();
     }
