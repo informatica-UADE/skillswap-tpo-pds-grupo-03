@@ -46,7 +46,6 @@ package "Application" {
     interface WalletRepository
     interface RatingRepository
     interface NotificationRepository
-    interface CatalogRepository
     interface CurrentUserProvider
     interface TransactionManager
     interface DomainEventPublisher
@@ -89,7 +88,6 @@ package "Infrastructure" {
     class InMemoryWalletRepository
     class InMemoryRatingRepository
     class InMemoryNotificationRepository
-    class InMemoryCatalogRepository
     class SynchronousTransactionManager
   }
 
@@ -100,7 +98,6 @@ package "Infrastructure" {
     class JpaWalletRepository
     class JpaRatingRepository
     class JpaNotificationRepository
-    class JpaCatalogRepository
     class JpaTransactionManager
   }
 
@@ -143,13 +140,11 @@ ProfileApplicationService --> TransactionManager
 
 PublicationApplicationService --> PublicationRepository
 PublicationApplicationService --> ProfileRepository
-PublicationApplicationService --> CatalogRepository : valida la categoría
 PublicationApplicationService --> CurrentUserProvider
 PublicationApplicationService --> TransactionManager
 
 DiscoveryApplicationService --> PublicationRepository
 DiscoveryApplicationService --> ProfileRepository
-DiscoveryApplicationService --> CatalogRepository : lista y valida categorías
 DiscoveryApplicationService --> CurrentUserProvider
 DiscoveryApplicationService --> RecommendationStrategy
 
@@ -196,6 +191,11 @@ RatingApplicationService ..> Rating
 RatingApplicationService ..> Profile
 WalletApplicationService ..> Wallet
 
+' Catálogo jerárquico de categorías y habilidades (Composite, #37).
+CatalogCategory --|> CatalogItem
+CatalogSkill --|> CatalogItem
+CatalogCategory o--> "0..*" CatalogItem : contiene
+
 ' Infrastructure adapters implement application output ports.
 InMemoryProfileRepository ..|> ProfileRepository
 JpaProfileRepository ..|> ProfileRepository
@@ -209,12 +209,6 @@ InMemoryRatingRepository ..|> RatingRepository
 JpaRatingRepository ..|> RatingRepository
 InMemoryNotificationRepository ..|> NotificationRepository
 JpaNotificationRepository ..|> NotificationRepository
-InMemoryCatalogRepository ..|> CatalogRepository
-JpaCatalogRepository ..|> CatalogRepository
-CatalogCategory --|> CatalogItem
-CatalogSkill --|> CatalogItem
-CatalogCategory o--> "0..*" CatalogItem : contiene
-CatalogRepository ..> CatalogCategory : reconstruye el árbol
 SynchronousTransactionManager ..|> TransactionManager
 JpaTransactionManager ..|> TransactionManager
 IdentityProviderAdapter ..|> CurrentUserProvider
