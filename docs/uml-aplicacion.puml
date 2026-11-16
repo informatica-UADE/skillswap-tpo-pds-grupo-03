@@ -36,6 +36,7 @@ package "Application" {
     class WalletApplicationService
     class RatingApplicationService
     class NotificationApplicationService
+    class PublicProfileFacade <<Facade>>
   }
 
   package "Output ports" {
@@ -75,6 +76,7 @@ package "Infrastructure" {
   class SkillSwapApplicationWiring <<composition root>>
   class WiredUiControllers <<presentation adapter>>
   class BusquedaUiController
+  class PerfilUiController
 
   package "In-memory adapters" {
     class InMemoryProfileRepository
@@ -117,6 +119,7 @@ package "Infrastructure" {
 WiredUiControllers ..|> UiControllers
 WiredUiControllers --> SkillSwapApplicationWiring
 BusquedaUiController --> DiscoveryApplicationService
+PerfilUiController --> PublicProfileUseCases
 
 ProfileUseCases <|.. ProfileApplicationService
 PublicationUseCases <|.. PublicationApplicationService
@@ -125,6 +128,7 @@ BookingUseCases <|.. BookingApplicationService
 WalletUseCases <|.. WalletApplicationService
 RatingUseCases <|.. RatingApplicationService
 NotificationUseCases <|.. NotificationApplicationService
+PublicProfileUseCases <|.. PublicProfileFacade
 
 ' Application services depend on output ports, not infrastructure implementations.
 ProfileApplicationService --> ProfileRepository
@@ -163,6 +167,13 @@ RatingApplicationService --> DomainEventPublisher
 NotificationApplicationService --> NotificationRepository
 NotificationApplicationService --> CurrentUserProvider
 NotificationApplicationService --> TransactionManager
+
+' Preserve the public-profile integration from main (#40 / #78).
+PublicProfileFacade --> ProfileRepository
+PublicProfileFacade --> PublicationRepository
+PublicProfileFacade --> BookingRepository
+PublicProfileFacade --> RatingRepository
+PublicProfileFacade --> TransactionManager
 
 ' Services coordinate domain behavior; detail is in uml-dominio.puml.
 ProfileApplicationService ..> Profile
@@ -223,6 +234,7 @@ SkillSwapApplicationWiring ..> BookingApplicationService
 SkillSwapApplicationWiring ..> WalletApplicationService
 SkillSwapApplicationWiring ..> RatingApplicationService
 SkillSwapApplicationWiring ..> NotificationApplicationService
+SkillSwapApplicationWiring ..> PublicProfileFacade
 SkillSwapApplicationWiring ..> InMemoryDomainEventPublisher : subscribes observers
 SkillSwapApplicationWiring ..> NotificationEventObserver
 SkillSwapApplicationWiring ..> RatingNotificationEventPublisher
@@ -262,7 +274,7 @@ note bottom of PublicationRepository
   Se muestra como contexto del repositorio, no como
   parte de las entregas de dominio documentadas aparte.
 end note
-note bottom of Facade
+note bottom of PublicProfileFacade
 Facade (#40): un punto de entrada para el perfil público.
 Coordina perfiles, publicaciones activas (página),
 contrataciones completadas (conteos) y últimas calificaciones
