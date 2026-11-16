@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchOrder;
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchQuery;
 import ar.edu.uade.skillswap.application.model.PageResult;
+import ar.edu.uade.skillswap.application.model.PublicationData.PublicationView;
 import ar.edu.uade.skillswap.domain.model.ActorType;
 import ar.edu.uade.skillswap.domain.model.Modality;
 import ar.edu.uade.skillswap.domain.model.Profile;
@@ -22,7 +23,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
- * Contrato ejecutable de {@link PublicationRepository#searchPublished}. Cada implementación
+ * Contrato ejecutable de {@link PublicationQueryPort#searchPublished}. Cada implementación
  * (en memoria, JPA) lo extiende e implementa {@link #createRepository}, que debe dejar persistidos
  * exactamente los datos recibidos. Si una implementación no pasa este contrato, la búsqueda se
  * comporta distinto según el almacenamiento.
@@ -31,13 +32,13 @@ public abstract class PublicationSearchContract {
     protected static final LocalDateTime T0 = LocalDateTime.of(2026, 10, 1, 10, 0);
 
     /** Crea el repositorio bajo prueba con exactamente los datos indicados ya persistidos. */
-    protected abstract PublicationRepository createRepository(List<Publication> publications, List<Profile> profiles);
+    protected abstract PublicationQueryPort createRepository(List<Publication> publications, List<Profile> profiles);
 
     /**
      * Como en la base (FK), todo autor tiene perfil: completa con un perfil activo y sin
      * calificaciones a los autores que el test no define explícitamente.
      */
-    private PublicationRepository repositoryWith(List<Publication> publications, List<Profile> profiles) {
+    private PublicationQueryPort repositoryWith(List<Publication> publications, List<Profile> profiles) {
         Set<String> defined = new HashSet<>();
         profiles.forEach(profile -> defined.add(profile.userId()));
         List<Profile> all = new ArrayList<>(profiles);
@@ -274,7 +275,7 @@ public abstract class PublicationSearchContract {
         List<String> seen = new ArrayList<>();
         int[] expectedSizes = {3, 3, 1, 0};
         for (int page = 0; page < expectedSizes.length; page++) {
-            PageResult<Publication> result = repository.searchPublished(page(page, 3));
+            PageResult<PublicationView> result = repository.searchPublished(page(page, 3));
             assertEquals(page, result.page());
             assertEquals(3, result.size());
             assertEquals(7, result.totalElements());
@@ -291,7 +292,7 @@ public abstract class PublicationSearchContract {
     void sinResultadosDevuelvePaginaVaciaConTotalCero() {
         var repository = repositoryWith(List.of(pub("a").build()), List.of());
 
-        PageResult<Publication> result = repository.searchPublished(text("inexistente"));
+        PageResult<PublicationView> result = repository.searchPublished(text("inexistente"));
 
         assertTrue(result.items().isEmpty());
         assertEquals(0, result.totalElements());
@@ -300,8 +301,8 @@ public abstract class PublicationSearchContract {
 
     // ---------- Fixtures ----------
 
-    protected static List<String> ids(PageResult<Publication> result) {
-        return result.items().stream().map(Publication::id).toList();
+    protected static List<String> ids(PageResult<PublicationView> result) {
+        return result.items().stream().map(PublicationView::id).toList();
     }
 
     protected static SearchQuery text(String text) {

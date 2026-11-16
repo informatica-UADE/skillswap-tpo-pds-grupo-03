@@ -247,7 +247,6 @@ class PublicProfileFacadeTest {
         @Override public Optional<Publication> findByIdForUpdate(String publicationId) { throw unexpected(); }
         @Override public List<Publication> findByAuthorUserId(String authorUserId) { throw unexpected(); }
         @Override public List<Publication> findPublished() { throw unexpected(); }
-        @Override public PageResult<Publication> searchPublished(SearchQuery query) { throw unexpected(); }
         @Override public Publication save(Publication publication) { throw unexpected(); }
     }
 

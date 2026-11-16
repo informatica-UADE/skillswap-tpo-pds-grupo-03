@@ -49,6 +49,7 @@ class MySqlPersistenceIntegrationTest {
     private JpaTransactionManager transactions;
     private JpaProfileRepository profiles;
     private JpaPublicationRepository publications;
+    private JpaPublicationQueryAdapter publicationQueries;
     private JpaBookingRepository bookings;
     private JpaWalletRepository wallets;
     private final AtomicInteger eventCount = new AtomicInteger();
@@ -96,6 +97,7 @@ class MySqlPersistenceIntegrationTest {
         transactions = new JpaTransactionManager(factory);
         profiles = new JpaProfileRepository(transactions);
         publications = new JpaPublicationRepository(transactions);
+        publicationQueries = new JpaPublicationQueryAdapter(transactions);
         bookings = new JpaBookingRepository(transactions);
         wallets = new JpaWalletRepository(transactions);
     }
@@ -169,14 +171,14 @@ class MySqlPersistenceIntegrationTest {
                     .setParameter("id", high.id()).executeUpdate();
             return high.id();
         });
-        var first = publications.searchPublished(new SearchQuery("", "Tecnología", null,
+        var first = publicationQueries.searchPublished(new SearchQuery("", "Tecnología", null,
                 null, null, null, null, SearchOrder.BEST_RATING, 0, 1));
-        var second = publications.searchPublished(new SearchQuery("", "Tecnología", null,
+        var second = publicationQueries.searchPublished(new SearchQuery("", "Tecnología", null,
                 null, null, null, null, SearchOrder.BEST_RATING, 1, 1));
         assertEquals(2, first.totalElements());
         assertEquals(highId, first.items().get(0).id());
         assertNotEquals(highId, second.items().get(0).id());
-        var filtered = publications.searchPublished(new SearchQuery("", null, null,
+        var filtered = publicationQueries.searchPublished(new SearchQuery("", null, null,
                 null, null, null, 4.0, SearchOrder.BEST_RATING, 0, 10));
         assertEquals(1, filtered.totalElements());
         assertEquals(highId, filtered.items().get(0).id());
@@ -402,7 +404,7 @@ class MySqlPersistenceIntegrationTest {
 
         assertEquals(ActorType.ORGANIZATION, profiles.findByUserId("org-1").orElseThrow().actorType());
         assertEquals(PublicationType.CHALLENGE, publications.findById(challengeId).orElseThrow().type());
-        assertEquals(PublicationType.CHALLENGE, publications.searchPublished(new SearchQuery("Hackatón",
+        assertEquals(PublicationType.CHALLENGE, publicationQueries.searchPublished(new SearchQuery("Hackatón",
                 null, null, null, null, null, null, null, 0, 10)).items().get(0).type());
     }
 
@@ -600,18 +602,18 @@ class MySqlPersistenceIntegrationTest {
         });
         List<String> actual = new ArrayList<>();
         for (int page = 0; page < 3; page++) {
-            var result = publications.searchPublished(search(page, 10, 50));
+            var result = publicationQueries.searchPublished(search(page, 10, 50));
             assertEquals(5, result.totalElements());
             assertEquals(3, result.totalPages());
             assertEquals(page == 2 ? 1 : 2, result.items().size());
-            actual.addAll(result.items().stream().map(Publication::id).toList());
+            actual.addAll(result.items().stream().map(ar.edu.uade.skillswap.application.model.PublicationData.PublicationView::id).toList());
         }
         assertEquals(expected, actual);
         assertEquals(5, new HashSet<>(actual).size());
-        assertTrue(publications.searchPublished(search(3, 10, 50)).items().isEmpty());
-        var filtered = publications.searchPublished(search(0, 20, 30));
+        assertTrue(publicationQueries.searchPublished(search(3, 10, 50)).items().isEmpty());
+        var filtered = publicationQueries.searchPublished(search(0, 20, 30));
         assertEquals(2, filtered.totalElements());
-        assertEquals(List.of(20, 30), filtered.items().stream().map(p -> p.basePrice().amount()).toList());
+        assertEquals(List.of(20, 30), filtered.items().stream().map(p -> p.priceInSkillCoins()).toList());
     }
 
     private SearchQuery search(int page, int minimum, int maximum) {
@@ -638,8 +640,8 @@ class MySqlPersistenceIntegrationTest {
         });
         List<String> actual = new ArrayList<>();
         for (int page = 0; page < 3; page++) {
-            actual.addAll(publications.searchPublished(search(page, 20, 20)).items()
-                    .stream().map(Publication::id).toList());
+            actual.addAll(publicationQueries.searchPublished(search(page, 20, 20)).items()
+                    .stream().map(ar.edu.uade.skillswap.application.model.PublicationData.PublicationView::id).toList());
         }
         assertEquals(expected, actual);
         assertEquals(5, new HashSet<>(actual).size());
