@@ -59,7 +59,7 @@ $env:SKILLSWAP_DB_PASSWORD = '<contraseña del usuario de la demo>'
 mvn exec:java '-Dexec.args=--persistence=jpa'
 ```
 
-La ventana indica **SkillSwap · MySQL**. En la primera ejecución se crean perfiles, billeteras y publicaciones de muestra. Al reiniciar no se reemplazan perfiles, no se reinician saldos ni se duplican la bienvenida o las publicaciones, incluso si estas fueron pausadas. Al cerrar se liberan las conexiones JPA. En esta rama el selector demo permite alternar entre Mateo, Ana y Lucía tanto en memoria como con JPA; no reemplaza autenticación real.
+La ventana indica **SkillSwap · MySQL**. En la primera ejecución se crean perfiles, billeteras y publicaciones de muestra. Al reiniciar no se reemplazan perfiles, no se reinician saldos ni se duplican la bienvenida o las publicaciones, incluso si estas fueron pausadas. Al cerrar se liberan las conexiones JPA. Para cambiar de usuario se hace clic en el recuadro del perfil activo, abajo en la barra lateral: lista los perfiles activos guardados con su tipo (con el seed, Mateo, Ana y Lucía), tanto en memoria como con JPA. No reemplaza una autenticación real.
 
 ## Recorrido de demostración
 
@@ -70,6 +70,7 @@ El guion detallado está en [`docs/guion-demo.md`](docs/guion-demo.md). Describe
 - [Modelo editable de clases en StarUML](docs/modelo-skill-swap.mdj), con diagramas de Domain y Application.
 - [Informe de decisiones actualizado](docs/informe-diseno.md) y [PDF actualizado sin UML](output/pdf/informe-diseno-actualizado.pdf). El [PDF histórico con diagramas](output/pdf/informe-diseno-skillswap.pdf) se conserva sin modificaciones.
 - [Auditoría de patrones, GRASP y SOLID](docs/auditoria-patrones-y-grasp.md), con estado verificado en `main` y pendientes de integración.
+- [Decisión e implementación de CQRS para el Issue #42](docs/issue-42-cqrs.md), con alcance, puertos y flujos de lectura/escritura.
 
 ## Estructura principal
 

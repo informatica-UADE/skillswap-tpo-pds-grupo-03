@@ -3,7 +3,6 @@ package ar.edu.uade.skillswap.application.service;
 import ar.edu.uade.skillswap.application.error.ApplicationErrorCode;
 import ar.edu.uade.skillswap.application.error.ApplicationException;
 import ar.edu.uade.skillswap.application.mapper.PublicationApplicationMapper;
-import ar.edu.uade.skillswap.application.model.DiscoveryData.AuthorView;
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchQuery;
 import ar.edu.uade.skillswap.application.model.PageResult;
 import ar.edu.uade.skillswap.application.model.PublicationData.PublicationView;
@@ -11,6 +10,7 @@ import ar.edu.uade.skillswap.application.port.in.DiscoveryUseCases;
 import ar.edu.uade.skillswap.application.port.out.CatalogRepository;
 import ar.edu.uade.skillswap.application.port.out.CurrentUserProvider;
 import ar.edu.uade.skillswap.application.port.out.ProfileRepository;
+import ar.edu.uade.skillswap.application.port.out.PublicationQueryPort;
 import ar.edu.uade.skillswap.application.port.out.PublicationRepository;
 import ar.edu.uade.skillswap.domain.model.Profile;
 import ar.edu.uade.skillswap.domain.model.Publication;
@@ -24,15 +24,18 @@ import java.util.stream.Collectors;
 /** Orchestrates search and personalized discovery through application ports. */
 public final class DiscoveryApplicationService implements DiscoveryUseCases {
     private final PublicationRepository publications;
+    private final PublicationQueryPort publicationQueries;
     private final ProfileRepository profiles;
     private final CatalogRepository catalog;
     private final CurrentUserProvider currentUser;
     private final RecommendationStrategy recommendationStrategy;
 
-    public DiscoveryApplicationService(PublicationRepository publications, ProfileRepository profiles,
-                                       CatalogRepository catalog, CurrentUserProvider currentUser,
+    public DiscoveryApplicationService(PublicationRepository publications, PublicationQueryPort publicationQueries,
+                                       ProfileRepository profiles, CatalogRepository catalog,
+                                       CurrentUserProvider currentUser,
                                        RecommendationStrategy recommendationStrategy) {
         this.publications = Objects.requireNonNull(publications);
+        this.publicationQueries = Objects.requireNonNull(publicationQueries);
         this.profiles = Objects.requireNonNull(profiles);
         this.catalog = Objects.requireNonNull(catalog);
         this.currentUser = Objects.requireNonNull(currentUser);
@@ -40,9 +43,9 @@ public final class DiscoveryApplicationService implements DiscoveryUseCases {
     }
 
     /**
-     * Valida que haya criterios y que la categoría exista en el catálogo, delega filtros, orden y
-     * paginación en el repositorio y completa cada resultado con los datos públicos de su autor.
-     * Una categoría incluye toda su rama del catálogo (#37); el repositorio la resuelve en la consulta.
+     * Valida que haya criterios y que la categoría exista en el catálogo, y delega la proyección
+     * paginada en el puerto de consulta. Una categoría incluye toda su rama del catálogo (#37); la
+     * consulta la resuelve en la base.
      */
     @Override
     public PageResult<PublicationView> search(SearchQuery query) {
@@ -53,8 +56,7 @@ public final class DiscoveryApplicationService implements DiscoveryUseCases {
             throw new ApplicationException(ApplicationErrorCode.VALIDATION,
                     "La categoría \"" + query.category() + "\" no existe en el catálogo");
         }
-        PageResult<Publication> result = publications.searchPublished(query);
-        return new PageResult<>(toViews(result.items()), result.page(), result.size(), result.totalElements());
+        return publicationQueries.searchPublished(query);
     }
 
     @Override
@@ -93,14 +95,5 @@ public final class DiscoveryApplicationService implements DiscoveryUseCases {
             throw new IllegalStateException("La publicación " + publication.id() + " no tiene perfil de autor");
         }
         return author;
-    }
-
-    @Override
-    public AuthorView author(String userId) {
-        String id = UseCaseSupport.requiredId(userId, "autor");
-        Profile profile = profiles.findByUserId(id).orElseThrow(() ->
-                new ApplicationException(ApplicationErrorCode.NOT_FOUND, "No existe el perfil del autor"));
-        return new AuthorView(
-                profile.userId(), profile.displayName(), profile.reputation());
     }
 }

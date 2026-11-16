@@ -1,7 +1,6 @@
 package ar.edu.uade.skillswap.application.port.in;
 
 import ar.edu.uade.skillswap.application.error.ApplicationException;
-import ar.edu.uade.skillswap.application.model.DiscoveryData.AuthorView;
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchQuery;
 import ar.edu.uade.skillswap.application.model.PageResult;
 import ar.edu.uade.skillswap.application.model.PublicationData.PublicationView;
@@ -20,5 +19,4 @@ public interface DiscoveryUseCases {
      */
     PageResult<PublicationView> search(SearchQuery query);
     List<PublicationView> recommend(int limit);
-    AuthorView author(String userId);
 }

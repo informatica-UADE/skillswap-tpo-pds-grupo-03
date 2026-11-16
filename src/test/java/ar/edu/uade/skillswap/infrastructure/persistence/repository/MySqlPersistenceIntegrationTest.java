@@ -4,6 +4,7 @@ import ar.edu.uade.skillswap.application.error.ApplicationException;
 import ar.edu.uade.skillswap.application.model.BookingData.BookingCommand;
 import ar.edu.uade.skillswap.application.model.BookingData.RequestCommand;
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchOrder;
+import ar.edu.uade.skillswap.application.model.PublicProfileData.PublicProfileQuery;
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchQuery;
 import ar.edu.uade.skillswap.application.service.BookingApplicationService;
 import ar.edu.uade.skillswap.application.service.ProfileApplicationService;
@@ -14,7 +15,7 @@ import ar.edu.uade.skillswap.application.model.NotificationMessage;
 import ar.edu.uade.skillswap.application.model.RatingData.SubmitCommand;
 import ar.edu.uade.skillswap.application.error.ApplicationErrorCode;
 import ar.edu.uade.skillswap.infrastructure.SkillSwapApplicationWiring;
-import ar.edu.uade.skillswap.infrastructure.WiredUiControllers;
+import ar.edu.uade.skillswap.infrastructure.SkillSwapUiControllers;
 import ar.edu.uade.skillswap.infrastructure.identity.MockIdentityClient;
 import ar.edu.uade.skillswap.infrastructure.notification.email.MockEmailClient;
 import ar.edu.uade.skillswap.infrastructure.notification.push.MockPushClient;
@@ -49,6 +50,7 @@ class MySqlPersistenceIntegrationTest {
     private JpaTransactionManager transactions;
     private JpaProfileRepository profiles;
     private JpaPublicationRepository publications;
+    private JpaPublicationQueryAdapter publicationQueries;
     private JpaBookingRepository bookings;
     private JpaWalletRepository wallets;
     private final AtomicInteger eventCount = new AtomicInteger();
@@ -96,6 +98,7 @@ class MySqlPersistenceIntegrationTest {
         transactions = new JpaTransactionManager(factory);
         profiles = new JpaProfileRepository(transactions);
         publications = new JpaPublicationRepository(transactions);
+        publicationQueries = new JpaPublicationQueryAdapter(transactions);
         bookings = new JpaBookingRepository(transactions);
         wallets = new JpaWalletRepository(transactions);
     }
@@ -114,8 +117,10 @@ class MySqlPersistenceIntegrationTest {
         initializeJpa();
         try (var wiring = SkillSwapApplicationWiring.usingJpa(factory, new MockIdentityClient("user-mateo"),
                 new MockEmailClient(), new MockPushClient())) {
-            var ui = new WiredUiControllers(wiring);
+            var ui = SkillSwapUiControllers.from(wiring);
             assertEquals("user-mateo", ui.sesionDemo().usuarioActual());
+            assertEquals(List.of("mentor-ana", "mentor-lu", "user-mateo"), ui.sesionDemo().usuariosDisponibles()
+                    .stream().map(user -> user.id()).toList());
             assertEquals(List.of(ar.edu.uade.skillswap.model.Models.TipoPublicacion.MENTORIA,
                     ar.edu.uade.skillswap.model.Models.TipoPublicacion.SERVICIO),
                     ui.publicaciones().tiposPublicacion("user-mateo"));
@@ -169,14 +174,14 @@ class MySqlPersistenceIntegrationTest {
                     .setParameter("id", high.id()).executeUpdate();
             return high.id();
         });
-        var first = publications.searchPublished(new SearchQuery("", "Tecnología", null,
+        var first = publicationQueries.searchPublished(new SearchQuery("", "Tecnología", null,
                 null, null, null, null, SearchOrder.BEST_RATING, 0, 1));
-        var second = publications.searchPublished(new SearchQuery("", "Tecnología", null,
+        var second = publicationQueries.searchPublished(new SearchQuery("", "Tecnología", null,
                 null, null, null, null, SearchOrder.BEST_RATING, 1, 1));
         assertEquals(2, first.totalElements());
         assertEquals(highId, first.items().get(0).id());
         assertNotEquals(highId, second.items().get(0).id());
-        var filtered = publications.searchPublished(new SearchQuery("", null, null,
+        var filtered = publicationQueries.searchPublished(new SearchQuery("", null, null,
                 null, null, null, 4.0, SearchOrder.BEST_RATING, 0, 10));
         assertEquals(1, filtered.totalElements());
         assertEquals(highId, filtered.items().get(0).id());
@@ -315,7 +320,7 @@ class MySqlPersistenceIntegrationTest {
         String publicationId;
         int expectedBalance;
         try {
-            var controllers = new WiredUiControllers(wiring);
+            var controllers = SkillSwapUiControllers.from(wiring);
             controllers.wallet().acreditarDemo("user-mateo", 120);
             wiring.profileService().update(new ProfileData.UpdateCommand("Mateo actualizado", "Bio", "UTC",
                     List.of("Java"), List.of("Diseño")));
@@ -337,7 +342,7 @@ class MySqlPersistenceIntegrationTest {
             identity.actor = "user-mateo";
             wiring.bookingService().complete(command);
             wiring.ratingService().submit(new SubmitCommand(bookingId, 5, "Persistido"));
-            var author = wiring.discoveryService().author("mentor-ana");
+            var author = wiring.publicProfiles().viewPublicProfile(new PublicProfileQuery("mentor-ana", 0, 1));
             assertEquals("Ana García", author.displayName());
             assertEquals(5.0, author.reputation());
             expectedBalance = controllers.wallet().consultarSaldo("user-mateo");
@@ -354,7 +359,7 @@ class MySqlPersistenceIntegrationTest {
         identity.actor = "user-mateo";
         try (var reopened = SkillSwapApplicationWiring.usingJpa(factory, identity,
                 new MockEmailClient(), new MockPushClient())) {
-            assertEquals(expectedBalance, new WiredUiControllers(reopened).wallet().consultarSaldo("user-mateo"));
+            assertEquals(expectedBalance, SkillSwapUiControllers.from(reopened).wallet().consultarSaldo("user-mateo"));
             assertEquals("Mateo actualizado", reopened.profileService().viewMyProfile().displayName());
             assertEquals(1, reopened.bookingService().listMyBookings().size());
             assertEquals(bookingId, reopened.bookingService().listMyBookings().get(0).id());
@@ -402,7 +407,7 @@ class MySqlPersistenceIntegrationTest {
 
         assertEquals(ActorType.ORGANIZATION, profiles.findByUserId("org-1").orElseThrow().actorType());
         assertEquals(PublicationType.CHALLENGE, publications.findById(challengeId).orElseThrow().type());
-        assertEquals(PublicationType.CHALLENGE, publications.searchPublished(new SearchQuery("Hackatón",
+        assertEquals(PublicationType.CHALLENGE, publicationQueries.searchPublished(new SearchQuery("Hackatón",
                 null, null, null, null, null, null, null, 0, 10)).items().get(0).type());
     }
 
@@ -600,18 +605,18 @@ class MySqlPersistenceIntegrationTest {
         });
         List<String> actual = new ArrayList<>();
         for (int page = 0; page < 3; page++) {
-            var result = publications.searchPublished(search(page, 10, 50));
+            var result = publicationQueries.searchPublished(search(page, 10, 50));
             assertEquals(5, result.totalElements());
             assertEquals(3, result.totalPages());
             assertEquals(page == 2 ? 1 : 2, result.items().size());
-            actual.addAll(result.items().stream().map(Publication::id).toList());
+            actual.addAll(result.items().stream().map(ar.edu.uade.skillswap.application.model.PublicationData.PublicationView::id).toList());
         }
         assertEquals(expected, actual);
         assertEquals(5, new HashSet<>(actual).size());
-        assertTrue(publications.searchPublished(search(3, 10, 50)).items().isEmpty());
-        var filtered = publications.searchPublished(search(0, 20, 30));
+        assertTrue(publicationQueries.searchPublished(search(3, 10, 50)).items().isEmpty());
+        var filtered = publicationQueries.searchPublished(search(0, 20, 30));
         assertEquals(2, filtered.totalElements());
-        assertEquals(List.of(20, 30), filtered.items().stream().map(p -> p.basePrice().amount()).toList());
+        assertEquals(List.of(20, 30), filtered.items().stream().map(p -> p.priceInSkillCoins()).toList());
     }
 
     private SearchQuery search(int page, int minimum, int maximum) {
@@ -638,8 +643,8 @@ class MySqlPersistenceIntegrationTest {
         });
         List<String> actual = new ArrayList<>();
         for (int page = 0; page < 3; page++) {
-            actual.addAll(publications.searchPublished(search(page, 20, 20)).items()
-                    .stream().map(Publication::id).toList());
+            actual.addAll(publicationQueries.searchPublished(search(page, 20, 20)).items()
+                    .stream().map(ar.edu.uade.skillswap.application.model.PublicationData.PublicationView::id).toList());
         }
         assertEquals(expected, actual);
         assertEquals(5, new HashSet<>(actual).size());
@@ -676,7 +681,7 @@ class MySqlPersistenceIntegrationTest {
     }
 
     private BookingApplicationService service(String actor) {
-        return new BookingApplicationService(bookings, publications, wallets, () -> actor, transactions,
+        return new BookingApplicationService(bookings, publications, profiles, wallets, () -> actor, transactions,
                 new StandardRefundPolicy(), event -> eventCount.incrementAndGet());
     }
 

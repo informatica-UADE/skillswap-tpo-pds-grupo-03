@@ -33,12 +33,6 @@ final class DiscoverySpy implements DiscoveryUseCases {
         return recommendations;
     }
 
-    @Override public ar.edu.uade.skillswap.application.model.DiscoveryData.AuthorView author(String userId) {
-        calls++;
-        return new ar.edu.uade.skillswap.application.model.DiscoveryData.AuthorView(
-                userId, "Autor de prueba", 0);
-    }
-
     static PublicationView view(String id, String authorName, double reputation) {
         LocalDateTime start = LocalDateTime.of(2026, 11, 10, 10, 0);
         return new PublicationView(id, "author-" + id, PublicationType.MENTORSHIP, "Mentoría " + id, "Descripción",

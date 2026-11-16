@@ -1,13 +1,14 @@
 package ar.edu.uade.skillswap.ui;
 
 import ar.edu.uade.skillswap.infrastructure.SkillSwapApplicationWiring;
-import ar.edu.uade.skillswap.infrastructure.WiredUiControllers;
+import ar.edu.uade.skillswap.infrastructure.SkillSwapUiControllers;
 import ar.edu.uade.skillswap.model.Models.Categoria;
 import org.junit.jupiter.api.Test;
 
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
+import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import java.awt.Component;
 import java.awt.Container;
@@ -22,7 +23,7 @@ class SkillSwapViewTest {
     @Test
     void elEstadoNoOcultaTituloObjetivoNiMensajeDeLaContratacion() throws Exception {
         try (var wiring = new SkillSwapApplicationWiring()) {
-            var ui = new WiredUiControllers(wiring);
+            var ui = SkillSwapUiControllers.from(wiring);
             var publication = ui.publicaciones().listarPropias("user-mateo").get(0);
             ui.sesionDemo().cambiarUsuario("mentor-ana");
             ui.contrataciones().solicitar("mentor-ana", publication.id(), "Mensaje visible", "Objetivo visible",
@@ -48,7 +49,7 @@ class SkillSwapViewTest {
     @Test
     void elNombreDelUsuarioAbreSuPerfilPublicoDesdeTarjetasDetalleYContratacionesYVuelve() throws Exception {
         try (var wiring = new SkillSwapApplicationWiring()) {
-            var ui = new WiredUiControllers(wiring);
+            var ui = SkillSwapUiControllers.from(wiring);
             var publication = ui.publicaciones().listarPropias("user-mateo").get(0);
             ui.sesionDemo().cambiarUsuario("mentor-ana");
             ui.contrataciones().solicitar("mentor-ana", publication.id(), "", "Objetivo",
@@ -88,7 +89,7 @@ class SkillSwapViewTest {
     @Test
     void explorarMuestraElCatalogoConSangriaYFiltraPorUnaRamaIncluyendoSusHabilidades() throws Exception {
         try (var wiring = new SkillSwapApplicationWiring()) {
-            var ui = new WiredUiControllers(wiring);
+            var ui = SkillSwapUiControllers.from(wiring);
             SwingUtilities.invokeAndWait(() -> {
                 var view = new SkillSwapView(ui);
                 List<String> homeCategories = buttons(view).stream().map(JButton::getText)
@@ -113,6 +114,23 @@ class SkillSwapViewTest {
                 click(view, "Buscar");
                 assertTrue(hasLabel(view, "1 resultados · Página 1 de 1"));
                 assertTrue(hasLabel(view, "<html><div style='width:210px'>Diseño de portfolio para perfiles digitales</div></html>"));
+            });
+        }
+    }
+
+    @Test
+    void elRecuadroDelPerfilActivoEsElQueCambiaDePerfilEnLaDemo() throws Exception {
+        try (var wiring = new SkillSwapApplicationWiring()) {
+            var ui = SkillSwapUiControllers.from(wiring);
+            SwingUtilities.invokeAndWait(() -> {
+                var view = new SkillSwapView(ui);
+                var switcher = descendants(view).stream().filter(JPanel.class::isInstance).map(JPanel.class::cast)
+                        .filter(panel -> "Cambiar de perfil".equals(panel.getToolTipText())).toList();
+                assertEquals(1, switcher.size());
+                assertTrue(descendants(switcher.get(0)).stream().filter(JLabel.class::isInstance)
+                        .anyMatch(label -> "Mateo Silva".equals(((JLabel) label).getText())));
+                assertTrue(switcher.get(0).getMouseListeners().length > 0);
+                assertTrue(buttons(view).stream().noneMatch(button -> button.getText().contains("Cambiar usuario")));
             });
         }
     }

@@ -2,9 +2,13 @@ package ar.edu.uade.skillswap.infrastructure;
 
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchQuery;
 import ar.edu.uade.skillswap.application.model.PageResult;
+import ar.edu.uade.skillswap.application.model.PublicationData.PublicationView;
+import ar.edu.uade.skillswap.application.mapper.PublicationApplicationMapper;
 import ar.edu.uade.skillswap.application.port.out.ProfileRepository;
+import ar.edu.uade.skillswap.application.port.out.PublicationQueryPort;
 import ar.edu.uade.skillswap.application.port.out.PublicationRepository;
 import ar.edu.uade.skillswap.domain.catalog.CatalogCategory;
+import ar.edu.uade.skillswap.domain.model.AvailabilitySlot;
 import ar.edu.uade.skillswap.domain.model.Profile;
 import ar.edu.uade.skillswap.domain.model.Publication;
 import ar.edu.uade.skillswap.domain.model.PublicationStatus;
@@ -27,7 +31,7 @@ import java.util.stream.Collectors;
  * equivalent of the join with the profiles table that the JPA query performs. The category filter
  * covers the whole branch of the catalog (#37), like the JPA query over the materialized path.
  */
-public final class InMemoryPublicationRepository implements PublicationRepository {
+public final class InMemoryPublicationRepository implements PublicationRepository, PublicationQueryPort {
     private final Map<String, Publication> publications = new HashMap<>();
     private final ProfileRepository profiles;
     private final InMemoryCatalogRepository catalog;
@@ -78,7 +82,7 @@ public final class InMemoryPublicationRepository implements PublicationRepositor
     }
 
     @Override
-    public PageResult<Publication> searchPublished(SearchQuery query) {
+    public PageResult<PublicationView> searchPublished(SearchQuery query) {
         Objects.requireNonNull(query, "Faltan los criterios de búsqueda");
         List<Publication> published = findPublished();
         Map<String, Profile> authors = profiles.findByUserIds(published.stream()
@@ -86,7 +90,6 @@ public final class InMemoryPublicationRepository implements PublicationRepositor
                         .collect(Collectors.toSet()))
                 .stream()
                 .collect(Collectors.toMap(Profile::userId, Function.identity()));
-
         List<Publication> matches = published.stream()
                 .filter(matches(query, authors, branchOf(query)))
                 .sorted(orderFor(query, authors))
@@ -94,7 +97,11 @@ public final class InMemoryPublicationRepository implements PublicationRepositor
 
         int from = Math.min(query.page() * query.size(), matches.size());
         int to = Math.min(from + query.size(), matches.size());
-        return new PageResult<>(matches.subList(from, to), query.page(), query.size(), matches.size());
+        List<PublicationView> views = matches.subList(from, to).stream()
+                .map(publication -> PublicationApplicationMapper.toView(
+                        publication, Objects.requireNonNull(authors.get(publication.authorUserId()))))
+                .toList();
+        return new PageResult<>(views, query.page(), query.size(), matches.size());
     }
 
     @Override

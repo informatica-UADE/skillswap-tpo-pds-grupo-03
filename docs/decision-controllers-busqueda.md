@@ -14,7 +14,7 @@ La consigna (§4.3 y §9) pide paginar todos los listados de los controllers de 
 
 ## Decisión
 
-1. **Un controller dedicado en `controllers`**, con el patrón de #28 (PR #63): `BusquedaUiController` implementa `BusquedaController` (`buscar`, `recomendar`, `categorias`). Recibe los puertos `DiscoveryUseCases` y `CatalogUseCases` (este último desde #37, para `categorias`), la identidad activa y un `ControllerExecutor`, y solo convierte datos y delega. `WiredUiControllers` lo arma y le delega esas operaciones. El contrato `BusquedaController` mantiene sus tres operaciones; solo cambia el tipo que devuelve `buscar`.
+1. **Un controller dedicado en `controllers`**, con el patrón de #28 (PR #63): `BusquedaUiController` implementa `BusquedaController` (`buscar`, `recomendar`, `categorias`). Recibe los puertos `DiscoveryUseCases` y `CatalogUseCases` (este último desde #37, para `categorias`), la identidad activa y un `ControllerExecutor`, y solo convierte datos y delega. Lo arma el punto de composición de la interfaz (`SkillSwapUiControllers` desde #32) y la vista lo usa directamente. El contrato `BusquedaController` mantiene sus tres operaciones; solo cambia el tipo que devuelve `buscar`.
 2. **Resultado paginado:** `buscar` devuelve `Models.PaginaPublicaciones` (items, página, tamaño, total, total de páginas, `hayAnterior()`, `haySiguiente()`). No contiene entidades ni modelos de Application.
 3. **Filtros completos:** `FiltrosBusqueda` agrega habilidad, precio mínimo, reputación mínima, página y tamaño. Se conserva la firma anterior de cinco parámetros, que devuelve la primera página de 20, para no romper los llamados existentes.
 4. **Orden estricto:** las etiquetas válidas son "Relevancia" (o vacío), "Mejor reputación", "Menor precio" y "Más recientes". Cualquier otra da `VALIDACION`.
@@ -52,7 +52,7 @@ Todos se traducen con `UiOperationExecutor` a `PresentationException`:
 | Prueba | Cubre |
 | --- | --- |
 | `BusquedaUiControllerTest` | Conversión de todos los filtros, orden y página; cada etiqueta de orden; página con autor y navegación; errores de filtros y paginación sin llamar al caso de uso; categorías; recomendaciones con cantidad fija, usuario activo, otro usuario y sin identidad. |
-| `WiredUiControllersTest` | Integración: páginas con total y navegación, filtros nuevos, error de validación, recomendación para otro usuario. |
+| `SkillSwapUiControllersTest` | Integración: páginas con total y navegación, filtros nuevos, error de validación, recomendación para otro usuario. |
 | `MockSkillSwapControllersTest` | El mock cumple el contrato paginado y los filtros nuevos. |
 | `UiModelMapperTest` | "Más recientes" y orden desconocido. |
 | `PresentationContractsTest` | `PaginaPublicaciones` no expone entidades. |

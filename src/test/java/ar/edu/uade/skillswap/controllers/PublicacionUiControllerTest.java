@@ -5,7 +5,8 @@ import ar.edu.uade.skillswap.application.error.ApplicationException;
 import ar.edu.uade.skillswap.application.model.ProfileData.AvailabilityInput;
 import ar.edu.uade.skillswap.application.model.ProfileData.AvailabilityView;
 import ar.edu.uade.skillswap.application.model.PublicationData.*;
-import ar.edu.uade.skillswap.application.port.in.PublicationUseCases;
+import ar.edu.uade.skillswap.application.port.in.PublicationCommandUseCases;
+import ar.edu.uade.skillswap.application.port.in.PublicationQueryUseCases;
 import ar.edu.uade.skillswap.controllers.error.PresentationException;
 import ar.edu.uade.skillswap.domain.model.Modality;
 import ar.edu.uade.skillswap.domain.model.PublicationStatus;
@@ -22,7 +23,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PublicacionUiControllerTest {
     private final PublicationSpy service = new PublicationSpy();
-    private final PublicacionUiController controller = new PublicacionUiController(service, () -> "u1", new UiOperationExecutor());
+    private final PublicacionUiController controller =
+            new PublicacionUiController(service, service, () -> "u1", new UiOperationExecutor());
     private final LocalDateTime start = LocalDateTime.of(2026, 11, 4, 15, 0);
 
     @Test
@@ -85,7 +87,7 @@ class PublicacionUiControllerTest {
 
     @Test
     void rechazaIdentidadAusenteEnTodasLasOperaciones() {
-        var anonymous = new PublicacionUiController(service, () -> null, new UiOperationExecutor());
+        var anonymous = new PublicacionUiController(service, service, () -> null, new UiOperationExecutor());
         for (Supplier<?> action : actions(anonymous, "u1")) {
             assertCode(Models.CodigoError.NO_AUTENTICADO, action);
         }
@@ -135,7 +137,7 @@ class PublicacionUiControllerTest {
         assertEquals(code, assertThrows(PresentationException.class, action::get).error().codigo());
     }
 
-    private class PublicationSpy implements PublicationUseCases {
+    private class PublicationSpy implements PublicationCommandUseCases, PublicationQueryUseCases {
         private CreateDraftCommand create;
         private EditDraftCommand edit;
         private ChangeStatusCommand change;

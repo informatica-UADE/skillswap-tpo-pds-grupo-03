@@ -50,9 +50,15 @@ public interface UiControllers {
         Calificacion calificar(String userId, String contratacionId, int puntaje, String comentario);
     }
 
-    /** Sólo para intercambiar identidades en la demostración local. */
-    interface SesionDemoController {
+    /**
+     * Login simulado de la demostración local: los usuarios con los que se puede probar la demo y
+     * el que está activo. No es un controller ni autenticación real; no hay caso de uso detrás.
+     */
+    interface SesionDemo {
+        /** Perfiles activos guardados (los precargados y los que se registren), ordenados por nombre. */
+        List<UsuarioDemo> usuariosDisponibles();
         String usuarioActual();
+        /** Cambia el usuario activo; tiene que ser uno de {@link #usuariosDisponibles()}. */
         void cambiarUsuario(String userId);
     }
 
@@ -82,7 +88,8 @@ public interface UiControllers {
     PublicacionController publicaciones();
     ContratacionController contrataciones();
     CalificacionController calificaciones();
-    default SesionDemoController sesionDemo() { return null; }
+    /** Solo la composición de la demo tiene sesión; el Mock UI Kit no. */
+    default SesionDemo sesionDemo() { return null; }
     WalletController wallet();
     NotificacionController notificaciones();
     PerfilController perfiles();

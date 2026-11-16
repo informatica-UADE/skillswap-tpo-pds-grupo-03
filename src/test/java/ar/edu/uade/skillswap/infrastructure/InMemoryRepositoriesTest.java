@@ -45,7 +45,8 @@ class InMemoryRepositoriesTest {
         assertEquals(publication.id(), publications.findById(publication.id()).orElseThrow().id());
         assertEquals(1, publications.findByAuthorUserId("user-1").size());
 
-        PageResult<Publication> result = publications.searchPublished(new SearchQuery("Java", null, null, null, null, null, null, null, 0, 10));
+        PageResult<ar.edu.uade.skillswap.application.model.PublicationData.PublicationView> result =
+                publications.searchPublished(new SearchQuery("Java", null, null, null, null, null, null, null, 0, 10));
         assertEquals(1L, result.totalElements());
         assertTrue(result.items().stream().anyMatch(item -> item.title().equals("Java para principiantes")));
     }

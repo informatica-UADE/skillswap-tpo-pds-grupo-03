@@ -41,11 +41,11 @@ SkillSwapView ──▶ BusquedaController / PublicacionController (Presentation
                         │
           ┌─────────────┼──────────────────────────────┐
           ▼             ▼                              ▼
-  CatalogUseCases   DiscoveryUseCases           PublicationUseCases       (Application, puertos de entrada)
+  CatalogUseCases   DiscoveryUseCases           PublicationCommandUseCases (Application, puertos de entrada)
           │             │  valida la categoría         │ valida y normaliza la categoría
           ▼             ▼                              ▼
   CatalogRepository ◀───┴──────────────────────────────┘                  (puerto de salida)
-          │                     PublicationRepository.searchPublished  ─▶ filtra la rama en SQL
+          │                     PublicationQueryPort.searchPublished   ─▶ filtra la rama en SQL
           ▼
   JpaCatalogRepository / InMemoryCatalogRepository ──▶ CatalogMapper ──▶ CatalogCategory / CatalogSkill (Domain)
 ```
@@ -71,7 +71,7 @@ SkillSwapView ──▶ BusquedaController / PublicacionController (Presentation
 | Service | `CatalogApplicationService` | Orquesta la lectura (ver la tabla anterior). |
 | Mapper de Application | `CatalogApplicationMapper` | Convierte el Composite en vistas con la misma recursión para hojas y ramas. |
 | Puerto de salida | `CatalogRepository` | `findRootCategories()` y `findCategoryName(nombre)`. Definido en Application, la capa que lo necesita. |
-| Infrastructure | `JpaCatalogRepository`, `CatalogMapper`, `CatalogCategoryEntity`, `CatalogSkillEntity`, `InMemoryCatalogRepository`, `DemoCatalog`, migración V6 | Persisten y reconstruyen el árbol; el filtro por rama vive en `JpaPublicationRepository` e `InMemoryPublicationRepository`. |
+| Infrastructure | `JpaCatalogRepository`, `CatalogMapper`, `CatalogCategoryEntity`, `CatalogSkillEntity`, `InMemoryCatalogRepository`, `DemoCatalog`, migración V6 | Persisten y reconstruyen el árbol; el filtro por rama vive en el lado de consulta (#42): `JpaPublicationQueryAdapter` e `InMemoryPublicationRepository`. |
 | Controller | `BusquedaUiController.categorias()` | Llama al caso de uso y aplana el árbol en preorden con `UiModelMapper.toCategorias`; descarta las habilidades. No exige usuario activo porque no modifica información. |
 
 ### Dónde vive cada regla
@@ -143,7 +143,7 @@ La redundancia entre `parent_id` y `path` la controla `CatalogMapper`: si no coi
 | `PublicationSearchContract` | Contrato de la búsqueda (memoria y MySQL) | Filtro por rama a cualquier profundidad, por etiqueta de una habilidad de la rama, sin incluir padres ni hermanas, con paginación y total en la consulta, y categoría inexistente sin resultados. |
 | `MySqlCatalogRepositoryTest` | Integración con MySQL real y Flyway | El árbol de V6 coincide con `DemoCatalog`; comparación sin acentos; la FK rechaza una categoría inexistente y acepta `NULL`; la migración conserva categorías anteriores y deja en `NULL` los borradores vacíos. |
 | `BusquedaUiControllerTest` | Unitaria de Presentation | Aplana el árbol en preorden con su nivel y sin habilidades; no exige usuario activo; traduce errores. |
-| `WiredUiControllersTest` | Integración de Presentation con Application | Crear en una subcategoría y encontrarla al buscar por sus ancestros; categoría fuera del catálogo como `VALIDACION` al buscar y al crear. |
+| `SkillSwapUiControllersTest` | Integración de Presentation con Application | Crear en una subcategoría y encontrarla al buscar por sus ancestros; categoría fuera del catálogo como `VALIDACION` al buscar y al crear. |
 | `SkillSwapViewTest` | Pantalla Swing | Inicio muestra solo el primer nivel; el combo de Explorar muestra la sangría; filtrar por "Diseño UX" encuentra la publicación etiquetada con sus habilidades. |
 
 ## Supuestos

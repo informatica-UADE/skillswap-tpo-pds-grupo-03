@@ -1,7 +1,5 @@
 package ar.edu.uade.skillswap.infrastructure.persistence.repository;
 
-import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchOrder;
-import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchQuery;
 import ar.edu.uade.skillswap.application.model.PageResult;
 import ar.edu.uade.skillswap.application.port.out.PublicationRepository;
 import ar.edu.uade.skillswap.domain.model.AvailabilitySlot;
@@ -9,27 +7,15 @@ import ar.edu.uade.skillswap.domain.model.Publication;
 import ar.edu.uade.skillswap.domain.model.StatusHistoryEntry;
 import ar.edu.uade.skillswap.infrastructure.persistence.JpaRepositorySupport;
 import ar.edu.uade.skillswap.infrastructure.persistence.JpaTransactionManager;
-import ar.edu.uade.skillswap.infrastructure.persistence.entity.CatalogCategoryEntity;
-import ar.edu.uade.skillswap.infrastructure.persistence.entity.CatalogSkillEntity;
-import ar.edu.uade.skillswap.infrastructure.persistence.entity.ProfileEntity;
 import ar.edu.uade.skillswap.infrastructure.persistence.entity.PublicationAvailabilityEntity;
 import ar.edu.uade.skillswap.infrastructure.persistence.entity.PublicationEntity;
 import ar.edu.uade.skillswap.infrastructure.persistence.entity.PublicationStatusHistoryEntity;
 import ar.edu.uade.skillswap.infrastructure.persistence.entity.PublicationTagEntity;
 import ar.edu.uade.skillswap.infrastructure.persistence.mapper.PublicationMapper;
 
-import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
-import jakarta.persistence.criteria.CriteriaBuilder;
-import jakarta.persistence.criteria.CriteriaQuery;
-import jakarta.persistence.criteria.Predicate;
-import jakarta.persistence.criteria.Root;
-
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -108,52 +94,6 @@ public final class JpaPublicationRepository extends JpaRepositorySupport
     }
 
     @Override
-    public PageResult<Publication> searchPublished(SearchQuery search) {
-        Objects.requireNonNull(search, "Faltan los criterios de búsqueda");
-
-        return query(em -> {
-            CriteriaBuilder cb = em.getCriteriaBuilder();
-            Optional<String> branchPath = categoryPath(em, search);
-
-            CriteriaQuery<PublicationEntity> resultQuery =
-                    cb.createQuery(PublicationEntity.class);
-            Root<PublicationEntity> publication =
-                    resultQuery.from(PublicationEntity.class);
-            Root<ProfileEntity> author = resultQuery.from(ProfileEntity.class);
-            Predicate[] predicates = buildPredicates(
-                    cb, resultQuery, publication, author, search, branchPath);
-            resultQuery.select(publication)
-                    .where(predicates)
-                    .orderBy(orderBy(cb, publication, author, search.order()));
-
-            int firstResult = Math.multiplyExact(
-                    search.page(), search.size());
-
-            List<Publication> items = em.createQuery(resultQuery)
-                    .setFirstResult(firstResult)
-                    .setMaxResults(search.size())
-                    .getResultList()
-                    .stream()
-                    .map(PublicationMapper::toDomain)
-                    .toList();
-
-            CriteriaQuery<Long> countQuery = cb.createQuery(Long.class);
-            Root<PublicationEntity> countRoot =
-                    countQuery.from(PublicationEntity.class);
-            Root<ProfileEntity> countAuthor = countQuery.from(ProfileEntity.class);
-
-            countQuery.select(cb.countDistinct(countRoot))
-                    .where(buildPredicates(
-                            cb, countQuery, countRoot, countAuthor, search, branchPath));
-
-            long total = em.createQuery(countQuery).getSingleResult();
-
-            return new PageResult<>(
-                    items, search.page(), search.size(), total);
-        });
-    }
-
-    @Override
     public PageResult<Publication> findPublishedByAuthor(String authorUserId, int page, int size) {
         Objects.requireNonNull(authorUserId, "Falta el ID del autor");
         requireValidPage(page, size);
@@ -191,155 +131,6 @@ public final class JpaPublicationRepository extends JpaRepositorySupport
         }
     }
 
-    /**
-     * Ruta materializada de la categoría pedida, para filtrar su rama completa (#37). Es una sola
-     * fila: no se carga el catálogo. Vacía si no se filtra por categoría o si no existe.
-     */
-    private static Optional<String> categoryPath(EntityManager em, SearchQuery search) {
-        if (search.category() == null || search.category().isBlank()) return Optional.empty();
-        return em.createQuery("SELECT c.path FROM CatalogCategoryEntity c WHERE LOWER(c.name) = LOWER(:name)",
-                        String.class)
-                .setParameter("name", search.category().trim())
-                .getResultStream()
-                .findFirst();
-    }
-
-    private Predicate[] buildPredicates(
-            CriteriaBuilder cb,
-            CriteriaQuery<?> criteria,
-            Root<PublicationEntity> publication,
-            Root<ProfileEntity> author,
-            SearchQuery search,
-            Optional<String> branchPath) {
-
-        List<Predicate> predicates = new ArrayList<>();
-
-        predicates.add(cb.equal(publication.get("status"), "PUBLISHED"));
-        predicates.add(cb.equal(author.get("userId"), publication.get("authorUserId")));
-        predicates.add(cb.isTrue(author.get("active")));
-
-        if (!search.text().isBlank()) {
-            String pattern = containsPattern(search.text());
-            var tagMatches = criteria.subquery(Integer.class);
-            Root<PublicationTagEntity> tag = tagMatches.from(PublicationTagEntity.class);
-            tagMatches.select(cb.literal(1)).where(
-                    cb.equal(tag.get("publication").get("id"), publication.get("id")),
-                    cb.like(cb.lower(tag.get("id").get("tag")), pattern, '\\'));
-
-            predicates.add(cb.or(
-                    cb.like(cb.lower(publication.get("title")), pattern, '\\'),
-                    cb.like(cb.lower(publication.get("description")), pattern, '\\'),
-                    cb.like(cb.lower(publication.get("category")), pattern, '\\'),
-                    cb.exists(tagMatches)
-            ));
-        }
-
-        if (search.category() != null && !search.category().isBlank()) {
-            predicates.add(branchPath
-                    .map(path -> inCategoryBranch(cb, criteria, publication, path))
-                    .orElseGet(cb::disjunction));
-        }
-
-        if (search.modality() != null) {
-            predicates.add(cb.equal(
-                    publication.get("modality"),
-                    search.modality().name()));
-        }
-
-        if (search.minimumPrice() != null) {
-            predicates.add(cb.greaterThanOrEqualTo(
-                    publication.<Integer>get("basePrice"),
-                    search.minimumPrice()));
-        }
-
-        if (search.maximumPrice() != null) {
-            predicates.add(cb.lessThanOrEqualTo(
-                    publication.<Integer>get("basePrice"),
-                    search.maximumPrice()));
-        }
-
-        if (search.skill() != null && !search.skill().isBlank()) {
-            var skillMatches = criteria.subquery(Integer.class);
-            Root<PublicationTagEntity> tag = skillMatches.from(PublicationTagEntity.class);
-            skillMatches.select(cb.literal(1)).where(
-                    cb.equal(tag.get("publication").get("id"), publication.get("id")),
-                    cb.equal(cb.lower(tag.get("id").get("tag")),
-                            search.skill().toLowerCase(Locale.ROOT)));
-            predicates.add(cb.exists(skillMatches));
-        }
-
-        if (search.minimumReputation() != null) {
-            predicates.add(cb.greaterThanOrEqualTo(
-                    author.<java.math.BigDecimal>get("reputation"),
-                    java.math.BigDecimal.valueOf(search.minimumReputation())));
-        }
-
-        return predicates.toArray(Predicate[]::new);
-    }
-
-    private List<jakarta.persistence.criteria.Order> orderBy(
-            CriteriaBuilder cb,
-            Root<PublicationEntity> publication,
-            Root<ProfileEntity> author,
-            SearchOrder order) {
-
-        List<jakarta.persistence.criteria.Order> orders = new ArrayList<>(switch (order) {
-            case LOWEST_PRICE -> List.of(
-                    cb.asc(publication.get("basePrice")),
-                    cb.desc(publication.get("createdAt")));
-            case MOST_RECENT -> List.of(
-                    cb.desc(publication.get("createdAt")));
-            case BEST_RATING -> List.of(
-                    cb.desc(author.get("reputation")),
-                    cb.desc(author.get("ratingCount")),
-                    cb.desc(publication.get("createdAt")));
-            case RELEVANCE -> List.of(
-                    cb.desc(publication.get("requestCount")),
-                    cb.desc(publication.get("createdAt")));
-        });
-        // A unique final key keeps page boundaries stable when prices/dates tie.
-        orders.add(cb.asc(publication.get("id")));
-        return orders;
-    }
-
-    /**
-     * Una publicación pertenece a la rama si su categoría es la elegida o una descendiente, o si
-     * alguna de sus etiquetas es una habilidad de esa rama. Ambas condiciones se resuelven con
-     * subconsultas sobre la ruta materializada, dentro de la misma consulta paginada.
-     */
-    private static Predicate inCategoryBranch(CriteriaBuilder cb, CriteriaQuery<?> criteria,
-                                              Root<PublicationEntity> publication, String path) {
-        String branch = likeEscape(path) + "%";
-        var branchCategories = criteria.subquery(String.class);
-        Root<CatalogCategoryEntity> category = branchCategories.from(CatalogCategoryEntity.class);
-        branchCategories.select(category.get("name")).where(cb.like(category.get("path"), branch, '\\'));
-
-        var branchSkillTags = criteria.subquery(Integer.class);
-        Root<PublicationTagEntity> tag = branchSkillTags.from(PublicationTagEntity.class);
-        Root<CatalogSkillEntity> skill = branchSkillTags.from(CatalogSkillEntity.class);
-        Root<CatalogCategoryEntity> owner = branchSkillTags.from(CatalogCategoryEntity.class);
-        branchSkillTags.select(cb.literal(1)).where(
-                cb.equal(tag.get("publication").get("id"), publication.get("id")),
-                cb.equal(cb.lower(tag.get("id").get("tag")), cb.lower(skill.get("name"))),
-                cb.equal(skill.get("categoryId"), owner.get("id")),
-                cb.like(owner.get("path"), branch, '\\'));
-
-        return cb.or(publication.get("category").in(branchCategories), cb.exists(branchSkillTags));
-    }
-
-    private static String likeEscape(String value) {
-        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
-    }
-
-    private static String containsPattern(String value) {
-        String escaped = value.toLowerCase(Locale.ROOT)
-                .replace("\\", "\\\\")
-                .replace("%", "\\%")
-                .replace("_", "\\_");
-        return "%" + escaped + "%";
-    }
-
-    @Override
     public Publication save(Publication publication) {
         Objects.requireNonNull(publication, "Falta la publicación");
 

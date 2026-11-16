@@ -83,4 +83,4 @@ La consigna (§4.3) pide buscar publicaciones por texto, categoría, modalidad, 
 | `DiscoveryApplicationServiceTest` | Delegación sin modificar criterios, autor en una sola lectura de perfiles (búsqueda y recomendaciones), autor sin perfil como inconsistencia, validación, propagación de fallas, búsqueda sin autenticación. |
 | `PublicationApplicationServiceTest` | Vistas de gestión con autor, borrador sin perfil rechazado, listado vacío sin perfil. |
 | `InMemoryRepositoriesTest` | Lectura de perfiles en lote. |
-| `UiModelMapperTest` / `WiredUiControllersTest` | Conversión de filtros de UI y nombre/reputación reales del autor en las tarjetas. |
+| `UiModelMapperTest` / `SkillSwapUiControllersTest` | Conversión de filtros de UI y nombre/reputación reales del autor en las tarjetas. |

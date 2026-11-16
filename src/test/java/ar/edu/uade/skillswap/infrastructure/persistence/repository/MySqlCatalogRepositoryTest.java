@@ -112,6 +112,7 @@ class MySqlCatalogRepositoryTest {
         var transactions = transactions("latest");
         var catalog = new JpaCatalogRepository(transactions);
         var publications = new JpaPublicationRepository(transactions);
+        var publicationQueries = new JpaPublicationQueryAdapter(transactions);
 
         List<CatalogCategory> roots = catalog.findRootCategories();
         CatalogCategory preserved = roots.get(roots.size() - 1);
@@ -119,7 +120,7 @@ class MySqlCatalogRepositoryTest {
         assertTrue(preserved.id().startsWith("anterior-"));
         assertEquals(views(DemoCatalog.tree()), views(roots.subList(0, roots.size() - 1)));
         assertEquals("", publications.findById("vacia").orElseThrow().category());
-        assertEquals(List.of("anterior"), publications.searchPublished(new SearchQuery(null,
+        assertEquals(List.of("anterior"), publicationQueries.searchPublished(new SearchQuery(null,
                 "Fotografía analógica", null, null, null, null, null, null, 0, 10)).items().stream()
                 .map(publication -> publication.id()).toList());
         try (var connection = DriverManager.getConnection(url, user, password);

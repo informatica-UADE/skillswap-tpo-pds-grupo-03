@@ -18,7 +18,7 @@ El modo predeterminado usa memoria. --persistence=jpa ensambla los mismos servic
 | Application | Servicios por capacidad, puertos y comandos/resultados. Identifican al actor, coordinan agregados, transacciones y eventos. No importan Swing ni JPA. |
 | Domain | Profile, Publication, Booking, Wallet, Rating, estados, políticas, Builder y cotizaciones. Conserva invariantes y depende de Java estándar. |
 | Infrastructure | Repositorios en memoria/JPA, mappers, migraciones, transacciones y adapters. Implementa los puertos internos. |
-| Composición | SkillSwapApplicationWiring selecciona implementaciones. WiredUiControllers conecta la UI y delega; conserva billetera/notificaciones que #32 separará. |
+| Composición | SkillSwapApplicationWiring selecciona implementaciones. SkillSwapUiControllers (#32) arma un controller por pantalla (búsqueda, publicaciones, contrataciones, calificaciones, billetera, notificaciones y perfil) y la vista habla con cada uno; no delega métodos ni tiene lógica. La sesión demo no es un controller: DemoCurrentUserProvider es la identidad activa y lista los perfiles activos de la base para cambiar de usuario. |
 
 Las entidades JPA no atraviesan los puertos. Los resultados de Application y DTOs de UI contienen datos, enums y colecciones copiadas. PresentationContractsTest comprueba que los controllers dedicados no expongan entidades ni dependan de persistencia.
 
@@ -28,7 +28,7 @@ Las entidades JPA no atraviesan los puertos. Los resultados de Application y DTO
 | --- | --- |
 | Profile | Titularidad, actividad, habilidades/intereses y reputación derivada. Tipo de actor fijo al registrar. |
 | Publication | Autoría, borrador, estados y disponibilidad. ActorType valida el tipo elegido. |
-| Booking | Participantes, transiciones, mensaje, objetivo y franja independientes; reprogramación e historial. |
+| Booking | Participantes, transiciones, mensaje, objetivo y franja independientes; reprogramación e historial. Cada transición tiene su actor: el proveedor acepta, rechaza e inicia; el cliente paga y completa (#32). |
 | Wallet / SkillCoins | Montos, saldo y ledger. Application coordina transferencias entre billeteras. |
 | Rating | Contratación completada, participantes y puntaje. Application y una restricción persistente protegen unicidad. |
 | Servicios | Cargan mediante puertos, delegan reglas, guardan resultados y publican eventos después del commit. |
@@ -60,7 +60,7 @@ Factory Method se descartó por ausencia de una variación de creación mediante
 
 Information Expert ubica reglas en quien conoce los datos. Creator aparece en métodos de creación y Builder. Controller recibe acciones. Polymorphism se aplica a State, Strategy y cotizaciones. Low Coupling, Indirection y Protected Variations se apoyan en puertos/adapters. Pure Fabrication ubica mappers/transacciones fuera del dominio. High Cohesion exige separar capacidades.
 
-SRP separa crear, adaptar, coordinar y persistir. DIP mantiene contratos internos independientes. ISP agrupa capacidades. OCP/LSP permiten sustituir estrategias/adapters respetando contratos, con el compromiso explícito de la fábrica. La separación pendiente de billetera/notificaciones se registra en #32: no se declara una aplicación perfecta de todos los principios.
+SRP separa crear, adaptar, coordinar y persistir. DIP mantiene contratos internos independientes. ISP agrupa capacidades. OCP/LSP permiten sustituir estrategias/adapters respetando contratos, con el compromiso explícito de la fábrica. #32 separó billetera y notificaciones en controllers propios, dejó la sesión demo como contexto de identidad y eliminó la clase que concentraba todas las pantallas; no se declara una aplicación perfecta de todos los principios.
 
 ## 6. Persistencia y consistencia
 
@@ -78,7 +78,7 @@ BorderLayout colocaba texto y estado de una contratación en la misma región; l
 
 BookingView incorpora el título que Application obtiene desde la publicación. Presentation deja de depender de una caché de búsquedas; cambiar de usuario o crear otra fachada conserva el título. La contraparte se calcula con la identidad activa, sin fijar Mateo.
 
-SkillSwapViewTest reproduce el problema de layout y verifica dimensiones visibles. WiredUiControllersTest comprueba título sin caché y contraparte desde ambos participantes. Se mantienen permisos, saldo, unicidad, tipos y paginación. No se editaron diagramas.
+SkillSwapViewTest reproduce el problema de layout y verifica dimensiones visibles. SkillSwapUiControllersTest comprueba título sin caché y contraparte desde ambos participantes. Se mantienen permisos, saldo, unicidad, tipos y paginación. No se editaron diagramas.
 
 ## 8. Cobertura reproducible
 

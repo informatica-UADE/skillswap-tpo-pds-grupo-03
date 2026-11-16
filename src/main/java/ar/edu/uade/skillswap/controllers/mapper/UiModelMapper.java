@@ -13,6 +13,7 @@ import ar.edu.uade.skillswap.application.model.PublicProfileData.PublicProfileQu
 import ar.edu.uade.skillswap.application.model.PublicProfileData.PublicProfileView;
 import ar.edu.uade.skillswap.application.model.PublicProfileData.ReceivedRatingView;
 import ar.edu.uade.skillswap.application.model.PublicationData.PublicationView;
+import ar.edu.uade.skillswap.application.model.RatingData.RatingView;
 import ar.edu.uade.skillswap.application.model.WalletData.MovementView;
 import ar.edu.uade.skillswap.domain.model.BookingStatus;
 import ar.edu.uade.skillswap.domain.model.Modality;
@@ -121,11 +122,18 @@ public final class UiModelMapper {
         };
     }
 
-    public Models.Contratacion toContratacion(BookingView view, String titulo, String contraparte,
-                                              String contraparteId) {
-        return new Models.Contratacion(view.id(), titulo, contraparte, contraparteId, view.createdAt(),
-                view.priceInSkillCoins(), toEstadoContratacion(view.status()), view.objective(),
+    /** La contraparte es el proveedor si el usuario activo compró, y el comprador en otro caso. */
+    public Models.Contratacion toContratacion(BookingView view, String activeUserId) {
+        boolean buyer = view.buyerUserId().equals(activeUserId);
+        String contraparteId = buyer ? view.providerUserId() : view.buyerUserId();
+        String contraparte = buyer ? view.providerDisplayName() : view.buyerDisplayName();
+        return new Models.Contratacion(view.id(), view.publicationTitle(), contraparte, contraparteId,
+                view.createdAt(), view.priceInSkillCoins(), toEstadoContratacion(view.status()), view.objective(),
                 view.clientMessage(), view.slotId());
+    }
+
+    public Models.Calificacion toCalificacion(RatingView view) {
+        return new Models.Calificacion(view.id(), view.bookingId(), view.score(), view.comment(), view.createdAt());
     }
 
     public Models.Perfil toPerfil(ProfileView view) {

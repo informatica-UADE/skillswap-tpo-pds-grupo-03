@@ -128,6 +128,7 @@ class ProfileApplicationServiceTest {
     }
 
     private static final class InMemoryProfiles implements ProfileRepository {
+        @Override public List<Profile> findActive() { throw new AssertionError("No debe listar perfiles"); }
         private final Map<String, Profile> byUser = new HashMap<>();
 
         @Override public Optional<Profile> findByUserId(String userId) { return Optional.ofNullable(byUser.get(userId)); }

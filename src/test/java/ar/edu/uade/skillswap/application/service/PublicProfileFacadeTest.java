@@ -213,6 +213,7 @@ class PublicProfileFacadeTest {
     }
 
     private final class Profiles extends TransactionalDouble implements ProfileRepository {
+        @Override public List<Profile> findActive() { throw new AssertionError("No debe listar perfiles"); }
         private final Map<String, Profile> byUserId = new HashMap<>();
 
         void add(Profile profile) {
@@ -247,7 +248,6 @@ class PublicProfileFacadeTest {
         @Override public Optional<Publication> findByIdForUpdate(String publicationId) { throw unexpected(); }
         @Override public List<Publication> findByAuthorUserId(String authorUserId) { throw unexpected(); }
         @Override public List<Publication> findPublished() { throw unexpected(); }
-        @Override public PageResult<Publication> searchPublished(SearchQuery query) { throw unexpected(); }
         @Override public Publication save(Publication publication) { throw unexpected(); }
     }
 

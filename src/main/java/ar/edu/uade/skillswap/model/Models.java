@@ -41,6 +41,14 @@ public final class Models {
         @Override public String toString() { return "    ".repeat(nivel) + nombre; }
     }
 
+    /**
+     * Perfil guardado con el que se puede probar la demo y su tipo ("Profesional" u "Organización").
+     * {@code toString()} es lo que muestra el selector de perfiles.
+     */
+    public record UsuarioDemo(String id, String nombre, String rol) {
+        @Override public String toString() { return nombre + " · " + rol; }
+    }
+
     public record Disponibilidad(String id, LocalDateTime inicio, LocalDateTime fin, int cupos) {}
 
     public record NuevoPerfil(String nombre, String bio, String zonaHoraria,

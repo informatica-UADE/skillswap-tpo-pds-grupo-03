@@ -7,7 +7,8 @@ import ar.edu.uade.skillswap.application.model.PublicationData.ChangeStatusComma
 import ar.edu.uade.skillswap.application.model.PublicationData.CreateDraftCommand;
 import ar.edu.uade.skillswap.application.model.PublicationData.EditDraftCommand;
 import ar.edu.uade.skillswap.application.model.PublicationData.PublicationView;
-import ar.edu.uade.skillswap.application.port.in.PublicationUseCases;
+import ar.edu.uade.skillswap.application.port.in.PublicationCommandUseCases;
+import ar.edu.uade.skillswap.application.port.in.PublicationQueryUseCases;
 import ar.edu.uade.skillswap.application.port.out.CatalogRepository;
 import ar.edu.uade.skillswap.application.port.out.CurrentUserProvider;
 import ar.edu.uade.skillswap.application.port.out.ProfileRepository;
@@ -22,7 +23,8 @@ import java.util.List;
 import java.util.Objects;
 
 /** Coordinates publication commands and delegates all lifecycle rules to Publication. */
-public final class PublicationApplicationService implements PublicationUseCases {
+public final class PublicationApplicationService
+        implements PublicationCommandUseCases, PublicationQueryUseCases {
     private final PublicationRepository publications;
     private final ProfileRepository profiles;
     private final CatalogRepository catalog;
