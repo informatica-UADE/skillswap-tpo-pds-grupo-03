@@ -14,10 +14,10 @@ import java.util.List;
  * su ruta materializada, y una fila por habilidad. En producción el catálogo lo carga Flyway; esta
  * carga existe solo para las pruebas sobre H2.
  */
-final class JpaCatalogFixtures {
+public final class JpaCatalogFixtures {
     private JpaCatalogFixtures() {}
 
-    static void persist(EntityManagerFactory factory, List<CatalogCategory> roots) {
+    public static void persist(EntityManagerFactory factory, List<CatalogCategory> roots) {
         var em = factory.createEntityManager();
         try {
             em.getTransaction().begin();

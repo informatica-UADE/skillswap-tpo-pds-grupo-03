@@ -8,10 +8,10 @@ Las secciones señaladas como **históricas** conservan el inventario de `main` 
 
 ## Actualización del PR #61
 
-- Application dispone de servicios concretos y pruebas bajo `application/service`; `SkillSwapApplicationWiring` los compone en memoria o con JPA mediante `--persistence=jpa`. La unidad JPA, transacciones y cierre de recursos se comparten para todos los repositorios del modo persistente.
+- Application dispone de servicios concretos y pruebas bajo `application/service`; `SkillSwapApplicationWiring` los compone siempre sobre los repositorios JPA (MySQL en la aplicación, H2 en las pruebas). La unidad JPA, transacciones y cierre de recursos se comparten para todos los repositorios.
 - Infrastructure incorpora entidades, mappers, repositorios JPA, `JpaTransactionManager` y migraciones V1/V2. `JpaBookingClientMessageTest` verifica guardar, buscar y actualizar el mensaje y aplicar V2 a una tabla con filas previas en H2 modo MySQL.
 - Adapter está implementado para identidad y notificaciones; Observer tiene un dispatcher, suscripciones y pruebas de varios observadores. La evidencia concreta se detalla abajo.
-- La verificación posterior contra MySQL real/Flyway, rollback, carreras de reservas/pagos y paginación se registra en [Pruebas de MySQL](pruebas-mysql.md). La demo en memoria y H2 no sustituyen esa suite. La prueba no certifica carga de producción ni todos los intercalados posibles.
+- La verificación posterior contra MySQL real/Flyway, rollback, carreras de reservas/pagos y paginación se registra en [Pruebas de MySQL](pruebas-mysql.md). Las pruebas sobre H2 no sustituyen esa suite. La prueba no certifica carga de producción ni todos los intercalados posibles.
 - La suite ampliada también verifica perfiles, calificaciones/reputación, notificaciones, orden por reputación y reinicio del wiring JPA sin perder ni duplicar datos. El arranque de Swing con MySQL se comprobó en modo de captura; no equivale a recorrer manualmente todas las pantallas.
 - Los controllers de #63/#64 y la integración/calificación de #65 están en ramas separadas; este corte no certifica su integración ni el recorrido visual completo. La cobertura Domain/Application todavía requiere medición.
 - Verificación inicial del 02/11/2026: `mvn clean test` sobre `d0f036a`, 117 pruebas, 0 fallos, 0 errores y 0 omitidas. La revisión documental `e634a02` fue seguida por las pruebas reales de MySQL, sus correcciones de Infrastructure y V3; consultar el registro enlazado para la validación posterior.

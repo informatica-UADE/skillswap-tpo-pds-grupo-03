@@ -48,7 +48,7 @@ SkillSwapView ──▶ BusquedaController / PublicacionController (Presentation
   CatalogRepository ◀───┴──────────────────────────────┘                  (puerto de salida)
           │                     PublicationQueryPort.searchPublished   ─▶ filtra la rama en SQL
           ▼
-  JpaCatalogRepository / InMemoryCatalogRepository ──▶ CatalogMapper ──▶ CatalogCategory / CatalogSkill (Domain)
+  JpaCatalogRepository ──▶ CatalogMapper ──▶ CatalogCategory / CatalogSkill (Domain)
 ```
 
 ## Casos de uso y responsabilidad de cada Service
@@ -71,7 +71,7 @@ SkillSwapView ──▶ BusquedaController / PublicacionController (Presentation
 | Puerto de entrada | `DiscoveryUseCases.categories()` | Contrato de la consulta de categorías (ver la tabla anterior). |
 | Service | `DiscoveryApplicationService` | Recorre el Composite y arma las vistas. |
 | Puerto de salida | `CatalogRepository` | `findRootCategories()` y `findCategoryName(nombre)`. Definido en Application, la capa que lo necesita. |
-| Infrastructure | `JpaCatalogRepository`, `CatalogMapper`, `CatalogCategoryEntity`, `CatalogSkillEntity`, `InMemoryCatalogRepository`, `DemoCatalog`, migración V6 | Persisten y reconstruyen el árbol; el filtro por rama vive en el lado de consulta (#42): `JpaPublicationQueryAdapter` e `InMemoryPublicationRepository`. |
+| Infrastructure | `JpaCatalogRepository`, `CatalogMapper`, `CatalogCategoryEntity`, `CatalogSkillEntity`, migración V6 | Persisten y reconstruyen el árbol; el filtro por rama vive en el lado de consulta (#42): `JpaPublicationQueryAdapter`. |
 | Controller | `BusquedaUiController.categorias()` | Llama al caso de uso y convierte cada `CategoryView` en `Models.Categoria` con `UiModelMapper.toCategorias`. No exige usuario activo porque no modifica información. |
 
 ### Dónde vive cada regla
@@ -105,7 +105,7 @@ La redundancia entre `parent_id` y `path` la controla `CatalogMapper`: si no coi
 
 **Entidades JPA separadas del dominio.** El Composite usa referencias al padre, una lista de hijos y recursión. Mapearlo directamente (`@OneToMany` autorreferenciado) metería anotaciones, proxies y carga perezosa en el dominio, y la ruta materializada es un detalle de la base. Por eso hay entidades planas (`CatalogCategoryEntity`, `CatalogSkillEntity`) y `CatalogMapper` arma el árbol con `CatalogCategory.add`. El catálogo se lee con **dos consultas** (categorías y habilidades), sin N+1.
 
-**Modo en memoria.** `DemoCatalog` arma el mismo árbol que V6; `MySqlCatalogRepositoryTest` verifica que coincidan. `InMemoryCatalogRepository` devuelve copias para que nadie modifique el catálogo desde afuera, igual que JPA, que reconstruye uno nuevo en cada lectura.
+**Catálogo en las pruebas.** En MySQL el catálogo lo carga V6. En las pruebas sobre H2 no corre Flyway, así que `DemoCatalog` (solo en `src/test`) arma el mismo árbol y `JpaCatalogFixtures` lo guarda; `MySqlCatalogRepositoryTest` verifica que coincida con V6. `JpaCatalogRepository` reconstruye un árbol nuevo en cada lectura, así que nadie puede modificar el catálogo guardado desde afuera.
 
 ## Errores, validaciones y transacciones
 
@@ -123,7 +123,7 @@ La redundancia entre `parent_id` y `path` la controla `CatalogMapper`: si no coi
 
 ## Interfaces y lo que no se agregó
 
-- **`CatalogRepository`:** necesidad real; Application no conoce JPA y hay dos implementaciones (memoria y JPA).
+- **`CatalogRepository`:** necesidad real; Application no conoce JPA, y los tests de los services usan un doble (`FixedCatalog`).
 - **Un caso de uso, un service y un DTO propios del catálogo:** no se agregaron. Solo servirían para listar categorías, que ya es parte de `DiscoveryUseCases`, y obligarían a mandar a la pantalla un árbol con habilidades que no usa.
 - **Casos de uso de alta y edición del catálogo:** no se agregaron porque la consigna no define quién administra el catálogo; agregarlos obligaba a inventar un rol y sus permisos.
 - **Un repositorio por nodo, un `SkillRepository` o un Visitor:** no resuelven nada del problema.
@@ -137,9 +137,9 @@ La redundancia entre `parent_id` y `path` la controla `CatalogMapper`: si no coi
 | `CatalogCompositeTest` | Unitaria de Domain | Recorrido igual para hoja y rama; habilidades y categorías de un subárbol; padre y profundidad; búsqueda sin mayúsculas ni acentos; hijos inmodificables desde afuera; ciclos, doble padre, hermanos repetidos, categoría repetida en otra rama; datos obligatorios. |
 | `PublicationApplicationServiceTest`, `DiscoveryApplicationServiceTest` | Unitarias de Application con dobles | La categoría se guarda con el nombre del catálogo; una categoría inexistente es `VALIDATION` sin guardar ni consultar publicaciones; las categorías se listan en preorden con su profundidad y sin habilidades. |
 | `CatalogRepositoryContract` | Contrato del puerto de salida | Árbol completo con orden y niveles; cada lectura es un árbol nuevo; categorías de cualquier nivel por nombre; una habilidad no es una categoría. |
-| `InMemoryCatalogRepositoryTest`, `JpaCatalogRepositoryTest` | Contrato en memoria y JPA sobre H2 | Que ambos almacenamientos se comporten igual. |
+| `JpaCatalogRepositoryTest` | Contrato sobre JPA y H2 | Árbol completo, lecturas independientes y búsqueda de categorías por nombre. |
 | `CatalogMapperTest` | Unitaria de Infrastructure | Filas inválidas: padre o categoría inexistente, ciclo, ruta desactualizada, nombres repetidos. |
-| `PublicationSearchContract` | Contrato de la búsqueda (memoria y MySQL) | Filtro por rama a cualquier profundidad, por etiqueta de una habilidad de la rama, sin incluir padres ni hermanas, con paginación y total en la consulta, y categoría inexistente sin resultados. |
+| `PublicationSearchContract` | Contrato de la búsqueda (MySQL, perfil `mysql-it`) | Filtro por rama a cualquier profundidad, por etiqueta de una habilidad de la rama, sin incluir padres ni hermanas, con paginación y total en la consulta, y categoría inexistente sin resultados. |
 | `MySqlCatalogRepositoryTest` | Integración con MySQL real y Flyway | El árbol de V6 coincide con `DemoCatalog`; comparación sin acentos; la FK rechaza una categoría inexistente y acepta `NULL`; la migración conserva categorías anteriores y deja en `NULL` los borradores vacíos. |
 | `BusquedaUiControllerTest` | Unitaria de Presentation | Convierte las categorías con su nivel y la sangría; no exige usuario activo; traduce errores. |
 | `SkillSwapUiControllersTest` | Integración de Presentation con Application | Crear en una subcategoría y encontrarla al buscar por sus ancestros; categoría fuera del catálogo como `VALIDACION` al buscar y al crear. |

@@ -56,7 +56,7 @@ Cualquier pantalla nueva o cambio de contrato tocaba esa clase, que dependía de
 | DTO de Application | `WalletView`, `MovementView`, `NotificationView`, `RatingView`, `BookingView` (con los nombres de las partes) | Datos simples que devuelven los casos de uso; nunca entidades. |
 | DTO de Presentation | `Models.Movimiento`, `Models.Notificacion`, `Models.Calificacion`, `Models.Contratacion` | Lo que muestra la vista. |
 | Service | `WalletApplicationService`, `NotificationApplicationService`, `RatingApplicationService`, `BookingApplicationService` | Orquestan; toman el usuario del puerto `CurrentUserProvider`, no del parámetro de la UI. |
-| Repository | `WalletRepository`, `NotificationRepository`, `RatingRepository`, `BookingRepository`, `ProfileRepository` | Interfaces en Application; implementaciones JPA y en memoria en Infrastructure. Sin cambios, salvo que `BookingApplicationService` ahora usa `ProfileRepository.findByUserIds`. |
+| Repository | `WalletRepository`, `NotificationRepository`, `RatingRepository`, `BookingRepository`, `ProfileRepository` | Interfaces en Application; implementaciones JPA en Infrastructure. Sin cambios, salvo que `BookingApplicationService` ahora usa `ProfileRepository.findByUserIds`. |
 | Controller | Los de la tabla anterior | Reciben la acción, validan el usuario activo y la entrada, convierten y delegan. |
 | Infrastructure | `SkillSwapUiControllers`, `DemoCurrentUserProvider`, `UiOperationExecutor`, `SkillSwapApplicationWiring` | Composición y detalles técnicos: arma los controllers, el contexto de la sesión demo y la traducción de errores de persistencia. |
 

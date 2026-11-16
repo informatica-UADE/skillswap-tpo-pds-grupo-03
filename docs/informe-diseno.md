@@ -8,7 +8,7 @@ Revisión del 15/11/2026 para el PR #65, sobre main en e64048c (#63/#64 y #75 in
 
 La aplicación es una demo Java 17/Swing. Permite publicar, buscar y solicitar propuestas, aceptar, pagar con SkillCoins ficticios, iniciar, completar y calificar. El selector permite alternar entre Mateo, Ana y Lucía. Las identidades, email y push son simulados: no hay autenticación, envío externo ni pagos reales.
 
-El modo predeterminado usa memoria. --persistence=jpa ensambla los mismos servicios con JPA/MySQL. Flyway aplica migraciones V1-V6 y Hibernate valida el esquema. #75 distingue profesionales y organizaciones y exige tipos explícitos. La demo no agrega alta visual de organizaciones ni un desafío inicial, pendientes de sus tareas correspondientes.
+La aplicación siempre persiste en MySQL con repositorios JPA: no hay un modo en memoria. Flyway aplica migraciones V1-V6 y Hibernate valida el esquema. Las pruebas usan los mismos repositorios JPA sobre H2 y, con el perfil mysql-it, sobre MySQL real. #75 distingue profesionales y organizaciones y exige tipos explícitos. La demo no agrega alta visual de organizaciones ni un desafío inicial, pendientes de sus tareas correspondientes.
 
 ## 2. Capas y dependencias
 
@@ -17,7 +17,7 @@ El modo predeterminado usa memoria. --persistence=jpa ensambla los mismos servic
 | Presentation | SkillSwapView, UiControllers y controllers de búsqueda, perfil, publicaciones, contratación y calificación. Convierten datos y delegan. PresentationException y UiActionHandler muestran errores estables. |
 | Application | Servicios por capacidad, puertos y comandos/resultados. Identifican al actor, coordinan agregados, transacciones y eventos. No importan Swing ni JPA. |
 | Domain | Profile, Publication, Booking, Wallet, Rating, estados, políticas, Builder y cotizaciones. Conserva invariantes y depende de Java estándar. |
-| Infrastructure | Repositorios en memoria/JPA, mappers, migraciones, transacciones y adapters. Implementa los puertos internos. |
+| Infrastructure | Repositorios JPA, mappers, migraciones, transacciones y adapters. Implementa los puertos internos. |
 | Composición | SkillSwapApplicationWiring selecciona implementaciones. SkillSwapUiControllers (#32) arma un controller por pantalla (búsqueda, publicaciones, contrataciones, calificaciones, billetera, notificaciones y perfil) y la vista habla con cada uno; no delega métodos ni tiene lógica. La sesión demo no es un controller: DemoCurrentUserProvider es la identidad activa y lista los perfiles activos de la base para cambiar de usuario. |
 
 Las entidades JPA no atraviesan los puertos. Los resultados de Application y DTOs de UI contienen datos, enums y colecciones copiadas. PresentationContractsTest comprueba que los controllers dedicados no expongan entidades ni dependan de persistencia.
@@ -68,7 +68,7 @@ Flyway versiona esquema y restricciones: V2 conserva el mensaje opcional, V3 ord
 
 JpaTransactionManager comparte EntityManager, confirma o revierte y ejecuta callbacks después del commit. Los repositorios bloquean recursos para cupos, pagos y calificaciones; las billeteras se adquieren en orden estable. MySQL usa READ_COMMITTED. La búsqueda pagina/filtra en persistencia y completa autores por lotes.
 
-SynchronousTransactionManager ejecuta directamente sobre objetos mutables: memoria no ofrece rollback ni garantías de concurrencia y pierde estado al cerrar. JPA conserva datos y el seed evita duplicados.
+Los repositorios en memoria y SynchronousTransactionManager se eliminaron: no aportaban rollback ni garantías de concurrencia y duplicaban cada consulta con una segunda implementación que había que mantener igual a la de JPA. JPA conserva datos y el seed evita duplicados.
 
 El pago de main transfiere directamente al proveedor. No existe custodia ni liberación al completar. Esta diferencia respecto del criterio de #19 es una brecha de negocio preexistente, fuera de la integración #65, que se debe resolver por separado. El guion ya no describe una custodia inexistente. Preparar este PR no certifica terminado todo el proyecto.
 

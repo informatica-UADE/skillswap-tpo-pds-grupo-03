@@ -6,41 +6,50 @@ import ar.edu.uade.skillswap.application.service.ProfileApplicationService;
 import ar.edu.uade.skillswap.application.service.PublicProfileFacade;
 import ar.edu.uade.skillswap.application.service.PublicationApplicationService;
 import ar.edu.uade.skillswap.controllers.error.PresentationException;
-import ar.edu.uade.skillswap.infrastructure.DemoCatalog;
-import ar.edu.uade.skillswap.infrastructure.InMemoryBookingRepository;
-import ar.edu.uade.skillswap.infrastructure.InMemoryCatalogRepository;
-import ar.edu.uade.skillswap.infrastructure.InMemoryProfileRepository;
-import ar.edu.uade.skillswap.infrastructure.InMemoryPublicationRepository;
-import ar.edu.uade.skillswap.infrastructure.InMemoryRatingRepository;
-import ar.edu.uade.skillswap.infrastructure.SynchronousTransactionManager;
 import ar.edu.uade.skillswap.infrastructure.UiOperationExecutor;
+import ar.edu.uade.skillswap.infrastructure.persistence.H2Database;
+import ar.edu.uade.skillswap.infrastructure.persistence.JpaTransactionManager;
+import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaBookingRepository;
+import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaCatalogRepository;
+import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaProfileRepository;
+import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaPublicationQueryAdapter;
+import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaPublicationRepository;
+import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaRatingRepository;
 import ar.edu.uade.skillswap.model.Models;
 import ar.edu.uade.skillswap.domain.model.RecentPopularityStrategy;
+import jakarta.persistence.EntityManagerFactory;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Real use cases and domain, with memory repositories; no JPA or database connection. */
+/** Controllers, casos de uso y dominio reales sobre los repositorios JPA en una base H2. */
 class ProfilePublicationControllersIntegrationTest {
     private String actor = "u1";
-    private final InMemoryProfileRepository profileRepository = new InMemoryProfileRepository();
-    private final InMemoryCatalogRepository catalogRepository = new InMemoryCatalogRepository(DemoCatalog.tree());
-    private final InMemoryPublicationRepository publicationRepository =
-            new InMemoryPublicationRepository(profileRepository, catalogRepository);
-    private final SynchronousTransactionManager transactions = new SynchronousTransactionManager();
-    private final InMemoryBookingRepository bookingRepository = new InMemoryBookingRepository();
+    private final EntityManagerFactory database = H2Database.factoryWithDemoCatalog("profile_publication");
+    private final JpaTransactionManager transactions = new JpaTransactionManager(database);
+    private final JpaProfileRepository profileRepository = new JpaProfileRepository(transactions);
+    private final JpaCatalogRepository catalogRepository = new JpaCatalogRepository(transactions);
+    private final JpaPublicationRepository publicationRepository = new JpaPublicationRepository(transactions);
+    private final JpaBookingRepository bookingRepository = new JpaBookingRepository(transactions);
     private final PerfilUiController profiles = new PerfilUiController(new ProfileApplicationService(
             profileRepository, bookingRepository, () -> actor, transactions),
             new PublicProfileFacade(profileRepository, publicationRepository, bookingRepository,
-                    new InMemoryRatingRepository(), transactions), () -> actor, new UiOperationExecutor());
+                    new JpaRatingRepository(transactions), transactions), () -> actor, new UiOperationExecutor());
     private final PublicationApplicationService publicationService = new PublicationApplicationService(
             publicationRepository, profileRepository, catalogRepository, () -> actor, transactions);
     private final PublicacionUiController publications = new PublicacionUiController(
             publicationService, publicationService, () -> actor, new UiOperationExecutor());
+
+    @AfterEach
+    void closeDatabase() {
+        database.close();
+    }
 
     @Test
     void registraUnaOrganizacionYCreaEditaYPublicaSuDesafioDesdeLosControllers() {
@@ -60,7 +69,7 @@ class ProfilePublicationControllersIntegrationTest {
         assertEquals(Models.EstadoPublicacion.PUBLICADA, published.estado());
         assertCode(Models.CodigoError.PERMISOS, () -> publications.crearBorrador("u1", draft()));
         assertEquals(1, publications.listarPropias("u1").size());
-        var catalog = new DiscoveryApplicationService(publicationRepository, publicationRepository,
+        var catalog = new DiscoveryApplicationService(publicationRepository, new JpaPublicationQueryAdapter(transactions),
                 profileRepository, catalogRepository, () -> actor, new RecentPopularityStrategy())
                 .search(new SearchQuery("", null, null, null, null, null, null, null, 0, 20));
         assertTrue(catalog.items().stream().anyMatch(item -> item.id().equals(challenge.id())));
@@ -132,7 +141,7 @@ class ProfilePublicationControllersIntegrationTest {
                 () -> publications.editarBorrador("u1", "inexistente", edition("Java")));
         assertCode(Models.CodigoError.NO_ENCONTRADO,
                 () -> publications.cambiarEstado("u1", "inexistente", Models.EstadoPublicacion.PUBLICADA));
-        var start = LocalDateTime.now().plusDays(2);
+        var start = LocalDateTime.now().plusDays(2).truncatedTo(ChronoUnit.MINUTES);
         var invalid = new Models.DatosBorrador("Java", "Mentoría", "Tecnología", Models.Modalidad.REMOTA,
                 60, 2, 100, List.of(), List.of(new Models.Disponibilidad(null, start, start.minusHours(1), 2)), Models.TipoPublicacion.MENTORIA);
         assertCode(Models.CodigoError.VALIDACION, () -> publications.crearBorrador("u1", invalid));
@@ -145,7 +154,7 @@ class ProfilePublicationControllersIntegrationTest {
     }
 
     private Models.DatosBorrador draft() {
-        var start = LocalDateTime.now().plusDays(2);
+        var start = LocalDateTime.now().plusDays(2).truncatedTo(ChronoUnit.MINUTES);
         return new Models.DatosBorrador("Java", "Mentoría", "Tecnología", Models.Modalidad.REMOTA,
                 60, 2, 100, List.of("OO"), List.of(new Models.Disponibilidad(null, start, start.plusHours(2), 2)), Models.TipoPublicacion.MENTORIA);
     }

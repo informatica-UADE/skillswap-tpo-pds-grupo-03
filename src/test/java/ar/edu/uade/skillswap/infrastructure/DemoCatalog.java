@@ -5,9 +5,10 @@ import ar.edu.uade.skillswap.domain.catalog.CatalogSkill;
 import java.util.List;
 
 /**
- * Catálogo de demostración para el modo en memoria (#37). Es el mismo árbol que carga la migración
- * {@code V6__create_catalog.sql} en MySQL; {@code MySqlCatalogRepositoryTest} verifica que no se
- * separen. Cada llamada arma un árbol nuevo, porque las categorías del Composite son mutables.
+ * Catálogo de demostración para las pruebas sobre H2 (#37), donde no corre Flyway. Es el mismo árbol
+ * que carga la migración {@code V6__create_catalog.sql} en MySQL; {@code MySqlCatalogRepositoryTest}
+ * verifica que no se separen. Cada llamada arma un árbol nuevo, porque las categorías del Composite son
+ * mutables.
  */
 public final class DemoCatalog {
     private DemoCatalog() {}

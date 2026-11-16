@@ -1,7 +1,7 @@
 package ar.edu.uade.skillswap.ui;
 
-import ar.edu.uade.skillswap.infrastructure.SkillSwapApplicationWiring;
 import ar.edu.uade.skillswap.infrastructure.SkillSwapUiControllers;
+import ar.edu.uade.skillswap.infrastructure.persistence.H2Database;
 import ar.edu.uade.skillswap.model.Models.Categoria;
 import ar.edu.uade.skillswap.model.Models.DatosBorrador;
 import ar.edu.uade.skillswap.model.Models.Disponibilidad;
@@ -52,7 +52,7 @@ class NuevaPublicacionFormTest {
 
     @Test
     void elBorradorCreadoConElFormularioSePublicaYSeEncuentraPorSusEtiquetas() throws Exception {
-        try (var wiring = new SkillSwapApplicationWiring()) {
+        try (var wiring = H2Database.wiring()) {
             var ui = SkillSwapUiControllers.from(wiring);
             Publicacion[] creada = new Publicacion[1];
             SwingUtilities.invokeAndWait(() -> {

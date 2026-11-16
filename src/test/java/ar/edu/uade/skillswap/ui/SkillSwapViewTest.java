@@ -1,7 +1,7 @@
 package ar.edu.uade.skillswap.ui;
 
-import ar.edu.uade.skillswap.infrastructure.SkillSwapApplicationWiring;
 import ar.edu.uade.skillswap.infrastructure.SkillSwapUiControllers;
+import ar.edu.uade.skillswap.infrastructure.persistence.H2Database;
 import ar.edu.uade.skillswap.model.Models.Categoria;
 import org.junit.jupiter.api.Test;
 
@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class SkillSwapViewTest {
     @Test
     void elEstadoNoOcultaTituloObjetivoNiMensajeDeLaContratacion() throws Exception {
-        try (var wiring = new SkillSwapApplicationWiring()) {
+        try (var wiring = H2Database.wiring()) {
             var ui = SkillSwapUiControllers.from(wiring);
             var publication = ui.publicaciones().listarPropias("user-mateo").get(0);
             ui.sesionDemo().cambiarUsuario("mentor-ana");
@@ -48,7 +48,7 @@ class SkillSwapViewTest {
 
     @Test
     void elNombreDelUsuarioAbreSuPerfilPublicoDesdeTarjetasDetalleYContratacionesYVuelve() throws Exception {
-        try (var wiring = new SkillSwapApplicationWiring()) {
+        try (var wiring = H2Database.wiring()) {
             var ui = SkillSwapUiControllers.from(wiring);
             var publication = ui.publicaciones().listarPropias("user-mateo").get(0);
             ui.sesionDemo().cambiarUsuario("mentor-ana");
@@ -88,7 +88,7 @@ class SkillSwapViewTest {
 
     @Test
     void explorarMuestraElCatalogoConSangriaYFiltraPorUnaRamaIncluyendoSusHabilidades() throws Exception {
-        try (var wiring = new SkillSwapApplicationWiring()) {
+        try (var wiring = H2Database.wiring()) {
             var ui = SkillSwapUiControllers.from(wiring);
             SwingUtilities.invokeAndWait(() -> {
                 var view = new SkillSwapView(ui);
@@ -120,7 +120,7 @@ class SkillSwapViewTest {
 
     @Test
     void elRecuadroDelPerfilActivoEsElQueCambiaDePerfilEnLaDemo() throws Exception {
-        try (var wiring = new SkillSwapApplicationWiring()) {
+        try (var wiring = H2Database.wiring()) {
             var ui = SkillSwapUiControllers.from(wiring);
             SwingUtilities.invokeAndWait(() -> {
                 var view = new SkillSwapView(ui);

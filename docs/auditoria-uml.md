@@ -18,7 +18,7 @@ Se deben leer en conjunto, pero no son duplicados: el primero explica **dónde v
 | Presentation | `SkillSwapView`, `UiControllers`, modelos y mappers de UI | Presentar información y consumir contratos de controllers; no acceder directamente a entidades JPA o repositorios. |
 | Application | Puertos de entrada, servicios, puertos de salida y modelos de aplicación | Ejecutar casos de uso, obtener el usuario actual, coordinar dominio y persistencia, gestionar transacciones y publicar eventos. |
 | Domain | Agregados principales, `RefundPolicy`, `RecommendationStrategy`, estados y estrategias de precio | Mantener invariantes y reglas de negocio sin depender de UI, almacenamiento o proveedores externos. |
-| Infrastructure | Wiring, adapters JPA/en memoria, identidad, transacciones, eventos y notificaciones | Implementar puertos, adaptar sistemas externos y ensamblar las implementaciones para los modos de ejecución. |
+| Infrastructure | Wiring, adapters JPA, identidad, transacciones, eventos y notificaciones | Implementar puertos, adaptar sistemas externos y ensamblar las implementaciones. |
 
 ### 1.2 Dirección de dependencias
 
@@ -48,9 +48,9 @@ El nivel de detalle es deliberadamente selectivo: las reglas de cada agregado y 
 
 ### 1.4 Adapters, composición y eventos
 
-- Los puertos de repositorio tienen implementaciones en memoria y JPA. Los ports de transacción también tienen variantes en memoria y JPA.
+- Cada puerto de repositorio tiene una sola implementación, la JPA; el de transacciones, `JpaTransactionManager`.
 - `IdentityProviderAdapter` implementa `CurrentUserProvider`.
-- `SkillSwapApplicationWiring` compone los servicios y configura el dispatcher de eventos. La aplicación puede usar implementaciones en memoria o JPA.
+- `SkillSwapApplicationWiring` compone los servicios y configura el dispatcher de eventos. Siempre usa las implementaciones JPA (MySQL en la aplicación, H2 en las pruebas).
 - `BookingApplicationService` y `RatingApplicationService` publican eventos a través de `DomainEventPublisher`; el port no conoce los observadores ni los canales.
 - El publicador en memoria despacha eventos a observadores registrados. El observador de contrataciones y el publicador/observador de calificaciones consultan preferencias del perfil y usan `NotificationFactory`.
 - `NotificationFactory` selecciona `EmailNotificationAdapter`, `PushNotificationAdapter` o `InAppNotificationAdapter`, que implementan `NotificationGateway`. Email y push usan clientes mock; la bandeja interna usa el repositorio de notificaciones.
