@@ -9,5 +9,9 @@ public interface BookingRepository {
     Optional<Booking> findById(String bookingId);
     Optional<Booking> findByIdForUpdate(String bookingId);
     List<Booking> findByParticipantUserId(String userId);
+    /** Cantidad de contrataciones COMPLETED en las que el usuario fue proveedor; se cuenta en la base. */
+    long countCompletedByProvider(String providerUserId);
+    /** Cantidad de contrataciones COMPLETED en las que el usuario fue cliente; se cuenta en la base. */
+    long countCompletedByBuyer(String buyerUserId);
     Booking save(Booking booking);
 }

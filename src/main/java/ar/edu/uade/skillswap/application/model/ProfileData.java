@@ -1,8 +1,11 @@
 package ar.edu.uade.skillswap.application.model;
 
+import ar.edu.uade.skillswap.application.model.PublicProfileData.CompletedBookingsSummary;
+import ar.edu.uade.skillswap.domain.model.ActorType;
 import ar.edu.uade.skillswap.domain.model.NotificationChannelType;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 /** Commands and read models for profile use cases. No domain entity crosses the application boundary. */
@@ -23,12 +26,13 @@ public final class ProfileData {
     public record RegisterCommand(String displayName, String biography, String timeZone,
                                   List<String> skills, List<String> interests,
                                   Set<NotificationChannelType> notificationChannels,
-                                  List<AvailabilityInput> availability) {
+                                  List<AvailabilityInput> availability, ActorType actorType) {
         public RegisterCommand {
             skills = List.copyOf(skills == null ? List.of() : skills);
             interests = List.copyOf(interests == null ? List.of() : interests);
             notificationChannels = Set.copyOf(notificationChannels == null ? Set.of() : notificationChannels);
             availability = List.copyOf(availability == null ? List.of() : availability);
+            if (actorType == null) throw new IllegalArgumentException("Falta el tipo de actor");
         }
     }
 
@@ -40,12 +44,13 @@ public final class ProfileData {
         }
     }
 
-    public record ProfileView(String id, String userId, String displayName, String biography,
-                              String timeZone, List<String> skills, List<String> interests,
-                              Set<NotificationChannelType> notificationChannels,
+    public record ProfileView(String id, String userId, ActorType actorType, String displayName,
+                              String biography, String timeZone, List<String> skills,
+                              List<String> interests, Set<NotificationChannelType> notificationChannels,
                               List<AvailabilityView> availability, double reputation,
-                              int ratingCount, boolean active) {
+                              int ratingCount, boolean active, CompletedBookingsSummary completedBookings) {
         public ProfileView {
+            Objects.requireNonNull(completedBookings, "Falta el historial de contrataciones");
             skills = List.copyOf(skills == null ? List.of() : skills);
             interests = List.copyOf(interests == null ? List.of() : interests);
             notificationChannels = Set.copyOf(notificationChannels == null ? Set.of() : notificationChannels);

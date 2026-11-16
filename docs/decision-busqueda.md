@@ -11,10 +11,10 @@ La consigna (§4.3) pide buscar publicaciones por texto, categoría, modalidad, 
 
 ## Decisión
 
-1. **La búsqueda sigue en `PublicationRepository.searchPublished`**, como el resto de las consultas del proyecto. Su comportamiento está definido en este documento (sección siguiente) y lo verifica el test de contrato `PublicationSearchContract`, que toda implementación (en memoria, JPA) debe extender.
+1. **La búsqueda sigue en `PublicationRepository.searchPublished`**, como el resto de las consultas del proyecto. Su comportamiento está definido en este documento (sección siguiente) y lo verifica el test de contrato `PublicationSearchContract`, que toda implementación debe extender; hoy la única es la JPA, sobre MySQL.
 2. **Toda `PublicationView` trae a su autor.** La base exige que toda publicación tenga un perfil de autor (FK `publications.author_user_id → profiles.user_id`), así que la vista lleva siempre un `AuthorView` (nombre, reputación y cantidad de calificaciones). La usan los seis casos de uso que devuelven publicaciones: `search` y `recommend` (#16/#17) y los de gestión de `PublicationUseCases` (#15). El dominio no cambia: `Publication` sigue referenciando al autor por id, como corresponde entre agregados.
 3. **Los datos del autor se leen sin N+1.** En búsqueda y recomendaciones, `DiscoveryApplicationService` lee los perfiles de todos los autores de la página con `ProfileRepository.findByUserIds`, que es abstracto: cada implementación debe resolverlo en una lectura (en JPA, un `IN`). En gestión el autor es el propio usuario, así que `PublicationApplicationService` hace un único `findByUserId`. Crear un borrador sin perfil devuelve `NOT_FOUND`, igual que lo rechazaría la FK de la base.
-4. **El filtro y el orden por autor se resuelven en el repositorio.** La búsqueda necesita la reputación y el estado del autor. En JPA es un join con la tabla de perfiles dentro de la consulta. En memoria, `InMemoryPublicationRepository` recibe el puerto `ProfileRepository` (no otra implementación concreta) y lee los perfiles de los autores en una sola llamada; es el equivalente en memoria de ese join y solo afecta al adaptador de demo y tests.
+4. **El filtro y el orden por autor se resuelven en el repositorio.** La búsqueda necesita la reputación y el estado del autor. En JPA es un join con la tabla de perfiles dentro de la consulta. (Hasta la eliminación de los repositorios en memoria, `InMemoryPublicationRepository` replicaba ese join leyendo los perfiles por el puerto `ProfileRepository`.)
 5. **Criterios autovalidados**, con la forma y la convención de `main`: `SearchQuery` mantiene sus campos (se agrega `skill`), recorta espacios, y el texto vacío o la categoría o habilidad nulas o en blanco significan "sin filtro". Las validaciones de rango de precio, reputación y página siguen en su constructor y lanzan `IllegalArgumentException`, como el resto de los comandos; `UiErrorMapper` las traduce a `VALIDACION`.
 6. **Sin transacción en el service**, igual que las demás lecturas del proyecto (`listMyBookings`, `viewMyWallet`, etc.). La página y el total se resuelven en una sola llamada a `searchPublished`; la implementación JPA puede ejecutar esa consulta como de solo lectura.
 
@@ -24,7 +24,7 @@ La consigna (§4.3) pide buscar publicaciones por texto, categoría, modalidad, 
 | --- | --- |
 | Visibilidad | Solo publicaciones `PUBLISHED`. Solo de autores con perfil activo: se excluyen los dados de baja (decisión del equipo). Un autor sin perfil no puede existir por la FK. |
 | Texto | Contenido en título, descripción, categoría o alguna etiqueta, sin distinguir mayúsculas ni acentos. Máximo 100 caracteres. |
-| Categoría | Igualdad sin distinguir mayúsculas. |
+| Categoría | La categoría elegida y toda su rama del catálogo: subcategorías a cualquier profundidad y publicaciones con una etiqueta que es habilidad de la rama. Sin distinguir mayúsculas ni acentos. Una categoría fuera del catálogo es `VALIDATION`. Ver [decisión del catálogo](decision-catalogo-composite.md) (#37). |
 | Modalidad | Igualdad. |
 | Habilidad | Igualdad (sin mayúsculas ni acentos) con alguna etiqueta de la publicación. |
 | Precio | Precio base dentro de `[mínimo, máximo]`, límites inclusivos. |
@@ -64,7 +64,7 @@ La consigna (§4.3) pide buscar publicaciones por texto, categoría, modalidad, 
 | `ProfileRepository.findByUserIds` | `JpaProfileRepository` lo implementa con una única consulta `IN` y devuelve una lista vacía para una entrada vacía. |
 | Contrato de `searchPublished` | `JpaPublicationRepository` implementa habilidad, texto en etiquetas, reputación mínima, autores activos y los cuatro órdenes con desempates estables. `JpaPublicationSearchContractTest` ejecuta el mismo contrato sobre MySQL. |
 | Rendimiento | Unir con `profiles` (JOIN, garantizado por la FK) para filtrar y ordenar por reputación y excluir autores dados de baja; cargar etiquetas y franjas sin N+1; marcar la consulta como de solo lectura. Índices sugeridos: `(status, created_at)`, `(status, base_price)`, `(status, category)`, `publication_tag(tag)`, `profile(user_id)` único. |
-| Acentos | La migración V4 aplica `utf8mb4_0900_ai_ci` a título, descripción, categoría y etiquetas para que MySQL coincida con el repositorio en memoria. |
+| Acentos | La migración V4 aplica `utf8mb4_0900_ai_ci` a título, descripción, categoría y etiquetas para que las búsquedas no distingan mayúsculas ni acentos. |
 
 **#15 (casos de uso de publicaciones).** `PublicationApplicationService` recibe `ProfileRepository` y sus vistas incluyen al autor; crear un borrador requiere que el usuario tenga perfil.
 
@@ -79,14 +79,13 @@ La consigna (§4.3) pide buscar publicaciones por texto, categoría, modalidad, 
 | Prueba | Cubre |
 | --- | --- |
 | `SearchQueryTest` | Valores por defecto, recorte de espacios y validación de texto, reputación, rango de precio y página. |
-| `PublicationSearchContract`, `InMemoryPublicationSearchTest` y `JpaPublicationSearchContractTest` | Visibilidad, cada filtro, filtros en blanco, combinaciones, órdenes y desempates, paginación completa en memoria y MySQL. |
+| `PublicationSearchContract` y `JpaPublicationSearchContractTest` | Visibilidad, cada filtro, filtros en blanco, combinaciones, órdenes y desempates, paginación completa en MySQL (perfil `mysql-it`). |
 | `DiscoveryApplicationServiceTest` | Delegación sin modificar criterios, autor en una sola lectura de perfiles (búsqueda y recomendaciones), autor sin perfil como inconsistencia, validación, propagación de fallas, búsqueda sin autenticación. |
 | `PublicationApplicationServiceTest` | Vistas de gestión con autor, borrador sin perfil rechazado, listado vacío sin perfil. |
-| `InMemoryRepositoriesTest` | Lectura de perfiles en lote. |
-| `UiModelMapperTest` / `WiredUiControllersTest` | Conversión de filtros de UI y nombre/reputación reales del autor en las tarjetas. |
+| `UiModelMapperTest` / `SkillSwapUiControllersTest` | Conversión de filtros de UI y nombre/reputación reales del autor en las tarjetas. |
 
 ## Revisión de integración del 05/11/2026
 
-`main` en `2d6e9fd` ya contiene la búsqueda y los contratos paginados incorporados por #71. La actualización de #70 había restaurado accidentalmente el mapeo anterior: se perdían filtros y paginación, faltaba `toPaginaPublicaciones`, desaparecía el helper de caché `remember` y se eliminaban pruebas de navegación y permisos. Esta revisión conserva exactamente los archivos Java y las pruebas vigentes en `main`; no vuelve a introducir el contrato antiguo ni inventa otra implementación de búsqueda. La funcionalidad de #16 ya está en la base y el cambio restante de este PR es este registro de reconciliación.
+`main` en `2d6e9fd` ya contenía la búsqueda y los contratos paginados incorporados por #71. Una actualización anterior de #70 había restaurado accidentalmente el mapeo previo, eliminado el helper de caché `remember` y quitado pruebas de filtros, paginación y permisos. Esta revisión conserva los archivos Java y las pruebas vigentes en `main`; no vuelve a introducir el contrato anterior ni duplica la implementación de búsqueda. El cambio restante de este PR es este registro de reconciliación.
 
-Validación local: `mvn -Pmysql-it test`, 208 pruebas, 0 fallos, 0 errores y 0 omitidas, contra MySQL 8.4.13. Se preservan las pruebas de paginación, filtros, permisos y el contrato compartido entre memoria y JPA. `git diff --check` está limpio. Los checks del commit y su aprobación se verifican por separado.
+Validación registrada el 05/11/2026: `mvn -Pmysql-it test`, 208 pruebas, 0 fallos, 0 errores y 0 omitidas, contra MySQL 8.4.13. También se verificaron `git diff --check`, Analyze Java, CodeQL, Dependency Review y Security Gate. Esta evidencia corresponde al estado de esa fecha; los checks actuales del PR se ejecutarán al actualizar la rama.

@@ -7,19 +7,23 @@ import ar.edu.uade.skillswap.domain.model.Booking;
 public final class BookingApplicationMapper {
     private BookingApplicationMapper() {}
 
-    public static BookingView toView(Booking booking) {
+    public static BookingView toView(Booking booking, String publicationTitle, String buyerDisplayName,
+                                     String providerDisplayName) {
         return new BookingView(
                 booking.id(),
                 booking.publicationId(),
                 booking.buyerUserId(),
                 booking.providerUserId(),
                 booking.objective(),
-        booking.clientMessage(),
+                booking.clientMessage(),
                 booking.slotId(),
                 booking.price().amount(),
                 booking.refund().amount(),
                 booking.status(),
                 booking.createdAt(),
-                booking.paidAt());
+                booking.paidAt(),
+                publicationTitle,
+                buyerDisplayName,
+                providerDisplayName);
     }
 }

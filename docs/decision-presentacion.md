@@ -17,7 +17,8 @@ mutable. El dominio no depende de estos mapeadores.
 
 ## Contrato de errores
 
-Las operaciones reales de `WiredUiControllers` se ejecutan mediante
+Las operaciones de cada controller (desde #32, uno por pantalla; ver
+[decisión de controllers](decision-controllers-ui.md)) se ejecutan mediante
 `UiOperationExecutor`. Ante un fallo, lanzan `PresentationException`, con un
 `ErrorPresentacion(codigo, mensaje)`. No se reemplazan errores por listas vacías,
 ceros ni resultados que aparenten éxito.

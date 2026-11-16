@@ -1,32 +1,99 @@
 package ar.edu.uade.skillswap.ui;
 
 import ar.edu.uade.skillswap.controllers.UiControllers;
+import ar.edu.uade.skillswap.controllers.error.PresentationException;
 import ar.edu.uade.skillswap.model.Models.*;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.List;
 
 import static ar.edu.uade.skillswap.ui.Theme.*;
 
 public final class SkillSwapView extends JPanel {
-    private static final String USER_ID="user-mateo";
+    private String USER_ID="user-mateo";
     private final UiControllers controllers;
-    private final UiActionHandler actions = new UiActionHandler(error ->
-            JOptionPane.showMessageDialog(this, error.mensaje(),
-                    "No se pudo completar la operación", JOptionPane.ERROR_MESSAGE));
+    private final UiActionHandler actions = new UiActionHandler(this::showError);
     private final JPanel content=new JPanel(new BorderLayout());
     private final JLabel pageTitle=label("Inicio",H1,TEXT);
     private final JLabel badge=label("",new Font("SansSerif",Font.BOLD,10),Color.WHITE);
+    private JLabel activeUserAvatar;
+    private JLabel activeUserName;
+    private JLabel activeUserRole;
+    private JButton coinsButton;
 
     public SkillSwapView(UiControllers controllers) {
         this.controllers=controllers; setLayout(new BorderLayout()); setBackground(BG);
+        if (controllers.sesionDemo() != null) USER_ID = controllers.sesionDemo().usuarioActual();
         actions.run(() -> {
             add(sidebar(),BorderLayout.WEST); add(shell(),BorderLayout.CENTER); showHome();
         });
+    }
+
+    /**
+     * En la demo, el recuadro del perfil activo (abajo en la barra lateral) abre el selector de los
+     * perfiles guardados. Sin sesión demo (Mock UI Kit) queda como un recuadro informativo.
+     */
+    private void makeProfileSwitcher(JPanel activeUser) {
+        if (controllers.sesionDemo() == null) return;
+        activeUser.setToolTipText("Cambiar de perfil");
+        activeUser.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        activeUser.add(label("⇅", H3, new Color(177, 200, 216)), BorderLayout.EAST);
+        activeUser.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent event) {
+                actions.run(() -> switchDemoUser());
+            }
+        });
+    }
+
+    private void switchDemoUser() {
+        if (controllers.sesionDemo() == null) return;
+        UsuarioDemo[] options = controllers.sesionDemo().usuariosDisponibles().toArray(UsuarioDemo[]::new);
+        UsuarioDemo current = Arrays.stream(options).filter(user -> user.id().equals(USER_ID))
+                .findFirst().orElse(null);
+        UsuarioDemo selected = (UsuarioDemo) JOptionPane.showInputDialog(this,
+                "Elegí el perfil con el que querés seguir la demo", "Cambiar de perfil",
+                JOptionPane.QUESTION_MESSAGE, null, options, current);
+        if (selected == null) return;
+        controllers.sesionDemo().cambiarUsuario(selected.id());
+        USER_ID = selected.id();
+        refreshIdentitySummary();
+        showHome();
+    }
+
+    private void refreshIdentitySummary() {
+        Perfil profile = controllers.perfiles().verPerfil(USER_ID);
+        if (activeUserAvatar != null) activeUserAvatar.setText(initials(profile.nombre()));
+        if (activeUserName != null) activeUserName.setText(profile.nombre());
+        if (activeUserRole != null) activeUserRole.setText(profile.rol());
+        refreshCoinsButton();
+    }
+
+    private void refreshCoinsButton() {
+        if (coinsButton != null) {
+            coinsButton.setText("◈  " + controllers.wallet().consultarSaldo(USER_ID) + " SkillCoins");
+        }
+    }
+
+    private String firstName(String fullName) {
+        String trimmed = fullName == null ? "" : fullName.trim();
+        int separator = trimmed.indexOf(' ');
+        return separator < 0 ? trimmed : trimmed.substring(0, separator);
+    }
+
+    private String initials(String fullName) {
+        String[] parts = fullName == null ? new String[0] : fullName.trim().split("\\s+");
+        if (parts.length == 0 || parts[0].isBlank()) return "?";
+        String result = parts[0].substring(0, 1);
+        if (parts.length > 1 && !parts[1].isBlank()) result += parts[1].substring(0, 1);
+        return result.toUpperCase(java.util.Locale.ROOT);
     }
 
     private JComponent sidebar() {
@@ -34,20 +101,21 @@ public final class SkillSwapView extends JPanel {
         JLabel logo=label("SkillSwap",new Font("SansSerif",Font.BOLD,25),Color.WHITE); logo.setAlignmentX(LEFT_ALIGNMENT); side.add(logo);
         JLabel sub=label("Aprendé. Compartí. Crecé.",SMALL,new Color(177,200,216)); sub.setAlignmentX(LEFT_ALIGNMENT); side.add(sub); side.add(Box.createVerticalStrut(28));
         side.add(nav("⌂  Inicio",this::showHome)); side.add(nav("⌕  Explorar",this::showExplore)); side.add(nav("▣  Mis publicaciones",this::showListings)); side.add(nav("✓  Contrataciones",this::showContracts)); side.add(nav("◈  SkillCoins",this::showWallet)); side.add(nav("●  Notificaciones",this::showNotifications)); side.add(nav("♙  Mi perfil",this::showProfile)); side.add(Box.createVerticalGlue());
+        Perfil profile = controllers.perfiles().verPerfil(USER_ID);
         JPanel user=new JPanel(new BorderLayout(10,0)); user.setOpaque(false); user.setBorder(new EmptyBorder(8,6,4,4)); user.setMaximumSize(new Dimension(Integer.MAX_VALUE,56)); user.setAlignmentX(LEFT_ALIGNMENT);
-        JLabel avatar=avatar("MS",36); user.add(avatar,BorderLayout.WEST); JPanel txt=new JPanel();txt.setOpaque(false);txt.setLayout(new BoxLayout(txt,BoxLayout.Y_AXIS));txt.add(label("Mateo Silva",H3,Color.WHITE));txt.add(label("Software Engineer",SMALL,new Color(177,200,216)));user.add(txt);side.add(user); return side;
+        activeUserAvatar=avatar(initials(profile.nombre()),36); user.add(activeUserAvatar,BorderLayout.WEST); JPanel txt=new JPanel();txt.setOpaque(false);txt.setLayout(new BoxLayout(txt,BoxLayout.Y_AXIS));activeUserName=label(profile.nombre(),H3,Color.WHITE);activeUserRole=label(profile.rol(),SMALL,new Color(177,200,216));txt.add(activeUserName);txt.add(activeUserRole);user.add(txt);makeProfileSwitcher(user);side.add(user); return side;
     }
 
     private JButton nav(String text,Runnable action){JButton b=new JButton(text);b.setMaximumSize(new Dimension(Integer.MAX_VALUE,44));b.setHorizontalAlignment(SwingConstants.LEFT);b.setForeground(new Color(224,234,241));b.setBackground(NAVY);b.setBorder(new EmptyBorder(10,12,10,12));b.setFocusPainted(false);b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));b.addActionListener(uiAction(e->action.run()));return b;}
 
-    private JComponent shell(){JPanel shell=new JPanel(new BorderLayout());shell.setBackground(BG);JPanel top=new JPanel(new BorderLayout());top.setBackground(Color.WHITE);top.setBorder(new EmptyBorder(16,26,16,26));top.add(pageTitle,BorderLayout.WEST);JPanel actions=new JPanel(new FlowLayout(FlowLayout.RIGHT,10,0));actions.setOpaque(false);badge.setOpaque(true);badge.setBackground(DANGER);badge.setBorder(new EmptyBorder(5,8,5,8));actions.add(badge);JButton coins=button("◈  "+controllers.wallet().consultarSaldo(USER_ID)+" SkillCoins",false);coins.addActionListener(uiAction(e->showWallet()));actions.add(coins);top.add(actions,BorderLayout.EAST);shell.add(top,BorderLayout.NORTH);content.setBackground(BG);shell.add(content);return shell;}
+    private JComponent shell(){JPanel shell=new JPanel(new BorderLayout());shell.setBackground(BG);JPanel top=new JPanel(new BorderLayout());top.setBackground(Color.WHITE);top.setBorder(new EmptyBorder(16,26,16,26));top.add(pageTitle,BorderLayout.WEST);JPanel actions=new JPanel(new FlowLayout(FlowLayout.RIGHT,10,0));actions.setOpaque(false);badge.setOpaque(true);badge.setBackground(DANGER);badge.setBorder(new EmptyBorder(5,8,5,8));actions.add(badge);coinsButton=button("",false);coinsButton.addActionListener(uiAction(e->showWallet()));actions.add(coinsButton);top.add(actions,BorderLayout.EAST);shell.add(top,BorderLayout.NORTH);content.setBackground(BG);shell.add(content);return shell;}
 
-    private void page(String title,JComponent view){pageTitle.setText(title);long unread=controllers.notificaciones().listarNotificaciones(USER_ID).stream().filter(n->!n.leida()).count();badge.setText(unread+" NUEVAS");content.removeAll();JScrollPane sp=new JScrollPane(view);sp.setBorder(null);sp.getVerticalScrollBar().setUnitIncrement(18);sp.getViewport().setBackground(BG);content.add(sp);content.revalidate();content.repaint();}
+    private void page(String title,JComponent view){pageTitle.setText(title);long unread=controllers.notificaciones().listarNotificaciones(USER_ID).stream().filter(n->!n.leida()).count();badge.setText(unread+" NUEVAS");refreshCoinsButton();content.removeAll();JScrollPane sp=new JScrollPane(view);sp.setBorder(null);sp.getVerticalScrollBar().setUnitIncrement(18);sp.getViewport().setBackground(BG);content.add(sp);content.revalidate();content.repaint();}
 
     private JPanel base(){JPanel p=new JPanel();p.setBackground(BG);p.setLayout(new BoxLayout(p,BoxLayout.Y_AXIS));p.setBorder(new EmptyBorder(24,26,28,26));return p;}
     private void addSection(JPanel p,String title,String subtitle){JLabel h=label(title,H2,TEXT);h.setAlignmentX(LEFT_ALIGNMENT);p.add(h);if(subtitle!=null){JLabel s=label(subtitle,BODY,MUTED);s.setAlignmentX(LEFT_ALIGNMENT);p.add(Box.createVerticalStrut(3));p.add(s);}p.add(Box.createVerticalStrut(14));}
 
-    private void showHome(){JPanel p=base();JPanel hero=new Theme.RoundedPanel(22,NAVY_2);hero.setLayout(new BorderLayout(22,0));hero.setBorder(new EmptyBorder(24,26,24,26));hero.setMaximumSize(new Dimension(Integer.MAX_VALUE,155));JPanel words=new JPanel();words.setOpaque(false);words.setLayout(new BoxLayout(words,BoxLayout.Y_AXIS));words.add(label("Hola, Mateo 👋",new Font("SansSerif",Font.BOLD,25),Color.WHITE));words.add(Box.createVerticalStrut(7));words.add(label("¿Qué habilidad querés desbloquear hoy?",BODY,new Color(213,228,238)));words.add(Box.createVerticalStrut(16));JTextField search=new JTextField();search.putClientProperty("JTextField.placeholderText","Buscar mentorías, servicios o habilidades...");search.setBorder(new EmptyBorder(11,13,11,13));search.addActionListener(uiAction(e->showExplore(search.getText())));words.add(search);hero.add(words);JPanel stat=new JPanel();stat.setOpaque(false);stat.setLayout(new BoxLayout(stat,BoxLayout.Y_AXIS));stat.add(label("TU PROGRESO",SMALL,new Color(169,202,219)));stat.add(label("52",new Font("SansSerif",Font.BOLD,34),Color.WHITE));stat.add(label("proyectos completados",SMALL,new Color(213,228,238)));hero.add(stat,BorderLayout.EAST);hero.setAlignmentX(LEFT_ALIGNMENT);p.add(hero);p.add(Box.createVerticalStrut(26));addSection(p,"Recomendado para vos","Selecciones basadas en tus habilidades e intereses");p.add(cardGrid(controllers.busqueda().recomendar(USER_ID)));p.add(Box.createVerticalStrut(26));addSection(p,"Explorá por categoría",null);JPanel cats=new JPanel(new FlowLayout(FlowLayout.LEFT,10,0));cats.setOpaque(false);for(String c:controllers.busqueda().categorias())if(!c.equals("Todas")){JButton b=button(c,false);b.addActionListener(uiAction(e->showExploreCategory(c)));cats.add(b);}cats.setAlignmentX(LEFT_ALIGNMENT);p.add(cats);page("Inicio",p);}
+    private void showHome(){Perfil me=controllers.perfiles().verPerfil(USER_ID);JPanel p=base();JPanel hero=new Theme.RoundedPanel(22,NAVY_2);hero.setLayout(new BorderLayout(22,0));hero.setBorder(new EmptyBorder(24,26,24,26));hero.setMaximumSize(new Dimension(Integer.MAX_VALUE,155));JPanel words=new JPanel();words.setOpaque(false);words.setLayout(new BoxLayout(words,BoxLayout.Y_AXIS));words.add(label("Hola, "+firstName(me.nombre())+" 👋",new Font("SansSerif",Font.BOLD,25),Color.WHITE));words.add(Box.createVerticalStrut(7));words.add(label("¿Qué habilidad querés desbloquear hoy?",BODY,new Color(213,228,238)));words.add(Box.createVerticalStrut(16));JTextField search=new JTextField();search.putClientProperty("JTextField.placeholderText","Buscar mentorías, servicios o habilidades...");search.setBorder(new EmptyBorder(11,13,11,13));search.addActionListener(uiAction(e->showExplore(search.getText())));words.add(search);hero.add(words);JPanel stat=new JPanel();stat.setOpaque(false);stat.setLayout(new BoxLayout(stat,BoxLayout.Y_AXIS));stat.add(label("TU PROGRESO",SMALL,new Color(169,202,219)));stat.add(label(String.valueOf(me.proyectosCompletados()),new Font("SansSerif",Font.BOLD,34),Color.WHITE));stat.add(label("proyectos completados",SMALL,new Color(213,228,238)));hero.add(stat,BorderLayout.EAST);hero.setAlignmentX(LEFT_ALIGNMENT);p.add(hero);p.add(Box.createVerticalStrut(26));addSection(p,"Recomendado para vos","Selecciones basadas en tus habilidades e intereses");p.add(cardGrid(controllers.busqueda().recomendar(USER_ID),this::showHome));p.add(Box.createVerticalStrut(26));addSection(p,"Explorá por categoría",null);JPanel cats=new JPanel(new FlowLayout(FlowLayout.LEFT,10,0));cats.setOpaque(false);for(Categoria c:controllers.busqueda().categorias())if(c.nivel()==0){JButton b=button(c.nombre(),false);b.addActionListener(uiAction(e->showExploreCategory(c.nombre())));cats.add(b);}cats.setAlignmentX(LEFT_ALIGNMENT);p.add(cats);page("Inicio",p);}
 
     private void showExplore(){showExplore("");}
     private void showExplore(String initial){showExploreWith(initial,"Todas");}
@@ -63,8 +131,12 @@ public final class SkillSwapView extends JPanel {
         filters.setAlignmentX(LEFT_ALIGNMENT);
         JTextField q = new JTextField(initial, 24);
         q.setBorder(new EmptyBorder(10, 12, 10, 12));
-        JComboBox<String> cat = new JComboBox<>(controllers.busqueda().categorias().toArray(String[]::new));
-        cat.setSelectedItem(category);
+        JComboBox<Categoria> cat = new JComboBox<>();
+        cat.addItem(Categoria.TODAS);
+        controllers.busqueda().categorias().forEach(cat::addItem);
+        for (int index = 0; index < cat.getItemCount(); index++) {
+            if (cat.getItemAt(index).nombre().equalsIgnoreCase(category)) cat.setSelectedIndex(index);
+        }
         JComboBox<String> order = new JComboBox<>(ORDENES);
         JButton go = button("Buscar", true);
         filters.add(q);
@@ -100,13 +172,14 @@ public final class SkillSwapView extends JPanel {
         Runnable[] refresh = new Runnable[1];
         refresh[0] = () -> {
             PaginaPublicaciones page = controllers.busqueda().buscar(new FiltrosBusqueda(q.getText(),
-                    (String) cat.getSelectedItem(), modalidad(modality.getSelectedIndex()), skill.getText(),
+                    ((Categoria) cat.getSelectedItem()).nombre(), modalidad(modality.getSelectedIndex()), skill.getText(),
                     positivoONulo(minPrice), positivoONulo(maxPrice), reputacionMinima(reputation.getSelectedIndex()),
                     (String) order.getSelectedItem(), currentPage[0], TAMANIO_PAGINA_EXPLORAR));
             results.removeAll();
             String pages = page.totalPaginas() == 0 ? "" : " · Página " + (page.pagina() + 1) + " de " + page.totalPaginas();
             addSection(results, page.total() + " resultados" + pages, "Mentorías y servicios disponibles");
-            results.add(cardGrid(page.items()));
+            results.add(cardGrid(page.items(),
+                    () -> showExploreWith(q.getText(), ((Categoria) cat.getSelectedItem()).nombre())));
             JPanel pager = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 12));
             pager.setOpaque(false);
             pager.setAlignmentX(LEFT_ALIGNMENT);
@@ -154,8 +227,8 @@ public final class SkillSwapView extends JPanel {
         return value > 0 ? value : null;
     }
 
-    private JPanel cardGrid(List<Publicacion> list){JPanel grid=new JPanel(new GridLayout(0,3,14,14));grid.setOpaque(false);grid.setAlignmentX(LEFT_ALIGNMENT);for(Publicacion x:list)grid.add(listingCard(x));return grid;}
-    private JComponent listingCard(Publicacion x){JPanel c=card(new BorderLayout(0,12));JPanel top=new JPanel(new BorderLayout());top.setOpaque(false);top.add(pill(x.categoria(),TEAL),BorderLayout.WEST);top.add(label("★ "+x.reputacion(),H3,GOLD),BorderLayout.EAST);c.add(top,BorderLayout.NORTH);JPanel mid=new JPanel();mid.setOpaque(false);mid.setLayout(new BoxLayout(mid,BoxLayout.Y_AXIS));JLabel t=label("<html><div style='width:210px'>"+x.titulo()+"</div></html>",H3,TEXT);mid.add(t);mid.add(Box.createVerticalStrut(7));mid.add(label("Por "+x.proveedor(),SMALL,MUTED));mid.add(Box.createVerticalStrut(9));mid.add(label("<html><div style='width:215px;color:#677480'>"+x.descripcion()+"</div></html>",BODY,MUTED));mid.add(Box.createVerticalStrut(9));mid.add(label(x.modalidad()+"  ·  "+x.duracionMinutos()+" min",SMALL,MUTED));c.add(mid);JPanel bottom=new JPanel(new BorderLayout());bottom.setOpaque(false);bottom.add(label(x.precio()+" ◈",new Font("SansSerif",Font.BOLD,20),NAVY),BorderLayout.WEST);JButton detail=button("Ver detalle",true);detail.addActionListener(uiAction(e->showDetail(x)));bottom.add(detail,BorderLayout.EAST);c.add(bottom,BorderLayout.SOUTH);return c;}
+    private JPanel cardGrid(List<Publicacion> list,Runnable back){JPanel grid=new JPanel(new GridLayout(0,3,14,14));grid.setOpaque(false);grid.setAlignmentX(LEFT_ALIGNMENT);for(Publicacion x:list)grid.add(listingCard(x,back));return grid;}
+    private JComponent listingCard(Publicacion x,Runnable back){JPanel c=card(new BorderLayout(0,12));JPanel top=new JPanel(new BorderLayout());top.setOpaque(false);top.add(pill(x.categoria(),TEAL),BorderLayout.WEST);top.add(label("★ "+x.reputacion(),H3,GOLD),BorderLayout.EAST);c.add(top,BorderLayout.NORTH);JPanel mid=new JPanel();mid.setOpaque(false);mid.setLayout(new BoxLayout(mid,BoxLayout.Y_AXIS));JLabel t=label("<html><div style='width:210px'>"+x.titulo()+"</div></html>",H3,TEXT);mid.add(t);mid.add(Box.createVerticalStrut(7));mid.add(inline(label("Por ",SMALL,MUTED),profileLink(x.proveedor(),x.proveedorId(),SMALL,back)));mid.add(Box.createVerticalStrut(9));mid.add(label("<html><div style='width:215px;color:#677480'>"+x.descripcion()+"</div></html>",BODY,MUTED));mid.add(Box.createVerticalStrut(9));mid.add(label(x.modalidad()+"  ·  "+x.duracionMinutos()+" min",SMALL,MUTED));c.add(mid);JPanel bottom=new JPanel(new BorderLayout());bottom.setOpaque(false);bottom.add(label(x.precio()+" ◈",new Font("SansSerif",Font.BOLD,20),NAVY),BorderLayout.WEST);JButton detail=button("Ver detalle",true);detail.addActionListener(uiAction(e->showDetail(x)));bottom.add(detail,BorderLayout.EAST);c.add(bottom,BorderLayout.SOUTH);return c;}
 
     private void showDetail(Publicacion publication) {
         JPanel page = base();
@@ -174,8 +247,9 @@ public final class SkillSwapView extends JPanel {
         information.add(Box.createVerticalStrut(14));
         information.add(label("<html><div style='width:540px'>" + publication.titulo() + "</div></html>", H1, TEXT));
         information.add(Box.createVerticalStrut(10));
-        information.add(label("★ " + publication.reputacion() + "  ·  " + publication.proveedor()
-                + "  ·  " + publication.modalidad(), H3, MUTED));
+        information.add(inline(label("★ " + publication.reputacion() + "  ·  ", H3, MUTED),
+                profileLink(publication.proveedor(), publication.proveedorId(), H3, () -> showDetail(publication)),
+                label("  ·  " + publication.modalidad(), H3, MUTED)));
         information.add(Box.createVerticalStrut(22));
         information.add(label("Sobre esta propuesta", H2, TEXT));
         information.add(Box.createVerticalStrut(8));
@@ -261,9 +335,28 @@ public final class SkillSwapView extends JPanel {
                 + " · " + slot.cuposDisponibles() + " cupo(s)";
     }
 
-    private void showListings(){JPanel p=base();JPanel title=new JPanel(new BorderLayout());title.setOpaque(false);title.add(label("Gestioná tus publicaciones",H2,TEXT));JButton create=button("+ Nueva publicación",true);create.addActionListener(uiAction(e->createListing()));title.add(create,BorderLayout.EAST);title.setMaximumSize(new Dimension(Integer.MAX_VALUE,45));title.setAlignmentX(LEFT_ALIGNMENT);p.add(title);p.add(Box.createVerticalStrut(15));List<Publicacion> own=controllers.publicaciones().listarPropias(USER_ID);if(own.isEmpty()){p.add(empty("Todavía no publicaste servicios","Creá tu primera propuesta para comenzar a compartir tu talento."));}else for(Publicacion x:own){JPanel row=card(new BorderLayout(12,0));row.setMaximumSize(new Dimension(Integer.MAX_VALUE,90));row.add(label(x.titulo(),H3,TEXT));row.add(pill(x.estado().name(),x.estado()==EstadoPublicacion.PUBLICADA?TEAL:MUTED),BorderLayout.CENTER);JButton toggle=button(x.estado()==EstadoPublicacion.PUBLICADA?"Pausar":"Publicar",false);toggle.addActionListener(uiAction(e->{controllers.publicaciones().cambiarEstado(USER_ID,x.id(),x.estado()==EstadoPublicacion.PUBLICADA?EstadoPublicacion.PAUSADA:EstadoPublicacion.PUBLICADA);showListings();}));row.add(toggle,BorderLayout.EAST);p.add(row);p.add(Box.createVerticalStrut(10));}page("Mis publicaciones",p);}
+    private void showListings(){JPanel p=base();JPanel title=new JPanel(new BorderLayout());title.setOpaque(false);title.add(label("Gestioná tus publicaciones",H2,TEXT));JButton create=button("+ Nueva publicación",true);create.addActionListener(uiAction(e->createListing()));title.add(create,BorderLayout.EAST);title.setMaximumSize(new Dimension(Integer.MAX_VALUE,45));title.setAlignmentX(LEFT_ALIGNMENT);p.add(title);p.add(Box.createVerticalStrut(15));List<Publicacion> own=controllers.publicaciones().listarPropias(USER_ID);if(own.isEmpty()){p.add(empty("Todavía no publicaste servicios","Creá tu primera propuesta para comenzar a compartir tu talento."));}else for(Publicacion x:own){JPanel row=card(new BorderLayout(12,0));row.setMaximumSize(new Dimension(Integer.MAX_VALUE,90));row.add(label(x.tipo()==null?x.titulo():x.tipo()+" · "+x.titulo(),H3,TEXT),BorderLayout.WEST);row.add(pill(x.estado().name(),x.estado()==EstadoPublicacion.PUBLICADA?TEAL:MUTED),BorderLayout.CENTER);JButton toggle=button(x.estado()==EstadoPublicacion.PUBLICADA?"Pausar":"Publicar",false);toggle.addActionListener(uiAction(e->{controllers.publicaciones().cambiarEstado(USER_ID,x.id(),x.estado()==EstadoPublicacion.PUBLICADA?EstadoPublicacion.PAUSADA:EstadoPublicacion.PUBLICADA);showListings();}));row.add(toggle,BorderLayout.EAST);p.add(row);p.add(Box.createVerticalStrut(10));}page("Mis publicaciones",p);}
 
-    private void createListing(){JTextField title=new JTextField();JTextArea desc=new JTextArea(4,26);JComboBox<String> cat=new JComboBox<>(controllers.busqueda().categorias().stream().filter(c->!c.equals("Todas")).toArray(String[]::new));JPanel form=new JPanel(new GridLayout(0,1,4,5));form.add(new JLabel("Título"));form.add(title);form.add(new JLabel("Descripción"));form.add(new JScrollPane(desc));form.add(new JLabel("Categoría"));form.add(cat);if(JOptionPane.showConfirmDialog(this,form,"Nueva publicación",JOptionPane.OK_CANCEL_OPTION,JOptionPane.PLAIN_MESSAGE)==JOptionPane.OK_OPTION&&!title.getText().isBlank()){controllers.publicaciones().crearBorrador(USER_ID,title.getText(),desc.getText(),(String)cat.getSelectedItem(),Modalidad.REMOTA,60,150);message("Borrador creado","La publicación quedó lista para que tus alumnos conecten su flujo real.");showListings();}}
+    /**
+     * Nueva publicación con todos los datos del borrador. Si el dominio rechaza algo, se muestra el
+     * error y el formulario vuelve a abrirse con lo que se había cargado.
+     */
+    private void createListing() {
+        NuevaPublicacionForm form = new NuevaPublicacionForm(controllers.publicaciones().tiposPublicacion(USER_ID),
+                controllers.busqueda().categorias());
+        while (JOptionPane.showConfirmDialog(this, form, "Nueva publicación", JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE) == JOptionPane.OK_OPTION) {
+            try {
+                controllers.publicaciones().crearBorrador(USER_ID, form.datos());
+            } catch (PresentationException error) {
+                showError(error.error());
+                continue;
+            }
+            message("Borrador creado", "Publicalo desde Mis publicaciones para que aparezca en la búsqueda.");
+            showListings();
+            return;
+        }
+    }
 
     private void showContracts() {
         JPanel p = base();
@@ -276,12 +369,12 @@ public final class SkillSwapView extends JPanel {
             text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
             text.add(label(booking.titulo(), H3, TEXT));
             text.add(Box.createVerticalStrut(5));
-            text.add(label(booking.contraparte() + "  ·  "
-                    + booking.fecha().format(DateTimeFormatter.ofPattern("dd/MM · HH:mm")), BODY, MUTED));
+            text.add(inline(profileLink(booking.contraparte(), booking.contraparteId(), BODY, this::showContracts),
+                    label("  ·  " + booking.fecha().format(DateTimeFormatter.ofPattern("dd/MM · HH:mm")), BODY, MUTED)));
             if (!booking.objetivo().isBlank()) text.add(label("Objetivo: " + booking.objetivo(), SMALL, MUTED));
             if (!booking.mensajeCliente().isBlank()) text.add(label("Mensaje: " + booking.mensajeCliente(), SMALL, MUTED));
-            row.add(text);
-            row.add(pill(booking.estado().name(), booking.estado() == EstadoContratacion.COMPLETADA ? TEAL : NAVY_2), BorderLayout.CENTER);
+            text.add(pill(booking.estado().name(), booking.estado() == EstadoContratacion.COMPLETADA ? TEAL : NAVY_2));
+            row.add(text, BorderLayout.CENTER);
 
             JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
             actions.setOpaque(false);
@@ -306,6 +399,11 @@ public final class SkillSwapView extends JPanel {
                 }));
                 actions.add(cancel);
             }
+            if (booking.estado() == EstadoContratacion.COMPLETADA) {
+                JButton rate = button("Calificar", true);
+                rate.addActionListener(uiAction(event -> showRating(booking)));
+                actions.add(rate);
+            }
             row.add(actions, BorderLayout.EAST);
             p.add(row);
             p.add(Box.createVerticalStrut(11));
@@ -313,17 +411,162 @@ public final class SkillSwapView extends JPanel {
         page("Contrataciones", p);
     }
 
+    private void showRating(Contratacion booking) {
+        JPanel panel = new JPanel(new GridLayout(0, 1, 8, 8));
+        JComboBox<Integer> score = new JComboBox<>(new Integer[]{5, 4, 3, 2, 1});
+        JTextField comment = new JTextField();
+        panel.add(label("Puntaje", H3, TEXT));
+        panel.add(score);
+        panel.add(label("Comentario", H3, TEXT));
+        panel.add(comment);
+        if (JOptionPane.showConfirmDialog(this, panel, "Calificar sesión",
+                JOptionPane.OK_CANCEL_OPTION) != JOptionPane.OK_OPTION) return;
+        controllers.calificaciones().calificar(USER_ID, booking.id(), (Integer) score.getSelectedItem(), comment.getText());
+        JOptionPane.showMessageDialog(this, "Calificación registrada");
+        showContracts();
+    }
+
     private void showWallet(){JPanel p=base();JPanel balance=new Theme.RoundedPanel(22,NAVY_2);balance.setLayout(new BorderLayout());balance.setBorder(new EmptyBorder(24,26,24,26));balance.setMaximumSize(new Dimension(Integer.MAX_VALUE,120));JPanel btxt=new JPanel();btxt.setOpaque(false);btxt.setLayout(new BoxLayout(btxt,BoxLayout.Y_AXIS));btxt.add(label("SALDO DISPONIBLE",SMALL,new Color(184,209,222)));btxt.add(label(controllers.wallet().consultarSaldo(USER_ID)+" SkillCoins",new Font("SansSerif",Font.BOLD,30),Color.WHITE));balance.add(btxt);JButton add=button("+ Acreditar demo",true);add.addActionListener(uiAction(e->{controllers.wallet().acreditarDemo(USER_ID,500);showWallet();}));balance.add(add,BorderLayout.EAST);balance.setAlignmentX(LEFT_ALIGNMENT);p.add(balance);p.add(Box.createVerticalStrut(24));addSection(p,"Movimientos recientes",null);for(Movimiento m:controllers.wallet().listarMovimientos(USER_ID)){JPanel row=card(new BorderLayout());row.setMaximumSize(new Dimension(Integer.MAX_VALUE,72));JPanel t=new JPanel();t.setOpaque(false);t.setLayout(new BoxLayout(t,BoxLayout.Y_AXIS));t.add(label(m.concepto(),H3,TEXT));t.add(label(m.fecha().format(DateTimeFormatter.ofPattern("dd/MM/yyyy · HH:mm")),SMALL,MUTED));row.add(t);row.add(label((m.importe()>0?"+":"")+m.importe()+" ◈",H3,m.importe()>0?TEAL:DANGER),BorderLayout.EAST);p.add(row);p.add(Box.createVerticalStrut(8));}page("SkillCoins",p);}
 
     private void showNotifications(){JPanel p=base();JPanel head=new JPanel(new BorderLayout());head.setOpaque(false);head.add(label("Centro de notificaciones",H2,TEXT));JButton all=button("Marcar todas como leídas",false);all.addActionListener(uiAction(e->{controllers.notificaciones().marcarTodasLeidas(USER_ID);showNotifications();}));head.add(all,BorderLayout.EAST);head.setMaximumSize(new Dimension(Integer.MAX_VALUE,42));head.setAlignmentX(LEFT_ALIGNMENT);p.add(head);p.add(Box.createVerticalStrut(15));for(Notificacion n:controllers.notificaciones().listarNotificaciones(USER_ID)){JPanel row=card(new BorderLayout(14,0));row.setMaximumSize(new Dimension(Integer.MAX_VALUE,90));JLabel dot=label(n.leida()?"○":"●",H2,n.leida()?BORDER:TEAL);row.add(dot,BorderLayout.WEST);JPanel t=new JPanel();t.setOpaque(false);t.setLayout(new BoxLayout(t,BoxLayout.Y_AXIS));t.add(label(n.titulo(),H3,TEXT));t.add(label(n.detalle(),BODY,MUTED));t.add(label(n.fecha().format(DateTimeFormatter.ofPattern("dd/MM · HH:mm")),SMALL,MUTED));row.add(t);if(!n.leida()){JButton read=button("Marcar leída",false);read.addActionListener(uiAction(e->{controllers.notificaciones().marcarLeida(USER_ID,n.id());showNotifications();}));row.add(read,BorderLayout.EAST);}p.add(row);p.add(Box.createVerticalStrut(9));}page("Notificaciones",p);}
 
-    private void showProfile(){Perfil x=controllers.perfiles().verPerfil(USER_ID);JPanel p=base();JPanel hero=card(new BorderLayout(20,0));hero.setMaximumSize(new Dimension(Integer.MAX_VALUE,180));hero.add(avatar("MS",86),BorderLayout.WEST);JPanel data=new JPanel();data.setOpaque(false);data.setLayout(new BoxLayout(data,BoxLayout.Y_AXIS));data.add(label(x.nombre(),H1,TEXT));data.add(label(x.rol(),H3,TEAL_DARK));data.add(Box.createVerticalStrut(10));data.add(label("<html><div style='width:570px'>"+x.bio()+"</div></html>",BODY,MUTED));hero.add(data);JPanel stats=new JPanel(new GridLayout(3,1,0,4));stats.setOpaque(false);stats.add(label("★ "+x.reputacion()+" reputación",H3,GOLD));stats.add(label(x.resenas()+" reseñas",BODY,MUTED));stats.add(label(x.proyectosCompletados()+" proyectos",BODY,MUTED));hero.add(stats,BorderLayout.EAST);hero.setAlignmentX(LEFT_ALIGNMENT);p.add(hero);p.add(Box.createVerticalStrut(24));addSection(p,"Habilidades",null);JPanel tags=new JPanel(new FlowLayout(FlowLayout.LEFT,8,0));tags.setOpaque(false);for(String s:x.habilidades())tags.add(pill(s,NAVY_2));tags.setAlignmentX(LEFT_ALIGNMENT);p.add(tags);page("Mi perfil",p);}
+    private void showProfile(){Perfil x=controllers.perfiles().verPerfil(USER_ID);JPanel p=base();JPanel hero=card(new BorderLayout(20,0));hero.setMaximumSize(new Dimension(Integer.MAX_VALUE,180));hero.add(avatar(initials(x.nombre()),86),BorderLayout.WEST);JPanel data=new JPanel();data.setOpaque(false);data.setLayout(new BoxLayout(data,BoxLayout.Y_AXIS));data.add(label(x.nombre(),H1,TEXT));data.add(label(x.rol(),H3,TEAL_DARK));data.add(Box.createVerticalStrut(10));data.add(label("<html><div style='width:570px'>"+x.bio()+"</div></html>",BODY,MUTED));hero.add(data);JPanel stats=new JPanel(new GridLayout(3,1,0,4));stats.setOpaque(false);stats.add(label("★ "+x.reputacion()+" reputación",H3,GOLD));stats.add(label(x.resenas()+" reseñas",BODY,MUTED));stats.add(label(x.proyectosCompletados()+" proyectos",BODY,MUTED));hero.add(stats,BorderLayout.EAST);hero.setAlignmentX(LEFT_ALIGNMENT);p.add(hero);p.add(Box.createVerticalStrut(24));addSection(p,"Habilidades",null);JPanel tags=new JPanel(new FlowLayout(FlowLayout.LEFT,8,0));tags.setOpaque(false);for(String s:x.habilidades())tags.add(pill(s,NAVY_2));tags.setAlignmentX(LEFT_ALIGNMENT);p.add(tags);page("Mi perfil",p);}
+
+    /** Perfil público de otro usuario; {@code back} vuelve a la pantalla desde la que se abrió. */
+    private void showPublicProfile(String perfilUserId, int pagina, Runnable back) {
+        PerfilPublico profile = controllers.perfiles().verPerfilPublico(perfilUserId, pagina);
+        Perfil x = profile.perfil();
+        JPanel p = base();
+        JButton backButton = button("← Volver", false);
+        backButton.setAlignmentX(LEFT_ALIGNMENT);
+        backButton.addActionListener(uiAction(event -> back.run()));
+        p.add(backButton);
+        p.add(Box.createVerticalStrut(18));
+
+        JPanel hero = card(new BorderLayout(20, 0));
+        hero.setMaximumSize(new Dimension(Integer.MAX_VALUE, 180));
+        hero.add(avatar(initials(x.nombre()), 86), BorderLayout.WEST);
+        JPanel data = new JPanel();
+        data.setOpaque(false);
+        data.setLayout(new BoxLayout(data, BoxLayout.Y_AXIS));
+        data.add(label(x.nombre(), H1, TEXT));
+        data.add(label(x.rol(), H3, TEAL_DARK));
+        data.add(Box.createVerticalStrut(10));
+        data.add(label("<html><div style='width:570px'>" + x.bio() + "</div></html>", BODY, MUTED));
+        hero.add(data);
+        JPanel stats = new JPanel(new GridLayout(3, 1, 0, 4));
+        stats.setOpaque(false);
+        stats.add(label("★ " + x.reputacion() + " reputación", H3, GOLD));
+        stats.add(label(x.resenas() + " reseñas", BODY, MUTED));
+        stats.add(label(x.proyectosCompletados() + " proyectos", BODY, MUTED));
+        hero.add(stats, BorderLayout.EAST);
+        hero.setAlignmentX(LEFT_ALIGNMENT);
+        p.add(hero);
+        p.add(Box.createVerticalStrut(24));
+
+        addSection(p, "Habilidades", null);
+        JPanel tags = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        tags.setOpaque(false);
+        for (String skill : x.habilidades()) tags.add(pill(skill, NAVY_2));
+        tags.setAlignmentX(LEFT_ALIGNMENT);
+        tags.setMaximumSize(new Dimension(Integer.MAX_VALUE, tags.getPreferredSize().height));
+        p.add(tags);
+        p.add(Box.createVerticalStrut(24));
+
+        addSection(p, "Historial", "Contrataciones completadas en SkillSwap");
+        JLabel history = label(profile.completadasComoProveedor() + " como proveedor  ·  "
+                + profile.completadasComoCliente() + " como cliente", H3, TEXT);
+        history.setAlignmentX(LEFT_ALIGNMENT);
+        p.add(history);
+        p.add(Box.createVerticalStrut(24));
+
+        addSection(p, "Últimas reseñas", null);
+        if (profile.ultimasResenas().isEmpty()) {
+            JLabel none = label("Todavía no recibió reseñas.", BODY, MUTED);
+            none.setAlignmentX(LEFT_ALIGNMENT);
+            p.add(none);
+        }
+        for (Resena review : profile.ultimasResenas()) {
+            JPanel row = card(new BorderLayout(14, 0));
+            row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 72));
+            row.add(label("★ " + review.puntaje(), H3, GOLD), BorderLayout.WEST);
+            JPanel text = new JPanel();
+            text.setOpaque(false);
+            text.setLayout(new BoxLayout(text, BoxLayout.Y_AXIS));
+            text.add(label(review.comentario().isBlank() ? "Sin comentario" : review.comentario(), BODY, TEXT));
+            text.add(label(review.fecha().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")), SMALL, MUTED));
+            row.add(text);
+            row.setAlignmentX(LEFT_ALIGNMENT);
+            p.add(row);
+            p.add(Box.createVerticalStrut(8));
+        }
+        p.add(Box.createVerticalStrut(16));
+
+        PaginaPublicaciones publications = profile.publicaciones();
+        String pages = publications.totalPaginas() == 0 ? ""
+                : " · Página " + (publications.pagina() + 1) + " de " + publications.totalPaginas();
+        addSection(p, "Publicaciones activas" + pages,
+                publications.total() + (publications.total() == 1 ? " publicación" : " publicaciones"));
+        if (publications.items().isEmpty()) {
+            p.add(empty("Sin publicaciones activas", "Este usuario no tiene propuestas publicadas en este momento."));
+        } else {
+            JPanel grid = cardGrid(publications.items(), () -> showPublicProfile(perfilUserId, pagina, back));
+            grid.setMaximumSize(new Dimension(Integer.MAX_VALUE, grid.getPreferredSize().height));
+            p.add(grid);
+        }
+        JPanel pager = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 12));
+        pager.setOpaque(false);
+        pager.setAlignmentX(LEFT_ALIGNMENT);
+        JButton previous = button("← Anterior", false);
+        previous.setEnabled(publications.hayAnterior());
+        previous.addActionListener(uiAction(e -> showPublicProfile(perfilUserId, pagina - 1, back)));
+        JButton next = button("Siguiente →", false);
+        next.setEnabled(publications.haySiguiente());
+        next.addActionListener(uiAction(e -> showPublicProfile(perfilUserId, pagina + 1, back)));
+        pager.add(previous);
+        pager.add(next);
+        p.add(pager);
+        page("Perfil público", p);
+    }
 
     private JLabel pill(String text,Color color){JLabel l=label(text,new Font("SansSerif",Font.BOLD,10),Color.WHITE);l.setOpaque(true);l.setBackground(color);l.setBorder(new EmptyBorder(6,9,6,9));return l;}
     private JLabel avatar(String initials,int size){JLabel a=new JLabel(initials,SwingConstants.CENTER);a.setPreferredSize(new Dimension(size,size));a.setMinimumSize(new Dimension(size,size));a.setMaximumSize(new Dimension(size,size));a.setOpaque(true);a.setBackground(TEAL);a.setForeground(Color.WHITE);a.setFont(new Font("SansSerif",Font.BOLD,size/3));a.setBorder(BorderFactory.createLineBorder(new Color(255,255,255,100),2,true));return a;}
     private JComponent empty(String title,String subtitle){JPanel e=card(new GridBagLayout());e.setMaximumSize(new Dimension(Integer.MAX_VALUE,190));JPanel t=new JPanel();t.setOpaque(false);t.setLayout(new BoxLayout(t,BoxLayout.Y_AXIS));JLabel h=label(title,H2,TEXT);h.setAlignmentX(CENTER_ALIGNMENT);t.add(h);t.add(Box.createVerticalStrut(8));JLabel s=label(subtitle,BODY,MUTED);s.setAlignmentX(CENTER_ALIGNMENT);t.add(s);e.add(t);return e;}
+    /**
+     * Nombre de un usuario que abre su perfil público al hacer clic; {@code back} vuelve a la
+     * pantalla actual. Sin identificador se muestra como texto común.
+     */
+    private JLabel profileLink(String name, String userId, Font font, Runnable back) {
+        if (userId == null || userId.isBlank()) return label(name, font, MUTED);
+        JLabel link = label("<html><u>" + name + "</u></html>", font, LINK);
+        link.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        link.setToolTipText("Ver el perfil público de " + name);
+        link.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent event) {
+                actions.run(() -> showPublicProfile(userId, 0, back));
+            }
+        });
+        return link;
+    }
+
+    /** Fila de componentes en línea, alineada a la izquierda y sin estirarse en alto. */
+    private static JPanel inline(JComponent... parts) {
+        JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        row.setOpaque(false);
+        for (JComponent part : parts) row.add(part);
+        row.setAlignmentX(LEFT_ALIGNMENT);
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, row.getPreferredSize().height));
+        return row;
+    }
+
     private ActionListener uiAction(ActionListener listener) {
         return event -> actions.run(() -> listener.actionPerformed(event));
+    }
+
+    private void showError(ErrorPresentacion error) {
+        JOptionPane.showMessageDialog(this, error.mensaje(), "No se pudo completar la operación",
+                JOptionPane.ERROR_MESSAGE);
     }
 
     private void message(String title,String body){JOptionPane.showMessageDialog(this,body,title,JOptionPane.INFORMATION_MESSAGE);}

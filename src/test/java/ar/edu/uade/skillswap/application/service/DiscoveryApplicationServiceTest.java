@@ -7,16 +7,24 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import ar.edu.uade.skillswap.application.error.ApplicationErrorCode;
 import ar.edu.uade.skillswap.application.error.ApplicationException;
+import ar.edu.uade.skillswap.application.model.DiscoveryData.CategoryView;
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchOrder;
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchQuery;
 import ar.edu.uade.skillswap.application.model.PageResult;
+import ar.edu.uade.skillswap.application.model.ProfileData.AvailabilityView;
+import ar.edu.uade.skillswap.application.model.PublicationData.AuthorView;
 import ar.edu.uade.skillswap.application.model.PublicationData.PublicationView;
 import ar.edu.uade.skillswap.application.port.out.ProfileRepository;
 import ar.edu.uade.skillswap.application.port.out.PublicationRepository;
+import ar.edu.uade.skillswap.application.port.out.PublicationQueryPort;
+import ar.edu.uade.skillswap.domain.catalog.CatalogCategory;
+import ar.edu.uade.skillswap.domain.catalog.CatalogSkill;
+import ar.edu.uade.skillswap.domain.model.ActorType;
 import ar.edu.uade.skillswap.domain.model.AvailabilitySlot;
 import ar.edu.uade.skillswap.domain.model.Modality;
 import ar.edu.uade.skillswap.domain.model.Profile;
 import ar.edu.uade.skillswap.domain.model.Publication;
+import ar.edu.uade.skillswap.domain.model.PublicationType;
 import ar.edu.uade.skillswap.domain.model.RecommendationStrategy;
 import ar.edu.uade.skillswap.domain.model.SkillCoins;
 import ar.edu.uade.skillswap.domain.state.PublicationStates;
@@ -32,9 +40,12 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 class DiscoveryApplicationServiceTest {
+    private static final FixedCatalog CATALOG = FixedCatalog.withRoots("Tecnología", "Diseño");
+
     @Test
     void delegaLaBusquedaSinModificarLosCriteriosYConservaLaPaginacion() {
-        var publications = new StubPublications(List.of(), new PageResult<>(List.of(publication("p1", "ana")), 2, 5, 11));
+        var publications = new StubPublications(List.of(), new PageResult<>(
+                List.of(view(publication("p1", "ana"), profile("ana", 0, 0))), 2, 5, 11));
         var service = service(publications, new StubProfiles(List.of(profile("ana", 0, 0))));
         var query = new SearchQuery("java", "Tecnología", Modality.REMOTE, "Java", 10, 200,
                 4.0, SearchOrder.BEST_RATING, 2, 5);
@@ -49,18 +60,19 @@ class DiscoveryApplicationServiceTest {
     }
 
     @Test
-    void completaCadaResultadoConLosDatosDelAutorEnUnaSolaLecturaDePerfiles() {
-        var slot = new AvailabilitySlot("slot-1", LocalDateTime.now().plusDays(1),
+    void devuelveLaProyeccionDeLecturaSinConsultarAgregadosDePerfiles() {
+        var slot = new AvailabilityView("slot-1", LocalDateTime.now().plusDays(1),
                 LocalDateTime.now().plusDays(1).plusHours(2), 2, 1);
-        var page = new PageResult<>(List.of(publication("p1", "ana", slot), publication("p2", "ana"),
-                publication("p3", "beto")), 0, 20, 3);
+        var page = new PageResult<>(List.of(
+                view(publication("p1", "ana"), profile("ana", 4.5, 2), slot),
+                view(publication("p2", "ana"), profile("ana", 4.5, 2)),
+                view(publication("p3", "beto"), profile("beto", 3.0, 1))), 0, 20, 3);
         var profiles = new StubProfiles(List.of(profile("ana", 4.5, 2), profile("beto", 3.0, 1)));
         var service = service(new StubPublications(List.of(), page), profiles);
 
         List<PublicationView> items = service.search(anyQuery()).items();
 
-        assertEquals(1, profiles.batchCalls);
-        assertEquals(Set.of("ana", "beto"), Set.copyOf(profiles.requestedUserIds));
+        assertEquals(0, profiles.batchCalls);
         assertEquals("Nombre ana", items.get(0).author().displayName());
         assertEquals(4.5, items.get(0).author().reputation());
         assertEquals(2, items.get(0).author().ratingCount());
@@ -72,10 +84,10 @@ class DiscoveryApplicationServiceTest {
 
     @Test
     void unAutorSinPerfilEsUnaInconsistenciaDeDatos() {
-        var page = new PageResult<>(List.of(publication("p1", "org-1")), 0, 20, 1);
-        var service = service(new StubPublications(List.of(), page), new StubProfiles(List.of()));
+        var service = service(new StubPublications(List.of(publication("p1", "org-1")), emptyPage()),
+                new StubProfiles(List.of(profile("user-1", 0, 0))));
 
-        var error = assertThrows(IllegalStateException.class, () -> service.search(anyQuery()));
+        var error = assertThrows(IllegalStateException.class, () -> service.recommend(1));
 
         assertEquals("La publicación pub-p1 no tiene perfil de autor", error.getMessage());
     }
@@ -94,7 +106,7 @@ class DiscoveryApplicationServiceTest {
     @Test
     void propagaLasFallasDelRepositorioSinOcultarlas() {
         var publications = new StubPublications(List.of(), null) {
-            @Override public PageResult<Publication> searchPublished(SearchQuery query) {
+            @Override public PageResult<PublicationView> searchPublished(SearchQuery query) {
                 throw new IllegalStateException("Base no disponible");
             }
         };
@@ -107,20 +119,22 @@ class DiscoveryApplicationServiceTest {
 
     @Test
     void laBusquedaNoRequiereUsuarioAutenticado() {
-        var page = new PageResult<>(List.of(publication("p1", "ana")), 0, 20, 1);
-        var service = new DiscoveryApplicationService(new StubPublications(List.of(), page),
-                new StubProfiles(List.of(profile("ana", 0, 0))), () -> null, strategyReturningFirst());
+        var page = new PageResult<>(List.of(view(publication("p1", "ana"), profile("ana", 0, 0))), 0, 20, 1);
+        var repository = new StubPublications(List.of(), page);
+        var service = new DiscoveryApplicationService(repository, repository,
+                new StubProfiles(List.of(profile("ana", 0, 0))), CATALOG, () -> null, strategyReturningFirst());
 
         assertEquals(1, service.search(anyQuery()).totalElements());
     }
 
     @Test
     void usesInjectedRecommendationStrategyWithAuthenticatedProfileAndLimit() {
-        Profile profile = Profile.register("user-1", "Ana", "", "UTC", Set.of("Java"), Set.of(), Set.of());
+        Profile profile = Profile.register("user-1", ActorType.PROFESSIONAL, "Ana", "", "UTC",
+                Set.of("Java"), Set.of(), Set.of());
         var repository = new StubPublications(List.of(publication("Java", "provider-1")), emptyPage());
         var strategy = new CapturingStrategy();
         var profiles = new StubProfiles(List.of(profile, profile("provider-1", 4.2, 3)));
-        var service = new DiscoveryApplicationService(repository, profiles, () -> "user-1", strategy);
+        var service = new DiscoveryApplicationService(repository, repository, profiles, CATALOG, () -> "user-1", strategy);
 
         List<PublicationView> result = service.recommend(3);
 
@@ -133,25 +147,51 @@ class DiscoveryApplicationServiceTest {
     }
 
     @Test
-    void listsDistinctPublishedCategoriesInStableOrder() {
-        var repository = new StubPublications(List.of(
-                publication("Java", "provider-1", "Tecnología"), publication("UX", "provider-1", "Diseño"),
-                publication("SQL", "provider-1", "Tecnología")), emptyPage());
-        var service = service(repository, new StubProfiles(List.of()));
+    void rechazaBuscarPorUnaCategoriaQueNoEstaEnElCatalogoSinConsultarPublicaciones() {
+        var publications = new StubPublications(List.of(), emptyPage());
+        var service = service(publications, new StubProfiles(List.of()));
+        var query = new SearchQuery(null, "Astrología", null, null, null, null, null, null, 0, 20);
 
-        assertEquals(List.of("Diseño", "Tecnología"), service.categories());
+        var error = assertThrows(ApplicationException.class, () -> service.search(query));
+
+        assertEquals(ApplicationErrorCode.VALIDATION, error.code());
+        assertNull(publications.receivedQuery);
     }
 
-    private static DiscoveryApplicationService service(PublicationRepository publications, ProfileRepository profiles) {
-        return new DiscoveryApplicationService(publications, profiles, () -> "user-1", strategyReturningFirst());
+    @Test
+    void lasCategoriasSonLasDelCatalogoEnPreordenConSuProfundidadYSinHabilidades() {
+        var backend = new CatalogCategory("backend", "Backend").add(new CatalogSkill("java", "Java"));
+        var technology = new CatalogCategory("tecnologia", "Tecnología").add(backend)
+                .add(new CatalogSkill("carrera", "Carrera"));
+        var publications = new StubPublications(List.of(), emptyPage());
+        var service = new DiscoveryApplicationService(publications, publications, new StubProfiles(List.of()),
+                new FixedCatalog(technology, new CatalogCategory("diseno", "Diseño")), () -> null,
+                strategyReturningFirst());
+
+        assertEquals(List.of(new CategoryView("Tecnología", 0), new CategoryView("Backend", 1),
+                new CategoryView("Diseño", 0)), service.categories());
+    }
+
+    private static DiscoveryApplicationService service(StubPublications publications, ProfileRepository profiles) {
+        return new DiscoveryApplicationService(
+                publications, publications, profiles, CATALOG, () -> "user-1", strategyReturningFirst());
     }
 
     private static SearchQuery anyQuery() {
         return new SearchQuery(null, null, null, null, null, null, null, null, 0, 20);
     }
 
-    private static PageResult<Publication> emptyPage() {
+    private static PageResult<PublicationView> emptyPage() {
         return new PageResult<>(List.of(), 0, 20, 0);
+    }
+
+    private static PublicationView view(Publication publication, Profile author, AvailabilityView... slots) {
+        return new PublicationView(publication.id(), publication.authorUserId(), publication.type(),
+                publication.title(), publication.description(), publication.category(), publication.modality(),
+                publication.durationMinutes(), publication.capacity(), publication.basePrice().amount(),
+                publication.tags(), publication.status(), List.of(slots), publication.createdAt(),
+                publication.requestCount(), new ar.edu.uade.skillswap.application.model.PublicationData.AuthorView(
+                        author.userId(), author.displayName(), author.reputation(), author.ratingCount()));
     }
 
     private static RecommendationStrategy strategyReturningFirst() {
@@ -164,7 +204,8 @@ class DiscoveryApplicationServiceTest {
     }
 
     private static Profile profile(String userId, double reputation, int ratingCount) {
-        return new Profile(null, userId, "Nombre " + userId, "", "UTC", Set.of(), Set.of(), Set.of(),
+        return new Profile(null, userId, ActorType.PROFESSIONAL, "Nombre " + userId, "", "UTC",
+                Set.of(), Set.of(), Set.of(),
                 reputation, ratingCount, true);
     }
 
@@ -173,8 +214,9 @@ class DiscoveryApplicationServiceTest {
     }
 
     private static Publication publication(String id, String author, String category, AvailabilitySlot... slots) {
-        return new Publication("pub-" + id, author, "Mentoría " + id, "Descripción", category, Modality.REMOTE,
-                60, 2, new SkillCoins(10), Set.of(), List.of(slots), PublicationStates.published(),
+        return new Publication("pub-" + id, author, PublicationType.MENTORSHIP, "Mentoría " + id, "Descripción",
+                category, Modality.REMOTE, 60, 2, new SkillCoins(10), Set.of(), List.of(slots),
+                PublicationStates.published(),
                 LocalDateTime.now(), 0, null, 0, List.of());
     }
 
@@ -190,12 +232,12 @@ class DiscoveryApplicationServiceTest {
         @Override public String name() { return "captura"; }
     }
 
-    private static class StubPublications implements PublicationRepository {
+    private static class StubPublications implements PublicationRepository, PublicationQueryPort {
         private final List<Publication> published;
-        private final PageResult<Publication> searchResult;
+        private final PageResult<PublicationView> searchResult;
         private SearchQuery receivedQuery;
 
-        private StubPublications(List<Publication> published, PageResult<Publication> searchResult) {
+        private StubPublications(List<Publication> published, PageResult<PublicationView> searchResult) {
             this.published = published;
             this.searchResult = searchResult;
         }
@@ -204,15 +246,19 @@ class DiscoveryApplicationServiceTest {
         @Override public Optional<Publication> findByIdForUpdate(String id) { return Optional.empty(); }
         @Override public List<Publication> findByAuthorUserId(String userId) { return List.of(); }
         @Override public List<Publication> findPublished() { return published; }
-        @Override public PageResult<Publication> searchPublished(SearchQuery query) {
+        @Override public PageResult<PublicationView> searchPublished(SearchQuery query) {
             receivedQuery = query;
             return searchResult;
+        }
+        @Override public PageResult<Publication> findPublishedByAuthor(String authorUserId, int page, int size) {
+            return new PageResult<>(List.of(), page, size, 0);
         }
         @Override public Publication save(Publication publication) { return publication; }
     }
 
     /** Registra las lecturas en lote para verificar que no se consulta un perfil por resultado. */
     private static final class StubProfiles implements ProfileRepository {
+        @Override public List<Profile> findActive() { throw new AssertionError("No debe listar perfiles"); }
         private final Map<String, Profile> byUserId;
         private int batchCalls;
         private final List<String> requestedUserIds = new ArrayList<>();

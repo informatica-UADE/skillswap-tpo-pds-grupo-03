@@ -7,5 +7,7 @@ import java.util.List;
 public interface RatingRepository {
     boolean existsByBookingIdAndAuthorUserId(String bookingId, String authorUserId);
     List<Rating> findBySubjectUserId(String subjectUserId);
+    /** Las últimas {@code limit} calificaciones recibidas, de la más reciente a la más antigua. */
+    List<Rating> findRecentBySubjectUserId(String subjectUserId, int limit);
     Rating save(Rating rating);
 }
