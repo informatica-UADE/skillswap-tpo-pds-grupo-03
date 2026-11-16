@@ -1,7 +1,7 @@
 package ar.edu.uade.skillswap;
 
 import ar.edu.uade.skillswap.controllers.UiControllers;
-import ar.edu.uade.skillswap.infrastructure.WiredUiControllers;
+import ar.edu.uade.skillswap.infrastructure.SkillSwapUiControllers;
 import ar.edu.uade.skillswap.infrastructure.SkillSwapApplicationWiring;
 import ar.edu.uade.skillswap.ui.SkillSwapView;
 import ar.edu.uade.skillswap.ui.Theme;
@@ -11,19 +11,20 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.util.Arrays;
 
 public final class SkillSwapApplication {
     private SkillSwapApplication() {}
 
     public static void main(String[] args) throws Exception {
         Theme.install();
-        boolean persistent = java.util.Arrays.asList(args).contains("--persistence=jpa");
-        String[] viewArgs = java.util.Arrays.stream(args)
+        boolean persistent = Arrays.asList(args).contains("--persistence=jpa");
+        String[] viewArgs = Arrays.stream(args)
                 .filter(arg -> !arg.equals("--persistence=jpa")).toArray(String[]::new);
         SkillSwapApplicationWiring wiring = persistent
                 ? SkillSwapApplicationWiring.persistent() : new SkillSwapApplicationWiring();
         Runtime.getRuntime().addShutdownHook(new Thread(wiring::close, "skillswap-persistence-close"));
-        UiControllers controllers = new WiredUiControllers(wiring);
+        UiControllers controllers = SkillSwapUiControllers.from(wiring);
         if (viewArgs.length == 2 && "--screenshot".equals(viewArgs[0])) {
             SkillSwapView view = new SkillSwapView(controllers);
             view.setSize(1365, 768); view.doLayout(); layoutTree(view);

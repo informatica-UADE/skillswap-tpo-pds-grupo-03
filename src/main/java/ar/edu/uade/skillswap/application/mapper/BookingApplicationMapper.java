@@ -7,7 +7,8 @@ import ar.edu.uade.skillswap.domain.model.Booking;
 public final class BookingApplicationMapper {
     private BookingApplicationMapper() {}
 
-    public static BookingView toView(Booking booking, String publicationTitle) {
+    public static BookingView toView(Booking booking, String publicationTitle, String buyerDisplayName,
+                                     String providerDisplayName) {
         return new BookingView(
                 booking.id(),
                 booking.publicationId(),
@@ -21,6 +22,8 @@ public final class BookingApplicationMapper {
                 booking.status(),
                 booking.createdAt(),
                 booking.paidAt(),
-                publicationTitle);
+                publicationTitle,
+                buyerDisplayName,
+                providerDisplayName);
     }
 }

@@ -221,6 +221,7 @@ class DiscoveryApplicationServiceTest {
 
     /** Registra las lecturas en lote para verificar que no se consulta un perfil por resultado. */
     private static final class StubProfiles implements ProfileRepository {
+        @Override public List<Profile> findActive() { throw new AssertionError("No debe listar perfiles"); }
         private final Map<String, Profile> byUserId;
         private int batchCalls;
         private final List<String> requestedUserIds = new ArrayList<>();

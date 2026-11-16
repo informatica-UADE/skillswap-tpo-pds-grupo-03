@@ -17,17 +17,13 @@ public final class BookingData {
     public record CancelCommand(String bookingId, String reason) {}
     public record RescheduleCommand(String bookingId, String newSlotId) {}
 
+    /**
+     * Contratación con los nombres visibles de ambas partes, para que la interfaz muestre la
+     * contraparte sin consultar cada perfil por separado.
+     */
     public record BookingView(String id, String publicationId, String buyerUserId,
                               String providerUserId, String objective, String clientMessage, String slotId,
                               int priceInSkillCoins, int refundInSkillCoins,
                               BookingStatus status, LocalDateTime createdAt, LocalDateTime paidAt,
-                              String publicationTitle) {
-        public BookingView(String id, String publicationId, String buyerUserId,
-                           String providerUserId, String objective, String slotId,
-                           int priceInSkillCoins, int refundInSkillCoins, BookingStatus status,
-                           LocalDateTime createdAt, LocalDateTime paidAt, String publicationTitle) {
-            this(id, publicationId, buyerUserId, providerUserId, objective, "", slotId,
-                    priceInSkillCoins, refundInSkillCoins, status, createdAt, paidAt, publicationTitle);
-        }
-    }
+                              String publicationTitle, String buyerDisplayName, String providerDisplayName) {}
 }
