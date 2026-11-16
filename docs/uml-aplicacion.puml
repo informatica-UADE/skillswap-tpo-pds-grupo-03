@@ -1,9 +1,19 @@
 @startuml
+title SkillSwap - Arquitectura hexagonal / Clean Architecture
+top to bottom direction
 skinparam packageStyle rectangle
 skinparam linetype ortho
+skinparam classAttributeIconSize 0
+skinparam nodesep 25
+skinparam ranksep 35
 
 package "Presentation" {
-  [UI Controllers] as Presentation
+  class SkillSwapView <<UI>>
+  interface UiControllers
+  class UiModels <<view models and mappers>>
+
+  SkillSwapView --> UiControllers
+  SkillSwapView --> UiModels
 }
 
 package "Application" {
@@ -17,6 +27,18 @@ package "Application" {
     interface NotificationUseCases
     interface PublicProfileUseCases
   }
+
+  package "Use case services" {
+    class ProfileApplicationService
+    class PublicationApplicationService
+    class DiscoveryApplicationService
+    class BookingApplicationService
+    class WalletApplicationService
+    class RatingApplicationService
+    class NotificationApplicationService
+    class PublicProfileFacade <<Facade>>
+  }
+
   package "Output ports" {
     interface ProfileRepository
     interface PublicationRepository
@@ -30,107 +52,243 @@ package "Application" {
     interface DomainEventPublisher
     interface NotificationGateway
   }
+
   package "Application models" {
-    [Commands and queries]
-    [Read results]
-    [DomainEvent]
-    [NotificationMessage]
+    class CommandsAndQueries
+    class ReadResults
+    class DomainEvent
+    class NotificationMessage
   }
-  [Use case services] as Services
-  [PublicProfileFacade] as Facade
 }
 
 package "Domain" {
-  [Profile]
-  [Publication]
-  [Booking]
-  [Wallet]
-  [Rating]
-  [Catalog composite]
-  [Policies and strategies]
+  class Profile <<Aggregate Root>>
+  class Publication <<Aggregate Root>>
+  class Booking <<Aggregate Root>>
+  class Wallet <<Aggregate Root>>
+  class Rating
+  interface RefundPolicy
+  interface RecommendationStrategy
+  class PricingStrategies
+  class StateImplementations
+  abstract class CatalogItem <<Composite: componente>>
+  class CatalogCategory <<Composite: compuesto>>
+  class CatalogSkill <<Composite: hoja>>
 }
 
 package "Infrastructure" {
-  [JPA repository adapters]
-  [Identity adapter]
-  [Transaction adapter]
-  [Event and notification adapters]
+  class SkillSwapApplicationWiring <<composition root>>
+  class WiredUiControllers <<presentation adapter>>
+  class BusquedaUiController
+  class PerfilUiController
+
+  package "In-memory adapters" {
+    class InMemoryProfileRepository
+    class InMemoryPublicationRepository
+    class InMemoryBookingRepository
+    class InMemoryWalletRepository
+    class InMemoryRatingRepository
+    class InMemoryNotificationRepository
+    class InMemoryCatalogRepository
+    class SynchronousTransactionManager
+  }
+
+  package "JPA adapters" {
+    class JpaProfileRepository
+    class JpaPublicationRepository
+    class JpaBookingRepository
+    class JpaWalletRepository
+    class JpaRatingRepository
+    class JpaNotificationRepository
+    class JpaCatalogRepository
+    class JpaTransactionManager
+  }
+
+  package "Identity adapter" {
+    class IdentityProviderAdapter
+  }
+
+  package "Events and notifications" {
+    class InMemoryDomainEventPublisher
+    class NotificationEventObserver <<event observer>>
+    class RatingNotificationEventPublisher <<event observer>>
+    class NotificationFactory <<Simple Factory>>
+    class EmailNotificationAdapter
+    class PushNotificationAdapter
+    class InAppNotificationAdapter
+    class MockEmailClient
+    class MockPushClient
+  }
 }
 
-Presentation --> ProfileUseCases
-Presentation --> PublicationUseCases
-Presentation --> DiscoveryUseCases
-Presentation --> BookingUseCases
-Presentation --> WalletUseCases
-Presentation --> RatingUseCases
-Presentation --> NotificationUseCases
-Presentation --> PublicProfileUseCases
+' Input adapters expose UI contracts; application services implement input ports.
+WiredUiControllers ..|> UiControllers
+WiredUiControllers --> SkillSwapApplicationWiring
+BusquedaUiController --> DiscoveryApplicationService
+PerfilUiController --> PublicProfileUseCases
 
-ProfileUseCases <|.. Services
-PublicationUseCases <|.. Services
-DiscoveryUseCases <|.. Services
-BookingUseCases <|.. Services
-WalletUseCases <|.. Services
-RatingUseCases <|.. Services
-NotificationUseCases <|.. Services
-Services --> ProfileRepository
-Services --> PublicationRepository
-Services --> BookingRepository
-Services --> WalletRepository
-Services --> RatingRepository
-Services --> NotificationRepository
-Services --> CatalogRepository
-Services --> CurrentUserProvider
-Services --> TransactionManager
-Services --> DomainEventPublisher
-Services --> NotificationGateway
-Services --> Profile
-Services --> Publication
-Services --> Booking
-Services --> Wallet
-Services --> Rating
-Services --> [Catalog composite]
+ProfileUseCases <|.. ProfileApplicationService
+PublicationUseCases <|.. PublicationApplicationService
+DiscoveryUseCases <|.. DiscoveryApplicationService
+BookingUseCases <|.. BookingApplicationService
+WalletUseCases <|.. WalletApplicationService
+RatingUseCases <|.. RatingApplicationService
+NotificationUseCases <|.. NotificationApplicationService
+PublicProfileUseCases <|.. PublicProfileFacade
 
-PublicProfileUseCases <|.. Facade
-Facade --> ProfileRepository
-Facade --> PublicationRepository
-Facade --> BookingRepository
-Facade --> RatingRepository
-Facade --> TransactionManager
+' Application services depend on output ports, not infrastructure implementations.
+ProfileApplicationService --> ProfileRepository
+ProfileApplicationService --> CurrentUserProvider
+ProfileApplicationService --> TransactionManager
 
-Infrastructure ..|> ProfileRepository
-Infrastructure ..|> PublicationRepository
-Infrastructure ..|> BookingRepository
-Infrastructure ..|> WalletRepository
-Infrastructure ..|> RatingRepository
-Infrastructure ..|> NotificationRepository
-Infrastructure ..|> CatalogRepository
-Infrastructure ..|> CurrentUserProvider
-Infrastructure ..|> TransactionManager
-Infrastructure ..|> DomainEventPublisher
-Infrastructure ..|> NotificationGateway
+PublicationApplicationService --> PublicationRepository
+PublicationApplicationService --> ProfileRepository
+PublicationApplicationService --> CatalogRepository : valida la categoría
+PublicationApplicationService --> CurrentUserProvider
+PublicationApplicationService --> TransactionManager
 
-note bottom of Services
-Concrete services are split by cohesive use-case area.
-The related subissues implement each area's orchestration;
-the domain remains responsible for its invariants.
+DiscoveryApplicationService --> PublicationRepository
+DiscoveryApplicationService --> ProfileRepository
+DiscoveryApplicationService --> CatalogRepository : lista y valida categorías
+DiscoveryApplicationService --> CurrentUserProvider
+DiscoveryApplicationService --> RecommendationStrategy
+
+BookingApplicationService --> BookingRepository
+BookingApplicationService --> PublicationRepository
+BookingApplicationService --> WalletRepository
+BookingApplicationService --> CurrentUserProvider
+BookingApplicationService --> TransactionManager
+BookingApplicationService --> RefundPolicy
+BookingApplicationService --> DomainEventPublisher
+
+WalletApplicationService --> WalletRepository
+WalletApplicationService --> CurrentUserProvider
+WalletApplicationService --> TransactionManager
+
+RatingApplicationService --> BookingRepository
+RatingApplicationService --> RatingRepository
+RatingApplicationService --> ProfileRepository
+RatingApplicationService --> CurrentUserProvider
+RatingApplicationService --> TransactionManager
+RatingApplicationService --> DomainEventPublisher
+
+NotificationApplicationService --> NotificationRepository
+NotificationApplicationService --> CurrentUserProvider
+NotificationApplicationService --> TransactionManager
+
+' Preserve the public-profile integration from main (#40 / #78).
+PublicProfileFacade --> ProfileRepository
+PublicProfileFacade --> PublicationRepository
+PublicProfileFacade --> BookingRepository
+PublicProfileFacade --> RatingRepository
+PublicProfileFacade --> TransactionManager
+
+' Services coordinate domain behavior; detail is in uml-dominio.puml.
+ProfileApplicationService ..> Profile
+PublicationApplicationService ..> Publication
+DiscoveryApplicationService ..> Profile
+DiscoveryApplicationService ..> Publication
+BookingApplicationService ..> Booking
+BookingApplicationService ..> Publication
+BookingApplicationService ..> Wallet
+RatingApplicationService ..> Booking
+RatingApplicationService ..> Rating
+RatingApplicationService ..> Profile
+WalletApplicationService ..> Wallet
+
+' Infrastructure adapters implement application output ports.
+InMemoryProfileRepository ..|> ProfileRepository
+JpaProfileRepository ..|> ProfileRepository
+InMemoryPublicationRepository ..|> PublicationRepository
+JpaPublicationRepository ..|> PublicationRepository
+InMemoryBookingRepository ..|> BookingRepository
+JpaBookingRepository ..|> BookingRepository
+InMemoryWalletRepository ..|> WalletRepository
+JpaWalletRepository ..|> WalletRepository
+InMemoryRatingRepository ..|> RatingRepository
+JpaRatingRepository ..|> RatingRepository
+InMemoryNotificationRepository ..|> NotificationRepository
+JpaNotificationRepository ..|> NotificationRepository
+InMemoryCatalogRepository ..|> CatalogRepository
+JpaCatalogRepository ..|> CatalogRepository
+CatalogCategory --|> CatalogItem
+CatalogSkill --|> CatalogItem
+CatalogCategory o--> "0..*" CatalogItem : contiene
+CatalogRepository ..> CatalogCategory : reconstruye el árbol
+SynchronousTransactionManager ..|> TransactionManager
+JpaTransactionManager ..|> TransactionManager
+IdentityProviderAdapter ..|> CurrentUserProvider
+
+' Events dispatch to observers; notification delivery is not a use-case service dependency.
+InMemoryDomainEventPublisher ..|> DomainEventPublisher
+RatingNotificationEventPublisher ..|> DomainEventPublisher
+InMemoryDomainEventPublisher --> NotificationEventObserver : booking events
+InMemoryDomainEventPublisher --> RatingNotificationEventPublisher : rating.submitted
+NotificationEventObserver --> ProfileRepository
+NotificationEventObserver --> NotificationFactory
+RatingNotificationEventPublisher --> ProfileRepository
+RatingNotificationEventPublisher --> NotificationFactory
+
+NotificationFactory --> NotificationGateway : creates by channel
+NotificationFactory --> NotificationRepository
+NotificationFactory --> MockEmailClient
+NotificationFactory --> MockPushClient
+EmailNotificationAdapter ..|> NotificationGateway
+PushNotificationAdapter ..|> NotificationGateway
+InAppNotificationAdapter ..|> NotificationGateway
+EmailNotificationAdapter --> MockEmailClient
+PushNotificationAdapter --> MockPushClient
+InAppNotificationAdapter --> NotificationRepository
+
+' The composition root selects implementations and wires the application.
+SkillSwapApplicationWiring ..> ProfileApplicationService : composes
+SkillSwapApplicationWiring ..> PublicationApplicationService
+SkillSwapApplicationWiring ..> DiscoveryApplicationService
+SkillSwapApplicationWiring ..> BookingApplicationService
+SkillSwapApplicationWiring ..> WalletApplicationService
+SkillSwapApplicationWiring ..> RatingApplicationService
+SkillSwapApplicationWiring ..> NotificationApplicationService
+SkillSwapApplicationWiring ..> PublicProfileFacade
+SkillSwapApplicationWiring ..> InMemoryDomainEventPublisher : subscribes observers
+SkillSwapApplicationWiring ..> NotificationEventObserver
+SkillSwapApplicationWiring ..> RatingNotificationEventPublisher
+
+note bottom of ProfileApplicationService
+  Cada servicio implementa un puerto de entrada
+  y coordina un área cohesiva. Las entidades del
+  dominio conservan sus invariantes de negocio.
 end note
-note right of PublicationRepository
-searchPublished(SearchQuery): PageResult<Publication>
-filters, order and pagination of the public catalog (#16).
-Executable contract: PublicationSearchContract.
-Every PublicationView includes AuthorView;
-search/recommend read authors with
-ProfileRepository.findByUserIds (one read per page).
+
+note right of SkillSwapApplicationWiring
+  Selecciona adaptadores en memoria para la demo
+  o JPA/transacciones para persistencia.
 end note
-note right of CatalogRepository
-Catálogo jerárquico (#37), fijo y cargado por la migración V6.
-findRootCategories() arma el Composite (CatalogCategory/CatalogSkill)
-con dos consultas; findCategoryName(nombre) valida la categoría
-de búsquedas y publicaciones. La rama se filtra en searchPublished
-con la ruta materializada. Contrato: CatalogRepositoryContract.
+
+note bottom of InMemoryDomainEventPublisher
+  Los eventos de contratación y calificación se
+  publican después del commit. Los observadores
+  eligen canales mediante NotificationFactory.
 end note
-note bottom of Facade
+
+note right of DomainEventPublisher
+  Puerto consumido por los casos de uso que emiten
+  eventos; no conoce observadores ni gateways.
+end note
+
+note bottom of UiControllers
+  Contrato de integración consumido por la vista.
+  Los casos de uso de Application son puertos
+  separados y no todas sus operaciones tienen
+  hoy una acción de UI conectada.
+end note
+
+note bottom of PublicationRepository
+  searchPublished(SearchQuery): PageResult<Publication>
+  implementa búsqueda, filtros, orden y paginación (#16).
+  Se muestra como contexto del repositorio, no como
+  parte de las entregas de dominio documentadas aparte.
+end note
+note bottom of PublicProfileFacade
 Facade (#40): un punto de entrada para el perfil público.
 Coordina perfiles, publicaciones activas (página),
 contrataciones completadas (conteos) y últimas calificaciones
