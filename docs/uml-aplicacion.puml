@@ -15,6 +15,7 @@ package "Application" {
     interface WalletUseCases
     interface RatingUseCases
     interface NotificationUseCases
+    interface PublicProfileUseCases
   }
   package "Output ports" {
     interface ProfileRepository
@@ -35,6 +36,7 @@ package "Application" {
     [NotificationMessage]
   }
   [Use case services] as Services
+  [PublicProfileFacade] as Facade
 }
 
 package "Domain" {
@@ -60,6 +62,7 @@ Presentation --> BookingUseCases
 Presentation --> WalletUseCases
 Presentation --> RatingUseCases
 Presentation --> NotificationUseCases
+Presentation --> PublicProfileUseCases
 
 ProfileUseCases <|.. Services
 PublicationUseCases <|.. Services
@@ -84,6 +87,13 @@ Services --> Booking
 Services --> Wallet
 Services --> Rating
 
+PublicProfileUseCases <|.. Facade
+Facade --> ProfileRepository
+Facade --> PublicationRepository
+Facade --> BookingRepository
+Facade --> RatingRepository
+Facade --> TransactionManager
+
 Infrastructure ..|> ProfileRepository
 Infrastructure ..|> PublicationRepository
 Infrastructure ..|> BookingRepository
@@ -107,5 +117,12 @@ Executable contract: PublicationSearchContract.
 Every PublicationView includes AuthorView;
 search/recommend read authors with
 ProfileRepository.findByUserIds (one read per page).
+end note
+note bottom of Facade
+Facade (#40): un punto de entrada para el perfil público.
+Coordina perfiles, publicaciones activas (página),
+contrataciones completadas (conteos) y últimas calificaciones
+en una transacción de lectura; no agrega reglas de negocio.
+Contrato ejecutable: PublicProfileQueriesContract.
 end note
 @enduml

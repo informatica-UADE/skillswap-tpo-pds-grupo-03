@@ -213,6 +213,9 @@ class DiscoveryApplicationServiceTest {
             receivedQuery = query;
             return searchResult;
         }
+        @Override public PageResult<Publication> findPublishedByAuthor(String authorUserId, int page, int size) {
+            return new PageResult<>(List.of(), page, size, 0);
+        }
         @Override public Publication save(Publication publication) { return publication; }
     }
 

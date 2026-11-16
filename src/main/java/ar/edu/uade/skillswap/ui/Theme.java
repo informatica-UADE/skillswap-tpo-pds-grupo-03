@@ -18,6 +18,8 @@ public final class Theme {
     public static final Color BORDER = new Color(222, 229, 234);
     public static final Color GOLD = new Color(241, 170, 43);
     public static final Color DANGER = new Color(207, 71, 71);
+    /** Texto que navega, como el nombre de un usuario que abre su perfil público. */
+    public static final Color LINK = new Color(29, 78, 216);
     public static final Font H1 = new Font("SansSerif", Font.BOLD, 27);
     public static final Font H2 = new Font("SansSerif", Font.BOLD, 20);
     public static final Font H3 = new Font("SansSerif", Font.BOLD, 15);

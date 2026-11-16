@@ -9,8 +9,11 @@ import ar.edu.uade.skillswap.application.error.ApplicationErrorCode;
 import ar.edu.uade.skillswap.application.error.ApplicationException;
 import ar.edu.uade.skillswap.application.model.ProfileData.RegisterCommand;
 import ar.edu.uade.skillswap.application.model.ProfileData.UpdateCommand;
+import ar.edu.uade.skillswap.application.model.PublicProfileData.CompletedBookingsSummary;
+import ar.edu.uade.skillswap.application.port.out.BookingRepository;
 import ar.edu.uade.skillswap.application.port.out.ProfileRepository;
 import ar.edu.uade.skillswap.domain.model.ActorType;
+import ar.edu.uade.skillswap.domain.model.Booking;
 import ar.edu.uade.skillswap.domain.model.Profile;
 import java.util.Collection;
 import java.util.HashMap;
@@ -26,7 +29,7 @@ class ProfileApplicationServiceTest {
     void registersAndMapsProfileForAuthenticatedUser() {
         var profiles = new InMemoryProfiles();
         var transactions = new ImmediateTransactionManager();
-        var service = new ProfileApplicationService(profiles, () -> "  user-1  ", transactions);
+        var service = new ProfileApplicationService(profiles, new CompletedBookings(), () -> "  user-1  ", transactions);
 
         var result = service.register(new RegisterCommand("Ana", "Bio", "America/Argentina/Buenos_Aires",
                 List.of("Java"), List.of("Mentoría"), Set.of(), List.of(), ActorType.PROFESSIONAL));
@@ -41,7 +44,7 @@ class ProfileApplicationServiceTest {
 
     @Test
     void registersOrganizationWithItsActorType() {
-        var service = new ProfileApplicationService(new InMemoryProfiles(), () -> "org-1",
+        var service = new ProfileApplicationService(new InMemoryProfiles(), new CompletedBookings(), () -> "org-1",
                 new ImmediateTransactionManager());
 
         var result = service.register(new RegisterCommand("Acme", "Empresa", "UTC", List.of(), List.of(),
@@ -58,14 +61,14 @@ class ProfileApplicationServiceTest {
         var profiles = new InMemoryProfiles();
         profiles.save(Profile.register("user-1", ActorType.PROFESSIONAL, "Ana", "", "UTC", Set.of(),
                 Set.of(), Set.of()));
-        var service = new ProfileApplicationService(profiles, () -> "user-1", new ImmediateTransactionManager());
+        var service = new ProfileApplicationService(profiles, new CompletedBookings(), () -> "user-1", new ImmediateTransactionManager());
 
         var duplicate = assertThrows(ApplicationException.class, () -> service.register(
                 new RegisterCommand("Ana", "", "UTC", List.of(), List.of(), Set.of(), List.of(),
                         ActorType.PROFESSIONAL)));
         assertEquals(ApplicationErrorCode.CONFLICT, duplicate.code());
 
-        var unauthenticated = new ProfileApplicationService(profiles, () -> " ", new ImmediateTransactionManager());
+        var unauthenticated = new ProfileApplicationService(profiles, new CompletedBookings(), () -> " ", new ImmediateTransactionManager());
         var error = assertThrows(ApplicationException.class, unauthenticated::viewMyProfile);
         assertEquals(ApplicationErrorCode.UNAUTHENTICATED, error.code());
     }
@@ -75,7 +78,7 @@ class ProfileApplicationServiceTest {
         var profiles = new InMemoryProfiles();
         profiles.save(Profile.register("user-1", ActorType.PROFESSIONAL, "Ana", "Bio", "UTC",
                 Set.of("Java"), Set.of(), Set.of()));
-        var service = new ProfileApplicationService(profiles, () -> "user-1", new ImmediateTransactionManager());
+        var service = new ProfileApplicationService(profiles, new CompletedBookings(), () -> "user-1", new ImmediateTransactionManager());
 
         var updated = service.update(new UpdateCommand("Ana B.", "Nueva bio", "UTC-3",
                 List.of("Java", "SQL"), List.of("Docencia")));
@@ -91,6 +94,37 @@ class ProfileApplicationServiceTest {
 
         service.activateMyProfile();
         assertTrue(service.viewMyProfile().active());
+    }
+
+    @Test
+    void myProfileIncludesCompletedBookingsCountedByRoleInsideOneTransaction() {
+        var profiles = new InMemoryProfiles();
+        profiles.save(Profile.register("user-1", ActorType.PROFESSIONAL, "Ana", "", "UTC", Set.of(),
+                Set.of(), Set.of()));
+        var bookings = new CompletedBookings();
+        bookings.asProvider.put("user-1", 3L);
+        bookings.asBuyer.put("user-1", 2L);
+        var transactions = new ImmediateTransactionManager();
+        var service = new ProfileApplicationService(profiles, bookings, () -> "user-1", transactions);
+
+        var view = service.viewMyProfile();
+
+        assertEquals(new CompletedBookingsSummary(3, 2), view.completedBookings());
+        assertEquals(5, view.completedBookings().total());
+        assertEquals(1, transactions.operations);
+    }
+
+    /** Solo responde los conteos que usa el perfil; cualquier otra lectura indica un acoplamiento no previsto. */
+    private static final class CompletedBookings implements BookingRepository {
+        private final Map<String, Long> asProvider = new HashMap<>();
+        private final Map<String, Long> asBuyer = new HashMap<>();
+
+        @Override public long countCompletedByProvider(String userId) { return asProvider.getOrDefault(userId, 0L); }
+        @Override public long countCompletedByBuyer(String userId) { return asBuyer.getOrDefault(userId, 0L); }
+        @Override public Optional<Booking> findById(String bookingId) { throw new AssertionError("No debe leer contrataciones"); }
+        @Override public Optional<Booking> findByIdForUpdate(String bookingId) { throw new AssertionError("No debe bloquear contrataciones"); }
+        @Override public List<Booking> findByParticipantUserId(String userId) { throw new AssertionError("No debe listar contrataciones"); }
+        @Override public Booking save(Booking booking) { throw new AssertionError("No debe guardar contrataciones"); }
     }
 
     private static final class InMemoryProfiles implements ProfileRepository {
