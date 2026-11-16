@@ -6,9 +6,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchOrder;
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchQuery;
 import ar.edu.uade.skillswap.application.model.PageResult;
+import ar.edu.uade.skillswap.application.model.PublicationData.PublicationView;
+import ar.edu.uade.skillswap.domain.model.ActorType;
 import ar.edu.uade.skillswap.domain.model.Modality;
 import ar.edu.uade.skillswap.domain.model.Profile;
 import ar.edu.uade.skillswap.domain.model.Publication;
+import ar.edu.uade.skillswap.domain.model.PublicationType;
 import ar.edu.uade.skillswap.domain.model.SkillCoins;
 import ar.edu.uade.skillswap.domain.state.PublicationState;
 import ar.edu.uade.skillswap.domain.state.PublicationStates;
@@ -20,22 +23,26 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
- * Contrato ejecutable de {@link PublicationRepository#searchPublished}. Cada implementación
+ * Contrato ejecutable de {@link PublicationQueryPort#searchPublished}. Cada implementación
  * (en memoria, JPA) lo extiende e implementa {@link #createRepository}, que debe dejar persistidos
  * exactamente los datos recibidos. Si una implementación no pasa este contrato, la búsqueda se
  * comporta distinto según el almacenamiento.
+ *
+ * <p>Las categorías son las del catálogo de demostración (#37): {@code DemoCatalog} en memoria y la
+ * migración V6 en MySQL. Así la clave foránea de la categoría se cumple y el filtro por rama tiene
+ * una jerarquía real: Tecnología &gt; Desarrollo de software &gt; Arquitectura de software.
  */
 public abstract class PublicationSearchContract {
     protected static final LocalDateTime T0 = LocalDateTime.of(2026, 10, 1, 10, 0);
 
     /** Crea el repositorio bajo prueba con exactamente los datos indicados ya persistidos. */
-    protected abstract PublicationRepository createRepository(List<Publication> publications, List<Profile> profiles);
+    protected abstract PublicationQueryPort createRepository(List<Publication> publications, List<Profile> profiles);
 
     /**
      * Como en la base (FK), todo autor tiene perfil: completa con un perfil activo y sin
      * calificaciones a los autores que el test no define explícitamente.
      */
-    private PublicationRepository repositoryWith(List<Publication> publications, List<Profile> profiles) {
+    private PublicationQueryPort repositoryWith(List<Publication> publications, List<Profile> profiles) {
         Set<String> defined = new HashSet<>();
         profiles.forEach(profile -> defined.add(profile.userId()));
         List<Profile> all = new ArrayList<>(profiles);
@@ -106,14 +113,63 @@ public abstract class PublicationSearchContract {
         assertEquals(2, repository.searchPublished(blank).totalElements());
     }
 
-    @Test
-    void filtraPorCategoriaExactaSinDistinguirMayusculas() {
-        var repository = repositoryWith(List.of(
-                pub("exact").category("Tecnología").build(),
-                pub("longer").category("Tecnología aplicada").build(),
-                pub("other").category("Diseño").build()), List.of());
+    // ---------- Categoría del catálogo jerárquico (#37) ----------
 
-        assertEquals(List.of("exact"), ids(repository.searchPublished(query().category("tecnología").build())));
+    @Test
+    void filtraPorUnaCategoriaYTodaSuRamaSinDistinguirMayusculas() {
+        var repository = repositoryWith(branchScenario(), List.of());
+
+        assertEquals(Set.of("root", "child", "grandchild", "career", "tagged"),
+                Set.copyOf(ids(repository.searchPublished(query().category("tecnología").build()))));
+        assertEquals(Set.of("child", "grandchild", "tagged"),
+                Set.copyOf(ids(repository.searchPublished(query().category("Desarrollo de software").build()))));
+        assertEquals(List.of("other"), ids(repository.searchPublished(query().category("DISEÑO").build())));
+    }
+
+    @Test
+    void unaSubcategoriaNoIncluyeASuPadreNiASusHermanas() {
+        var repository = repositoryWith(branchScenario(), List.of());
+
+        assertEquals(List.of("grandchild"),
+                ids(repository.searchPublished(query().category("Arquitectura de software").build())));
+        assertEquals(List.of("career"),
+                ids(repository.searchPublished(query().category("Carrera en tecnología").build())));
+    }
+
+    @Test
+    void laRamaSePaginaYSeCuentaEnLaConsulta() {
+        var repository = repositoryWith(branchScenario(), List.of());
+
+        PageResult<PublicationView> first = repository.searchPublished(query().category("Tecnología").page(0, 2).build());
+        PageResult<PublicationView> last = repository.searchPublished(query().category("Tecnología").page(2, 2).build());
+
+        assertEquals(5, first.totalElements());
+        assertEquals(2, first.items().size());
+        assertEquals(1, last.items().size());
+    }
+
+    @Test
+    void unaCategoriaQueNoEstaEnElCatalogoNoDevuelveResultados() {
+        var repository = repositoryWith(branchScenario(), List.of());
+
+        PageResult<PublicationView> none = repository.searchPublished(query().category("Astrología").build());
+
+        assertTrue(none.items().isEmpty());
+        assertEquals(0, none.totalElements());
+    }
+
+    /**
+     * Publicaciones en distintos niveles de la rama Tecnología, una con una habilidad de la rama como
+     * etiqueta aunque su categoría sea de otra rama, y una fuera de la rama.
+     */
+    private static List<Publication> branchScenario() {
+        return List.of(
+                pub("root").category("Tecnología").build(),
+                pub("child").category("Desarrollo de software").build(),
+                pub("grandchild").category("Arquitectura de software").build(),
+                pub("career").category("Carrera en tecnología").build(),
+                pub("tagged").category("Productividad").tags("java").build(),
+                pub("other").category("Diseño").build());
     }
 
     @Test
@@ -272,7 +328,7 @@ public abstract class PublicationSearchContract {
         List<String> seen = new ArrayList<>();
         int[] expectedSizes = {3, 3, 1, 0};
         for (int page = 0; page < expectedSizes.length; page++) {
-            PageResult<Publication> result = repository.searchPublished(page(page, 3));
+            PageResult<PublicationView> result = repository.searchPublished(page(page, 3));
             assertEquals(page, result.page());
             assertEquals(3, result.size());
             assertEquals(7, result.totalElements());
@@ -289,7 +345,7 @@ public abstract class PublicationSearchContract {
     void sinResultadosDevuelvePaginaVaciaConTotalCero() {
         var repository = repositoryWith(List.of(pub("a").build()), List.of());
 
-        PageResult<Publication> result = repository.searchPublished(text("inexistente"));
+        PageResult<PublicationView> result = repository.searchPublished(text("inexistente"));
 
         assertTrue(result.items().isEmpty());
         assertEquals(0, result.totalElements());
@@ -298,8 +354,8 @@ public abstract class PublicationSearchContract {
 
     // ---------- Fixtures ----------
 
-    protected static List<String> ids(PageResult<Publication> result) {
-        return result.items().stream().map(Publication::id).toList();
+    protected static List<String> ids(PageResult<PublicationView> result) {
+        return result.items().stream().map(PublicationView::id).toList();
     }
 
     protected static SearchQuery text(String text) {
@@ -323,12 +379,14 @@ public abstract class PublicationSearchContract {
     }
 
     protected static Profile profile(String userId, double reputation, int ratingCount, boolean active) {
-        return new Profile(null, userId, "Nombre " + userId, "", "UTC", Set.of(), Set.of(), Set.of(),
+        return new Profile(null, userId, ActorType.PROFESSIONAL, "Nombre " + userId, "", "UTC",
+                Set.of(), Set.of(), Set.of(),
                 reputation, ratingCount, active);
     }
 
     protected static Profile profileWithSkills(String userId, Set<String> skills) {
-        return new Profile(null, userId, "Nombre " + userId, "", "UTC", skills, Set.of(), Set.of(),
+        return new Profile(null, userId, ActorType.PROFESSIONAL, "Nombre " + userId, "", "UTC",
+                skills, Set.of(), Set.of(),
                 0, 0, true);
     }
 
@@ -338,7 +396,7 @@ public abstract class PublicationSearchContract {
         private String author = "provider";
         private String title;
         private String description;
-        private String category = "General";
+        private String category = "Productividad";
         private Modality modality = Modality.REMOTE;
         private int price = 100;
         private Set<String> tags = Set.of();
@@ -364,7 +422,8 @@ public abstract class PublicationSearchContract {
         public PublicationFixture requests(int value) { requests = value; return this; }
 
         public Publication build() {
-            return new Publication(id, author, title, description, category, modality, 60, 5,
+            return new Publication(id, author, PublicationType.MENTORSHIP, title, description, category,
+                    modality, 60, 5,
                     new SkillCoins(price), tags, List.of(), state, created, requests,
                     requests == 0 ? null : created, 0, List.of());
         }

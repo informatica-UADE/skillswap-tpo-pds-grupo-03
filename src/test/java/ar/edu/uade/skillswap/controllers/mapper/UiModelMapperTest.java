@@ -5,12 +5,15 @@ import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchOrder;
 import ar.edu.uade.skillswap.application.model.NotificationData.NotificationView;
 import ar.edu.uade.skillswap.application.model.ProfileData.AvailabilityView;
 import ar.edu.uade.skillswap.application.model.ProfileData.ProfileView;
+import ar.edu.uade.skillswap.application.model.PublicProfileData.CompletedBookingsSummary;
 import ar.edu.uade.skillswap.application.model.PublicationData.AuthorView;
 import ar.edu.uade.skillswap.application.model.PublicationData.PublicationView;
 import ar.edu.uade.skillswap.application.model.WalletData.MovementView;
+import ar.edu.uade.skillswap.domain.model.ActorType;
 import ar.edu.uade.skillswap.domain.model.BookingStatus;
 import ar.edu.uade.skillswap.domain.model.Modality;
 import ar.edu.uade.skillswap.domain.model.PublicationStatus;
+import ar.edu.uade.skillswap.domain.model.PublicationType;
 import ar.edu.uade.skillswap.model.Models;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -26,8 +29,19 @@ class UiModelMapperTest {
     private final LocalDateTime fecha = LocalDateTime.of(2026, 11, 3, 15, 0);
 
     @Test
+    void convierteLosTiposDePublicacionEnAmbosSentidos() {
+        for (PublicationType type : PublicationType.values()) {
+            assertEquals(type, mapper.toPublicationType(mapper.toTipoPublicacion(type)));
+        }
+        assertEquals(Models.TipoPublicacion.DESAFIO, mapper.toTipoPublicacion(PublicationType.CHALLENGE));
+        assertEquals(PublicationType.SERVICE, mapper.toPublicationType(Models.TipoPublicacion.SERVICIO));
+        assertThrows(IllegalArgumentException.class, () -> mapper.toPublicationType(null));
+        assertEquals("Mentoría", Models.TipoPublicacion.MENTORIA.toString());
+    }
+
+    @Test
     void conviertePublicacionYCalculaCuposDisponibles() {
-        var view = new PublicationView("p1", "u1", "Java", "Mentoría", "Tecnología",
+        var view = new PublicationView("p1", "u1", PublicationType.MENTORSHIP, "Java", "Mentoría", "Tecnología",
                 Modality.REMOTE, 60, 4, 120, Set.of("Java"), PublicationStatus.PUBLISHED,
                 List.of(new AvailabilityView("f1", fecha, fecha.plusHours(1), 4, 3)), fecha, 2,
                 new AuthorView("u1", "Julieta", 4.5, 3));
@@ -42,9 +56,11 @@ class UiModelMapperTest {
         assertEquals(60, dto.duracionMinutos());
         assertEquals(120, dto.precio());
         assertEquals("Julieta", dto.proveedor());
+        assertEquals("u1", dto.proveedorId());
         assertEquals(4.5, dto.reputacion());
         assertEquals(List.of("Java"), dto.etiquetas());
         assertEquals(Models.EstadoPublicacion.PUBLICADA, dto.estado());
+        assertEquals(Models.TipoPublicacion.MENTORIA, dto.tipo());
         assertFalse(dto.destacada());
         assertEquals(new Models.FranjaDisponibilidad("f1", fecha, fecha.plusHours(1), 1),
                 dto.franjasDisponibles().get(0));
@@ -53,20 +69,23 @@ class UiModelMapperTest {
     @Test
     void conservaLosDatosDeLaSolicitud() {
         var view = new BookingView("b1", "p1", "comprador", "proveedor", "Aprender Java",
-                "Hola", "f1", 120, 0, BookingStatus.PENDING, fecha, null);
+                "Hola", "f1", 120, 0, BookingStatus.PENDING, fecha, null, "Java", "Mateo", "Julieta");
 
-        assertEquals(new Models.Contratacion("b1", "Java", "Julieta", fecha, 120,
+        assertEquals(new Models.Contratacion("b1", "Java", "Julieta", "proveedor", fecha, 120,
                 Models.EstadoContratacion.PENDIENTE, "Aprender Java", "Hola", "f1"),
-                mapper.toContratacion(view, "Java", "Julieta"));
+                mapper.toContratacion(view, "comprador"));
+        assertEquals("Mateo", mapper.toContratacion(view, "proveedor").contraparte());
+        assertEquals("comprador", mapper.toContratacion(view, "proveedor").contraparteId());
     }
 
     @Test
     void conviertePerfilMovimientosYNotificaciones() {
-        var view = new ProfileView("perfil", "u1", "Julieta", "Mentora", "UTC",
-                List.of("Java"), List.of(), Set.of(), List.of(), 4.5, 3, true);
+        var view = new ProfileView("perfil", "u1", ActorType.PROFESSIONAL, "Julieta", "Mentora", "UTC",
+                List.of("Java"), List.of(), Set.of(), List.of(), 4.5, 3, true, new CompletedBookingsSummary(2, 1));
 
-        assertEquals(new Models.Perfil("u1", "Julieta", "Mentora", "Mentora",
-                List.of("Java"), 4.5, 3, 2), mapper.toPerfil(view, "Mentora", 2));
+        assertEquals(new Models.Perfil("u1", "Julieta", "Profesional", "Mentora",
+                List.of("Java"), 4.5, 3, 3), mapper.toPerfil(view));
+        assertEquals("Organización", mapper.toRol(ActorType.ORGANIZATION));
         assertEquals(new Models.Movimiento("Pago", fecha, -120, 380),
                 mapper.toMovimiento(new MovementView("m1", "Pago", -120, 380, fecha)));
         assertEquals(new Models.Notificacion("n1", "Pago", "Confirmado", fecha, false, "PAGO"),

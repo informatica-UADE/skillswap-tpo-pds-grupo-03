@@ -5,6 +5,7 @@ import ar.edu.uade.skillswap.domain.model.AvailabilitySlot;
 import ar.edu.uade.skillswap.domain.model.Modality;
 import ar.edu.uade.skillswap.domain.model.Publication;
 import ar.edu.uade.skillswap.domain.model.PublicationStatus;
+import ar.edu.uade.skillswap.domain.model.PublicationType;
 import ar.edu.uade.skillswap.domain.model.SkillCoins;
 import ar.edu.uade.skillswap.domain.model.StatusHistoryEntry;
 import ar.edu.uade.skillswap.domain.state.PublicationStates;
@@ -30,9 +31,10 @@ public final class PublicationMapper {
         PublicationEntity entity = new PublicationEntity();
         entity.setId(publication.id());
         entity.setAuthorUserId(publication.authorUserId());
+        entity.setType(publication.type().name());
         entity.setTitle(publication.title());
         entity.setDescription(publication.description());
-        entity.setCategory(publication.category());
+        entity.setCategory(categoryColumn(publication.category()));
         entity.setModality(publication.modality().name());
         entity.setDurationMinutes(publication.durationMinutes());
         entity.setCapacity(publication.capacity());
@@ -114,6 +116,7 @@ public final class PublicationMapper {
         return new Publication(
                 entity.getId(),
                 entity.getAuthorUserId(),
+                PublicationType.valueOf(entity.getType()),
                 entity.getTitle(),
                 entity.getDescription(),
                 entity.getCategory(),
@@ -136,5 +139,13 @@ public final class PublicationMapper {
                 entity.getVersion(),
                 history
         );
+    }
+
+    /**
+     * Un borrador puede no tener categoría todavía. Se guarda como {@code NULL} porque la columna
+     * referencia al catálogo (#37) y una cadena vacía no es una categoría.
+     */
+    public static String categoryColumn(String category) {
+        return category == null || category.isBlank() ? null : category;
     }
 }

@@ -57,6 +57,27 @@ public final class JpaRatingRepository extends JpaRepositorySupport
     }
 
     @Override
+    public List<Rating> findRecentBySubjectUserId(String subjectUserId, int limit) {
+        Objects.requireNonNull(
+                subjectUserId, "Falta el identificador del destinatario");
+        if (limit < 1) {
+            throw new IllegalArgumentException("El límite debe ser positivo");
+        }
+
+        return query(em -> em.createQuery(
+                        "SELECT r FROM RatingEntity r "
+                                + "WHERE r.subjectUserId = :subjectUserId "
+                                + "ORDER BY r.createdAt DESC, r.id ASC",
+                        RatingEntity.class)
+                .setParameter("subjectUserId", subjectUserId)
+                .setMaxResults(limit)
+                .getResultList()
+                .stream()
+                .map(RatingMapper::toDomain)
+                .toList());
+    }
+
+    @Override
     public Rating save(Rating rating) {
         Objects.requireNonNull(rating, "Falta la calificación");
 

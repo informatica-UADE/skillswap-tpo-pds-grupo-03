@@ -1,5 +1,6 @@
 package ar.edu.uade.skillswap.controllers;
 
+import ar.edu.uade.skillswap.application.model.DiscoveryData.CategoryView;
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchQuery;
 import ar.edu.uade.skillswap.application.model.PageResult;
 import ar.edu.uade.skillswap.application.model.ProfileData.AvailabilityView;
@@ -8,6 +9,7 @@ import ar.edu.uade.skillswap.application.model.PublicationData.PublicationView;
 import ar.edu.uade.skillswap.application.port.in.DiscoveryUseCases;
 import ar.edu.uade.skillswap.domain.model.Modality;
 import ar.edu.uade.skillswap.domain.model.PublicationStatus;
+import ar.edu.uade.skillswap.domain.model.PublicationType;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
@@ -19,6 +21,8 @@ final class DiscoverySpy implements DiscoveryUseCases {
     int calls;
     PageResult<PublicationView> page = new PageResult<>(List.of(), 0, 20, 0);
     List<PublicationView> recommendations = List.of();
+    List<CategoryView> categories = List.of();
+    RuntimeException categoriesFailure;
 
     @Override public PageResult<PublicationView> search(SearchQuery query) {
         calls++;
@@ -32,21 +36,16 @@ final class DiscoverySpy implements DiscoveryUseCases {
         return recommendations;
     }
 
-    @Override public List<String> categories() {
+    @Override public List<CategoryView> categories() {
         calls++;
-        return List.of("Diseño", "Tecnología");
-    }
-
-    @Override public ar.edu.uade.skillswap.application.model.DiscoveryData.AuthorView author(String userId) {
-        calls++;
-        return new ar.edu.uade.skillswap.application.model.DiscoveryData.AuthorView(
-                userId, "Autor de prueba", 0);
+        if (categoriesFailure != null) throw categoriesFailure;
+        return categories;
     }
 
     static PublicationView view(String id, String authorName, double reputation) {
         LocalDateTime start = LocalDateTime.of(2026, 11, 10, 10, 0);
-        return new PublicationView(id, "author-" + id, "Mentoría " + id, "Descripción", "Tecnología",
-                Modality.HYBRID, 60, 4, 150, Set.of("Java"), PublicationStatus.PUBLISHED,
+        return new PublicationView(id, "author-" + id, PublicationType.MENTORSHIP, "Mentoría " + id, "Descripción",
+                "Tecnología", Modality.HYBRID, 60, 4, 150, Set.of("Java"), PublicationStatus.PUBLISHED,
                 List.of(new AvailabilityView("slot-" + id, start, start.plusHours(1), 4, 1)),
                 start.minusDays(1), 2, new AuthorView("author-" + id, authorName, reputation, 3));
     }

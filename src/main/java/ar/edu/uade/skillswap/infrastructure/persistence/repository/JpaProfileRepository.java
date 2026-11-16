@@ -71,6 +71,17 @@ public final class JpaProfileRepository extends JpaRepositorySupport
     }
 
     @Override
+    public List<Profile> findActive() {
+        return query(em -> em.createQuery(
+                        "SELECT p FROM ProfileEntity p WHERE p.active = true ORDER BY p.displayName, p.userId",
+                        ProfileEntity.class)
+                .getResultList()
+                .stream()
+                .map(ProfileMapper::toDomain)
+                .toList());
+    }
+
+    @Override
     public Profile save(Profile profile) {
         Objects.requireNonNull(profile, "Falta el perfil");
 

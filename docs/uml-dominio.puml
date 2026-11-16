@@ -6,6 +6,7 @@ hide empty members
 package "domain.model" {
   class Profile {
     - userId: String
+    - actorType: ActorType
     - reputation: double
     - ratingCount: int
     - active: boolean
@@ -26,6 +27,7 @@ package "domain.model" {
 
   class Publication {
     - authorUserId: String
+    - type: PublicationType
     - state: PublicationState
     - basePrice: SkillCoins
     + publish(actor)
@@ -35,6 +37,8 @@ package "domain.model" {
 
   class PublicationBuilder <<Builder>> {
     - authorUserId: String
+    - authorType: ActorType
+    - type: PublicationType
     - title: String
     - description: String
     - category: String
@@ -54,6 +58,19 @@ package "domain.model" {
     + tag(value): PublicationBuilder
     + addAvailability(slot): PublicationBuilder
     + build(): Publication
+  }
+
+  enum ActorType {
+    PROFESSIONAL
+    ORGANIZATION
+    + publicationTypes(): Set<PublicationType>
+    + canPublish(type): boolean
+  }
+
+  enum PublicationType {
+    MENTORSHIP
+    SERVICE
+    CHALLENGE
   }
 
   enum PublicationStatus {
@@ -140,6 +157,24 @@ package "domain.state" {
   class BookingStates.Cancelled <<Singleton enum>>
 }
 
+package "domain.catalog" {
+  abstract class CatalogItem <<Composite: componente>> {
+    - id: String
+    - name: String
+    + parent(): Optional<CatalogCategory>
+    + depth(): int
+    + children(): List<CatalogItem>
+    + stream(): Stream<CatalogItem>
+    + skillNames(): Set<String>
+    + categoryNames(): Set<String>
+    + findCategory(name): Optional<CatalogCategory>
+  }
+  class CatalogCategory <<Composite: compuesto>> {
+    + add(item: CatalogItem): CatalogCategory
+  }
+  class CatalogSkill <<Composite: hoja>>
+}
+
 package "domain.policy" {
   interface RefundPolicy <<Strategy>> {
     + refundFor(booking, cancelledAt, sessionStartsAt): SkillCoins
@@ -159,6 +194,10 @@ package "domain.model" {
 Profile "1" *-- "0..*" AvailabilitySlot : disponibilidad
 Publication "1" *-- "0..*" AvailabilitySlot : franjas publicables
 PublicationBuilder ..> Publication : construye borrador
+PublicationBuilder ..> ActorType : tipo del autor
+Profile --> ActorType : tipo de actor
+Publication --> PublicationType : tipo
+ActorType "1..*" --> "1..*" PublicationType : puede crear
 PublicationBuilder ..> AvailabilitySlot : compone disponibilidad
 Publication "1" *-- "0..*" StatusHistoryEntry : historial
 Booking "1" *-- "0..*" StatusHistoryEntry : historial
@@ -169,6 +208,11 @@ Booking --> SkillCoins : precio / reintegro
 Booking "0..*" --> "1" Publication : se origina en
 Rating "0..*" --> "1" Booking : califica contratación
 Rating "0..*" ..> "1" Profile : subjectUserId / reputación derivada
+
+CatalogCategory --|> CatalogItem
+CatalogSkill --|> CatalogItem
+CatalogCategory "0..1" o-- "0..*" CatalogItem : contiene
+Publication "0..*" ..> "0..1" CatalogCategory : categoría (por nombre)
 
 Publication --> PublicationState : estado actual
 Booking --> BookingState : estado actual
@@ -199,6 +243,14 @@ note right of Rating
   en el puerto de persistencia/caso de uso.
 end note
 
+note right of ActorType
+  Un profesional puede crear mentorías y servicios; una
+  organización, desafíos. Es la única diferencia entre tipos:
+  datos, estados, permisos del autor y contratación son iguales.
+  El autor elige el tipo al crear el borrador y el dominio
+  rechaza uno que su actor no puede crear.
+end note
+
 note bottom of AvailabilitySlot
   La franja valida el intervalo y la capacidad.
   Publicación controla cuándo se reserva o libera.
@@ -213,6 +265,13 @@ note bottom of Booking
   BookingStates usa enums sin datos propios: cada estado tiene
   una sola instancia inmutable. Booking conserva el estado actual,
   participantes, pagos e historial propios de cada contratación.
+end note
+
+note right of CatalogCategory
+  Composite (#37): la categoría protege el árbol al agregar.
+  Un elemento tiene un solo padre, no hay ciclos, los hermanos
+  no repiten nombre y el nombre de una categoría es único.
+  Hojas y ramas se recorren con las mismas operaciones.
 end note
 
 @enduml

@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import ar.edu.uade.skillswap.application.model.DiscoveryData.CategoryView;
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchOrder;
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchQuery;
 import ar.edu.uade.skillswap.application.model.PageResult;
@@ -99,8 +100,23 @@ class BusquedaUiControllerTest {
     }
 
     @Test
-    void lasCategoriasEmpiezanConTodas() {
-        assertEquals(List.of("Todas", "Diseño", "Tecnología"), controller.categorias());
+    void lasCategoriasSeConviertenConSuNivelEnElOrdenDelCasoDeUso() {
+        discovery.categories = List.of(new CategoryView("Tecnología", 0), new CategoryView("Backend", 1),
+                new CategoryView("Diseño", 0));
+
+        assertEquals(List.of(new Models.Categoria("Tecnología", 0), new Models.Categoria("Backend", 1),
+                new Models.Categoria("Diseño", 0)), controller.categorias());
+        assertEquals("    Backend", controller.categorias().get(1).toString());
+    }
+
+    @Test
+    void lasCategoriasNoRequierenUsuarioActivoYTraducenErrores() {
+        var anonymous = new BusquedaUiController(discovery, () -> null, new UiOperationExecutor());
+        assertEquals(List.of(), anonymous.categorias());
+
+        discovery.categoriesFailure = new IllegalStateException("El catálogo guardado es inválido");
+        var error = assertThrows(PresentationException.class, controller::categorias);
+        assertEquals(Models.CodigoError.ESTADO, error.error().codigo());
     }
 
     @Test

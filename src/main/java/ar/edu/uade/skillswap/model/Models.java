@@ -3,13 +3,83 @@ package ar.edu.uade.skillswap.model;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 public final class Models {
     private Models() {}
 
     public enum Modalidad { REMOTA, PRESENCIAL, HIBRIDA }
+    public enum TipoActor { PROFESIONAL, ORGANIZACION }
     public enum EstadoPublicacion { BORRADOR, PUBLICADA, PAUSADA, CERRADA, CANCELADA }
+
+    /** Tipo de publicación; {@code toString()} es el texto que muestra la pantalla. */
+    public enum TipoPublicacion {
+        MENTORIA("Mentoría"), SERVICIO("Servicio"), DESAFIO("Desafío");
+
+        private final String etiqueta;
+
+        TipoPublicacion(String etiqueta) { this.etiqueta = etiqueta; }
+
+        @Override public String toString() { return etiqueta; }
+    }
     public enum EstadoContratacion { PENDIENTE, ACEPTADA, CONFIRMADA, EN_CURSO, COMPLETADA, RECHAZADA, CANCELADA }
+    public enum CanalNotificacion { EMAIL, PUSH, IN_APP }
+
+    /**
+     * Categoría del catálogo jerárquico (#37) con su nivel en el árbol: cero para una categoría raíz.
+     * {@code toString()} la muestra con sangría según el nivel, para los combos de la pantalla.
+     */
+    public record Categoria(String nombre, int nivel) {
+        /** Opción "sin filtro" de Explorar; no es una categoría del catálogo. */
+        public static final Categoria TODAS = new Categoria("Todas", 0);
+
+        public Categoria {
+            if (nombre == null || nombre.isBlank()) throw new IllegalArgumentException("Falta el nombre de la categoría");
+            if (nivel < 0) throw new IllegalArgumentException("El nivel no puede ser negativo");
+        }
+
+        @Override public String toString() { return "    ".repeat(nivel) + nombre; }
+    }
+
+    /**
+     * Perfil guardado con el que se puede probar la demo y su tipo ("Profesional" u "Organización").
+     * {@code toString()} es lo que muestra el selector de perfiles.
+     */
+    public record UsuarioDemo(String id, String nombre, String rol) {
+        @Override public String toString() { return nombre + " · " + rol; }
+    }
+
+    public record Disponibilidad(String id, LocalDateTime inicio, LocalDateTime fin, int cupos) {}
+
+    public record NuevoPerfil(String nombre, String bio, String zonaHoraria,
+                              List<String> habilidades, List<String> intereses,
+                              Set<CanalNotificacion> canales, List<Disponibilidad> disponibilidad,
+                              TipoActor tipoActor) {
+        public NuevoPerfil {
+            habilidades = List.copyOf(habilidades == null ? List.of() : habilidades);
+            intereses = List.copyOf(intereses == null ? List.of() : intereses);
+            canales = Set.copyOf(canales == null ? Set.of() : canales);
+            disponibilidad = List.copyOf(disponibilidad == null ? List.of() : disponibilidad);
+        }
+    }
+
+    public record DatosBorrador(String titulo, String descripcion, String categoria,
+                                Modalidad modalidad, int duracionMinutos, int cupos, int precio,
+                                List<String> etiquetas, List<Disponibilidad> disponibilidad,
+                                TipoPublicacion tipo) {
+        public DatosBorrador {
+            etiquetas = List.copyOf(etiquetas == null ? List.of() : etiquetas);
+            disponibilidad = List.copyOf(disponibilidad == null ? List.of() : disponibilidad);
+        }
+    }
+
+    public record EdicionBorrador(String titulo, String descripcion, String categoria,
+                                 Modalidad modalidad, int duracionMinutos, int cupos,
+                                 List<String> etiquetas) {
+        public EdicionBorrador {
+            etiquetas = List.copyOf(etiquetas == null ? List.of() : etiquetas);
+        }
+    }
 
     public enum CodigoError {
         VALIDACION, NO_AUTENTICADO, NO_ENCONTRADO, PERMISOS, ESTADO,
@@ -48,31 +118,48 @@ public final class Models {
 
     public record Publicacion(String id, String titulo, String descripcion,
                               String categoria, Modalidad modalidad, int duracionMinutos,
-                              int precio, double reputacion, String proveedor,
+                              int precio, double reputacion, String proveedor, String proveedorId,
                               List<String> etiquetas, EstadoPublicacion estado,
-                              boolean destacada, List<FranjaDisponibilidad> franjasDisponibles) {
+                              boolean destacada, List<FranjaDisponibilidad> franjasDisponibles,
+                              TipoPublicacion tipo) {
         public Publicacion {
             etiquetas = List.copyOf(etiquetas == null ? List.of() : etiquetas);
             franjasDisponibles = List.copyOf(franjasDisponibles == null ? List.of() : franjasDisponibles);
-        }
-
-        public Publicacion(String id, String titulo, String descripcion, String categoria,
-                           Modalidad modalidad, int duracionMinutos, int precio, double reputacion,
-                           String proveedor, List<String> etiquetas, EstadoPublicacion estado,
-                           boolean destacada) {
-            this(id, titulo, descripcion, categoria, modalidad, duracionMinutos, precio,
-                    reputacion, proveedor, etiquetas, estado, destacada, List.of());
+            Objects.requireNonNull(tipo, "Falta el tipo de publicación");
         }
     }
 
-    public record Contratacion(String id, String titulo, String contraparte,
+    /** {@code contraparteId} identifica al otro participante para abrir su perfil público; vacío si no se conoce. */
+    public record Contratacion(String id, String titulo, String contraparte, String contraparteId,
                                LocalDateTime fecha, int precio, EstadoContratacion estado,
                                String objetivo, String mensajeCliente, String franjaId) {
         public Contratacion(String id, String titulo, String contraparte, LocalDateTime fecha,
                             int precio, EstadoContratacion estado) {
-            this(id, titulo, contraparte, fecha, precio, estado, "", "", "");
+            this(id, titulo, contraparte, "", fecha, precio, estado, "", "", "");
         }
     }
+
+    /** Reseña recibida que muestra el perfil público, sin identificar a quien la escribió. */
+    public record Resena(int puntaje, String comentario, LocalDateTime fecha) {}
+
+    /**
+     * Perfil público de cualquier usuario activo: sus datos de presentación, una página de sus
+     * publicaciones activas, las contrataciones completadas según el rol y las últimas reseñas.
+     */
+    public record PerfilPublico(Perfil perfil, PaginaPublicaciones publicaciones,
+                                int completadasComoProveedor, int completadasComoCliente,
+                                List<Resena> ultimasResenas) {
+        public static final int TAMANIO_PAGINA = 6;
+
+        public PerfilPublico {
+            Objects.requireNonNull(perfil, "Falta el perfil");
+            Objects.requireNonNull(publicaciones, "Faltan las publicaciones");
+            ultimasResenas = List.copyOf(ultimasResenas == null ? List.of() : ultimasResenas);
+        }
+    }
+
+    public record Calificacion(String id, String contratacionId, int puntaje,
+                               String comentario, LocalDateTime fecha) {}
 
     public record Movimiento(String concepto, LocalDateTime fecha, int importe, int saldo) {}
 
