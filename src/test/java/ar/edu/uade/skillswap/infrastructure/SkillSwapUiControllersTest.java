@@ -1,5 +1,6 @@
 package ar.edu.uade.skillswap.infrastructure;
 
+import ar.edu.uade.skillswap.infrastructure.persistence.H2Database;
 import ar.edu.uade.skillswap.model.Models.FiltrosBusqueda;
 import ar.edu.uade.skillswap.model.Models.Modalidad;
 import ar.edu.uade.skillswap.model.Models.EstadoContratacion;
@@ -26,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class SkillSwapUiControllersTest {
     @Test
     void cadaPantallaRecibeSuControllerYLaBilleteraYLaBandejaSiguenALaSesionDemo() {
-        try (var wiring = new SkillSwapApplicationWiring()) {
+        try (var wiring = H2Database.wiring()) {
             var ui = SkillSwapUiControllers.from(wiring);
             assertInstanceOf(BusquedaUiController.class, ui.busqueda());
             assertInstanceOf(PublicacionUiController.class, ui.publicaciones());
@@ -55,7 +56,7 @@ class SkillSwapUiControllersTest {
 
     @Test
     void muestraElTituloSinCacheYLaContraparteSegunLaIdentidadActiva() {
-        try (var wiring = new SkillSwapApplicationWiring()) {
+        try (var wiring = H2Database.wiring()) {
             var ui = SkillSwapUiControllers.from(wiring);
             var publication = ui.publicaciones().listarPropias("user-mateo").get(0);
             ui.sesionDemo().cambiarUsuario("mentor-ana");
@@ -76,7 +77,7 @@ class SkillSwapUiControllersTest {
 
     @Test
     void elPerfilPublicoDelAutorReflejaSuHistorialYReseniasDesdeLaUi() {
-        try (var wiring = new SkillSwapApplicationWiring()) {
+        try (var wiring = H2Database.wiring()) {
             var ui = SkillSwapUiControllers.from(wiring);
             var publication = ui.busqueda().buscar(
                     new FiltrosBusqueda("entrevistas", "Todas", null, 0, "Relevancia")).items().get(0);
@@ -111,7 +112,7 @@ class SkillSwapUiControllersTest {
 
     @Test
     void mantieneLosTiposExplicitosYLosPermisosAlCambiarLaSesionDemo() {
-        var controllers = SkillSwapUiControllers.from(new SkillSwapApplicationWiring());
+        var controllers = SkillSwapUiControllers.from(H2Database.wiring());
         controllers.sesionDemo().cambiarUsuario("mentor-lu");
         assertEquals(List.of(Models.TipoPublicacion.MENTORIA, Models.TipoPublicacion.SERVICIO),
                 controllers.publicaciones().tiposPublicacion("mentor-lu"));
@@ -137,7 +138,7 @@ class SkillSwapUiControllersTest {
 
     @Test
     void conectaLasNuevasOperacionesSinCambiarLaFachadaDeLaUi() {
-        var controllers = SkillSwapUiControllers.from(new SkillSwapApplicationWiring());
+        var controllers = SkillSwapUiControllers.from(H2Database.wiring());
         var draft = controllers.publicaciones().crearBorrador("user-mateo", "Java",
                 "Mentoría", "Tecnología", Modalidad.REMOTA, 60, 100, Models.TipoPublicacion.MENTORIA);
         var updated = controllers.publicaciones().editarBorrador("user-mateo", draft.id(),
@@ -153,7 +154,7 @@ class SkillSwapUiControllersTest {
 
     @Test
     void conectaLaCreacionDePerfilYTraduceElConflictoDelUsuarioDemo() {
-        var controllers = SkillSwapUiControllers.from(new SkillSwapApplicationWiring());
+        var controllers = SkillSwapUiControllers.from(H2Database.wiring());
         var input = new Models.NuevoPerfil("Otro nombre", "Bio", "UTC", java.util.List.of(),
                 java.util.List.of(), java.util.Set.of(), java.util.List.of(), Models.TipoActor.PROFESIONAL);
         var conflict = assertThrows(PresentationException.class,
@@ -164,7 +165,7 @@ class SkillSwapUiControllersTest {
 
     @Test
     void presentaLosErroresDeEntradaConUnContratoUniforme() {
-        var controllers = SkillSwapUiControllers.from(new SkillSwapApplicationWiring());
+        var controllers = SkillSwapUiControllers.from(H2Database.wiring());
         var search = assertThrows(PresentationException.class, () -> controllers.busqueda().buscar(null));
         assertEquals(Models.CodigoError.VALIDACION, search.error().codigo());
         var publication = assertThrows(PresentationException.class, () -> controllers.publicaciones()
@@ -178,7 +179,7 @@ class SkillSwapUiControllersTest {
 
     @Test
     void presentaNoEncontradoEnOperacionesConYSinRetorno() {
-        var controllers = SkillSwapUiControllers.from(new SkillSwapApplicationWiring());
+        var controllers = SkillSwapUiControllers.from(H2Database.wiring());
         var booking = assertThrows(PresentationException.class,
                 () -> controllers.contrataciones().avanzar("user-mateo", "inexistente"));
         assertEquals(Models.CodigoError.NO_ENCONTRADO, booking.error().codigo());
@@ -189,7 +190,7 @@ class SkillSwapUiControllersTest {
 
     @Test
     void presentaErroresDePermisosSinCambiarLaContratacion() {
-        var controllers = SkillSwapUiControllers.from(new SkillSwapApplicationWiring());
+        var controllers = SkillSwapUiControllers.from(H2Database.wiring());
         var publication = controllers.busqueda().buscar(
                 new FiltrosBusqueda("", "Todas", null, 0, "Relevancia")).items().stream()
                 .filter(item -> !"Mateo Silva".equals(item.proveedor())).findFirst().orElseThrow();
@@ -206,7 +207,7 @@ class SkillSwapUiControllersTest {
 
     @Test
     void presentaLasTransicionesInvalidasComoErroresDeEstado() {
-        var controllers = SkillSwapUiControllers.from(new SkillSwapApplicationWiring());
+        var controllers = SkillSwapUiControllers.from(H2Database.wiring());
         var draft = controllers.publicaciones().crearBorrador("user-mateo", "Mentoría",
                 "Descripción", "Tecnología", Modalidad.REMOTA, 60, 100, Models.TipoPublicacion.MENTORIA);
 
@@ -219,7 +220,7 @@ class SkillSwapUiControllersTest {
 
     @Test
     void usaLaWiringDeAplicacionParaBusquedaYPerfil() {
-        var controllers = SkillSwapUiControllers.from(new SkillSwapApplicationWiring());
+        var controllers = SkillSwapUiControllers.from(H2Database.wiring());
 
         var resultados = controllers.busqueda().buscar(
                 new FiltrosBusqueda("Java", "Todas", Modalidad.REMOTA, 0, "Relevancia")).items();
@@ -233,7 +234,7 @@ class SkillSwapUiControllersTest {
 
     @Test
     void laBusquedaMuestraElNombreYLaReputacionRealesDelAutor() {
-        var controllers = SkillSwapUiControllers.from(new SkillSwapApplicationWiring());
+        var controllers = SkillSwapUiControllers.from(H2Database.wiring());
 
         var resultados = controllers.busqueda().buscar(
                 new FiltrosBusqueda("entrevistas", "Todas", null, 0, "Relevancia")).items();
@@ -245,7 +246,7 @@ class SkillSwapUiControllersTest {
 
     @Test
     void laBusquedaDevuelvePaginasConElTotalYNavegacion() {
-        var controllers = SkillSwapUiControllers.from(new SkillSwapApplicationWiring());
+        var controllers = SkillSwapUiControllers.from(H2Database.wiring());
 
         var first = controllers.busqueda().buscar(new FiltrosBusqueda("", "Todas", null, null, null, null,
                 null, "Menor precio", 0, 2));
@@ -264,7 +265,7 @@ class SkillSwapUiControllersTest {
 
     @Test
     void laBusquedaAplicaLosFiltrosNuevos() {
-        var controllers = SkillSwapUiControllers.from(new SkillSwapApplicationWiring());
+        var controllers = SkillSwapUiControllers.from(H2Database.wiring());
 
         var bySkill = controllers.busqueda().buscar(new FiltrosBusqueda("", "Todas", null, "backend", null, null,
                 null, null, 0, 20));
@@ -283,7 +284,7 @@ class SkillSwapUiControllersTest {
 
     @Test
     void losFiltrosInvalidosSeInformanComoValidacion() {
-        var controllers = SkillSwapUiControllers.from(new SkillSwapApplicationWiring());
+        var controllers = SkillSwapUiControllers.from(H2Database.wiring());
 
         var error = assertThrows(PresentationException.class, () -> controllers.busqueda().buscar(
                 new FiltrosBusqueda("", "Todas", null, null, 300, 100, null, null, 0, 20)));
@@ -293,7 +294,7 @@ class SkillSwapUiControllersTest {
 
     @Test
     void noRecomiendaParaOtroUsuario() {
-        var controllers = SkillSwapUiControllers.from(new SkillSwapApplicationWiring());
+        var controllers = SkillSwapUiControllers.from(H2Database.wiring());
 
         var error = assertThrows(PresentationException.class,
                 () -> controllers.busqueda().recomendar("mentor-ana"));
@@ -303,7 +304,7 @@ class SkillSwapUiControllersTest {
 
     @Test
     void lasRecomendacionesMuestranElNombreYLaReputacionRealesDelAutor() {
-        var controllers = SkillSwapUiControllers.from(new SkillSwapApplicationWiring());
+        var controllers = SkillSwapUiControllers.from(H2Database.wiring());
 
         var recomendaciones = controllers.busqueda().recomendar("user-mateo");
 
@@ -315,7 +316,7 @@ class SkillSwapUiControllersTest {
 
         @Test
         void conectaContratacionesWalletYNotificacionesConAplicacion() {
-        var controllers = SkillSwapUiControllers.from(new SkillSwapApplicationWiring());
+        var controllers = SkillSwapUiControllers.from(H2Database.wiring());
         var publication = controllers.busqueda().buscar(
                 new FiltrosBusqueda("", "Todas", null, 0, "Relevancia")).items().stream()
             .filter(item -> !"Mateo Silva".equals(item.proveedor()))
@@ -343,7 +344,7 @@ class SkillSwapUiControllersTest {
 
     @Test
     void ofreceLosTiposDelUsuarioYCreaElBorradorDelTipoElegido() {
-        var controllers = SkillSwapUiControllers.from(new SkillSwapApplicationWiring());
+        var controllers = SkillSwapUiControllers.from(H2Database.wiring());
 
         assertEquals(List.of(Models.TipoPublicacion.MENTORIA, Models.TipoPublicacion.SERVICIO),
                 controllers.publicaciones().tiposPublicacion("user-mateo"));
@@ -363,7 +364,7 @@ class SkillSwapUiControllersTest {
 
     @Test
     void rechazaUnTipoQueElUsuarioNoPuedeCrearComoPermisos() {
-        var controllers = SkillSwapUiControllers.from(new SkillSwapApplicationWiring());
+        var controllers = SkillSwapUiControllers.from(H2Database.wiring());
         int before = controllers.publicaciones().listarPropias("user-mateo").size();
 
         var error = assertThrows(PresentationException.class, () -> controllers.publicaciones().crearBorrador(
@@ -376,7 +377,7 @@ class SkillSwapUiControllersTest {
 
         @Test
         void creaBorradoresPublicablesConDisponibilidadValida() {
-        var controllers = SkillSwapUiControllers.from(new SkillSwapApplicationWiring());
+        var controllers = SkillSwapUiControllers.from(H2Database.wiring());
         var draft = controllers.publicaciones().crearBorrador("user-mateo", "Mentoría de integración",
             "Práctica de arquitectura y testing.", "Tecnología", Modalidad.REMOTA, 60, 120,
             Models.TipoPublicacion.MENTORIA);

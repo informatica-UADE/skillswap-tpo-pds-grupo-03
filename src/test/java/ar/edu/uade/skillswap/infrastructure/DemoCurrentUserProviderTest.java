@@ -3,22 +3,35 @@ package ar.edu.uade.skillswap.infrastructure;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import ar.edu.uade.skillswap.application.port.out.ProfileRepository;
 import ar.edu.uade.skillswap.domain.model.ActorType;
 import ar.edu.uade.skillswap.domain.model.Profile;
+import ar.edu.uade.skillswap.infrastructure.persistence.H2Database;
+import ar.edu.uade.skillswap.infrastructure.persistence.JpaTransactionManager;
+import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaProfileRepository;
+import jakarta.persistence.EntityManagerFactory;
 import ar.edu.uade.skillswap.model.Models.UsuarioDemo;
 import java.util.List;
 import java.util.Set;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 class DemoCurrentUserProviderTest {
-    private final InMemoryProfileRepository profiles = new InMemoryProfileRepository();
+    private final EntityManagerFactory factory = H2Database.factory("demo_user");
+    private final JpaTransactionManager transactions = new JpaTransactionManager(factory);
+    private final ProfileRepository profiles = new JpaProfileRepository(transactions);
 
     DemoCurrentUserProviderTest() {
-        profiles.save(profile("user-mateo", "Mateo Silva"));
-        profiles.save(profile("mentor-ana", "Ana García"));
+        save(profile("user-mateo", "Mateo Silva"));
+        save(profile("mentor-ana", "Ana García"));
         Profile inactive = profile("mentor-lu", "Lucía Pérez");
         inactive.deactivate("mentor-lu");
-        profiles.save(inactive);
+        save(inactive);
+    }
+
+    @AfterEach
+    void closeDatabase() {
+        factory.close();
     }
 
     @Test
@@ -40,9 +53,9 @@ class DemoCurrentUserProviderTest {
                 new UsuarioDemo("user-mateo", "Mateo Silva", "Profesional")), identity.usuariosDisponibles());
         assertEquals("Ana García · Profesional", identity.usuariosDisponibles().get(0).toString());
 
-        profiles.save(Profile.register("acme", ActorType.ORGANIZATION, "Acme", "", "UTC", Set.of(), Set.of(),
+        save(Profile.register("acme", ActorType.ORGANIZATION, "Acme", "", "UTC", Set.of(), Set.of(),
                 Set.of()));
-        profiles.save(profile("nuevo", "Beto Ruiz"));
+        save(profile("nuevo", "Beto Ruiz"));
         assertEquals(new UsuarioDemo("acme", "Acme", "Organización"), identity.usuariosDisponibles().get(0));
         assertEquals("Beto Ruiz", identity.usuariosDisponibles().get(2).nombre());
         identity.cambiarUsuario("nuevo");
@@ -58,6 +71,10 @@ class DemoCurrentUserProviderTest {
         assertThrows(IllegalArgumentException.class, () -> identity.cambiarUsuario(" "));
         assertThrows(IllegalArgumentException.class, () -> identity.cambiarUsuario(null));
         assertEquals("mentor-ana", identity.currentUserId());
+    }
+
+    private void save(Profile profile) {
+        transactions.required(() -> profiles.save(profile));
     }
 
     private static Profile profile(String userId, String name) {

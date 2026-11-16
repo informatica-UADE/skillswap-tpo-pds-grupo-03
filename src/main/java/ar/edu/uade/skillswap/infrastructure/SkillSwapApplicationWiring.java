@@ -55,10 +55,11 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
-/** Composition root shared by the in-memory demo and the JPA execution mode. */
+/**
+ * Punto de composición: arma los casos de uso sobre los repositorios JPA. La aplicación usa MySQL
+ * ({@link #persistent()}); las pruebas pasan su propia fábrica ({@link #usingJpa}).
+ */
 public final class SkillSwapApplicationWiring implements AutoCloseable {
-    private record InMemoryPublicationAdapters(InMemoryPublicationRepository repository) {}
-
     private final BookingRepository bookings;
     private final WalletRepository wallets;
     private final NotificationRepository notifications;
@@ -84,42 +85,17 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
     private final NotificationApplicationService notificationService;
     private final PublicProfileUseCases publicProfiles;
 
-    public SkillSwapApplicationWiring() {
-        this(new MockIdentityClient("user-mateo"), new MockEmailClient(), new MockPushClient());
-    }
-
-    public SkillSwapApplicationWiring(MockIdentityClient identityClient,
-                                      MockEmailClient emailClient, MockPushClient pushClient) {
-        this(identityClient, emailClient, pushClient, new InMemoryProfileRepository());
-    }
-
-    public SkillSwapApplicationWiring(MockIdentityClient identityClient,
-                                      MockEmailClient emailClient, MockPushClient pushClient,
-                                      ProfileRepository profiles) {
-        this(identityClient, emailClient, pushClient, profiles, inMemoryPublicationAdapters(profiles),
-                new InMemoryBookingRepository(),
-                new InMemoryWalletRepository(), new InMemoryRatingRepository(),
-                new InMemoryNotificationRepository(), new SynchronousTransactionManager(), () -> {});
-    }
-
-    private SkillSwapApplicationWiring(MockIdentityClient identityClient,
-            MockEmailClient emailClient, MockPushClient pushClient, ProfileRepository profiles,
-            InMemoryPublicationAdapters publicationAdapters, BookingRepository bookings,
-            WalletRepository wallets, RatingRepository ratings, NotificationRepository notifications,
-            TransactionManager transactions, Runnable closeResources) {
-        this(identityClient, emailClient, pushClient, profiles,
-                publicationAdapters.repository(), publicationAdapters.repository(),
-                bookings, wallets, ratings, notifications, transactions, closeResources);
-    }
-
-    /** Runs Flyway before Hibernate validates the database configured through the environment. */
+    /**
+     * Arma la aplicación sobre la base MySQL configurada en las variables de entorno: Flyway aplica
+     * las migraciones antes de que Hibernate valide el esquema.
+     */
     public static SkillSwapApplicationWiring persistent() {
         FlywayConfig.migrate();
         return usingJpa(HibernateConfig.createEntityManagerFactory(),
                 new MockIdentityClient("user-mateo"), new MockEmailClient(), new MockPushClient());
     }
 
-    /** Takes ownership of the factory; close the wiring to release its connections. */
+    /** Toma la fábrica JPA y la cierra junto con la wiring, liberando sus conexiones. */
     public static SkillSwapApplicationWiring usingJpa(EntityManagerFactory factory,
             MockIdentityClient identity, MockEmailClient email, MockPushClient push) {
         Objects.requireNonNull(factory, "Falta la fábrica JPA");
@@ -170,10 +146,6 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
 
         subscribeNotifications();
         transactions.required(() -> { seedDemoData(); return null; });
-    }
-
-    private static InMemoryPublicationAdapters inMemoryPublicationAdapters(ProfileRepository profiles) {
-        return new InMemoryPublicationAdapters(new InMemoryPublicationRepository(profiles));
     }
 
     @Override

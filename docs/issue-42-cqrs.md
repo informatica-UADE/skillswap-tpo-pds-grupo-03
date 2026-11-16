@@ -36,7 +36,6 @@ La separación es a nivel de contratos y adaptadores, no de procesos ni almacena
 | `application.port.out.PublicationRepository` | Persistencia/carga de agregados y paginación existente de publicaciones del perfil público; no contiene la búsqueda del catálogo. |
 | `application.port.out.PublicationQueryPort` | Búsqueda paginada y categorías; las publicaciones proyectadas incluyen los datos públicos de su autor. |
 | `infrastructure.persistence.repository.JpaPublicationQueryAdapter` | Proyección JPA paginada para el catálogo. |
-| `infrastructure.InMemoryPublicationRepository` | Implementación en memoria de los puertos de agregado y consulta. |
 
 `PublicationApplicationService` implementa los dos puertos de entrada para conservar la
 orquestación de publicación, pero sus contratos de comandos y consultas son distintos.
@@ -82,8 +81,8 @@ BusquedaUiController
 
 El adaptador no reconstruye agregados para formar el catálogo. La página y el total se resuelven
 en persistencia; etiquetas y disponibilidad se recuperan por lote para los IDs de esa página,
-evitando una consulta individual por publicación. El contrato común de búsqueda valida el mismo
-comportamiento en memoria y en JPA.
+evitando una consulta individual por publicación. El contrato común de búsqueda valida ese
+comportamiento sobre MySQL.
 
 ## Persistencia, consistencia y límites
 
@@ -100,11 +99,11 @@ comportamiento en memoria y en JPA.
 ## Pruebas y verificaciones
 
 - `PublicationSearchContract` comprueba filtros, visibilidad, orden, conteo y límites de paginación
-  para los adaptadores en memoria y MySQL.
+  sobre MySQL (perfil `mysql-it`).
 - `DiscoveryApplicationServiceTest` comprueba la delegación de criterios, la respuesta proyectada,
   la propagación de errores y que la búsqueda no consulta agregados de perfiles.
 - `ProfilePublicationControllersIntegrationTest` cubre comandos y consultas contra el dominio y
-  repositorios en memoria, incluida la transición a publicado y el listado propio.
+  repositorios JPA sobre H2, incluida la transición a publicado y el listado propio.
 - `MySqlPersistenceIntegrationTest` cubre la búsqueda paginada/proyectada y la persistencia de los
   cambios en MySQL cuando se habilita el perfil `mysql-it`.
 

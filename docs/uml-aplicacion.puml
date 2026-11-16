@@ -78,16 +78,6 @@ package "Infrastructure" {
   class BusquedaUiController
   class PerfilUiController
 
-  package "In-memory adapters" {
-    class InMemoryProfileRepository
-    class InMemoryPublicationRepository
-    class InMemoryBookingRepository
-    class InMemoryWalletRepository
-    class InMemoryRatingRepository
-    class InMemoryNotificationRepository
-    class SynchronousTransactionManager
-  }
-
   package "JPA adapters" {
     class JpaProfileRepository
     class JpaPublicationRepository
@@ -189,19 +179,12 @@ RatingApplicationService ..> Profile
 WalletApplicationService ..> Wallet
 
 ' Infrastructure adapters implement application output ports.
-InMemoryProfileRepository ..|> ProfileRepository
 JpaProfileRepository ..|> ProfileRepository
-InMemoryPublicationRepository ..|> PublicationRepository
 JpaPublicationRepository ..|> PublicationRepository
-InMemoryBookingRepository ..|> BookingRepository
 JpaBookingRepository ..|> BookingRepository
-InMemoryWalletRepository ..|> WalletRepository
 JpaWalletRepository ..|> WalletRepository
-InMemoryRatingRepository ..|> RatingRepository
 JpaRatingRepository ..|> RatingRepository
-InMemoryNotificationRepository ..|> NotificationRepository
 JpaNotificationRepository ..|> NotificationRepository
-SynchronousTransactionManager ..|> TransactionManager
 JpaTransactionManager ..|> TransactionManager
 IdentityProviderAdapter ..|> CurrentUserProvider
 
@@ -246,8 +229,8 @@ note bottom of ProfileApplicationService
 end note
 
 note right of SkillSwapApplicationWiring
-  Selecciona adaptadores en memoria para la demo
-  o JPA/transacciones para persistencia.
+  Arma los casos de uso sobre los adaptadores JPA:
+  MySQL en la aplicación, H2 en las pruebas.
 end note
 
 note bottom of InMemoryDomainEventPublisher

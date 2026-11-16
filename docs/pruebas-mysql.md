@@ -32,7 +32,7 @@ Las carreras usan conexiones y transacciones independientes en dos hilos, coordi
 
 Las reglas de estados, participantes, saldo y capacidad continúan en Domain/Application. Las correcciones se limitan a Infrastructure, configuración, migración y pruebas.
 
-El modo `--persistence=jpa` ejecuta Flyway y compone todos los repositorios JPA con un único `JpaTransactionManager` y `EntityManagerFactory`. La composición de servicios, Observer y Simple Factory es compartida con el modo en memoria. Los proveedores de email/push e identidad continúan siendo mock. El [README](../README.md) detalla cómo iniciar la interfaz con la base configurada.
+La aplicación ejecuta Flyway y compone todos los repositorios JPA con un único `JpaTransactionManager` y `EntityManagerFactory`; no hay un modo en memoria. Las pruebas que no necesitan MySQL usan la misma composición sobre una base H2 creada por prueba (`H2Database`), sin Flyway: Hibernate genera el esquema desde las entidades. Los proveedores de email/push e identidad continúan siendo mock. El [README](../README.md) detalla cómo iniciar la interfaz con la base configurada.
 
 ## Ejecución local en PowerShell
 

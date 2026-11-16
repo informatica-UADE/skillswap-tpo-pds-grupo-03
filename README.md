@@ -4,17 +4,16 @@ SkillSwap es un marketplace académico para ofrecer y contratar mentorías. Este
 
 ## Estado actual
 
-La aplicación ejecutable es una demo de escritorio en Java Swing. La vista usa controllers que conectan perfiles, publicaciones, búsqueda, contrataciones, billetera y notificaciones con servicios de Application. El modo predeterminado usa memoria; `--persistence=jpa` conecta esos mismos servicios a MySQL mediante repositorios JPA. `MockSkillSwapControllers` permanece disponible para pruebas y recorridos aislados.
+La aplicación ejecutable es una demo de escritorio en Java Swing. La vista usa controllers que conectan perfiles, publicaciones, búsqueda, contrataciones, billetera, calificaciones y notificaciones con servicios de Application, y estos persisten en **MySQL mediante repositorios JPA (Hibernate)**. No hay un modo en memoria: la aplicación siempre se conecta a la base configurada. `MockSkillSwapControllers` permanece disponible para pruebas y recorridos aislados de la UI.
 
-El modo en memoria no requiere MySQL y pierde los datos al cerrar. El modo JPA conserva los datos entre ejecuciones; Flyway aplica las migraciones antes de que Hibernate valide el esquema. Ambos modos usan identidades y proveedores de demostración y SkillCoins ficticios; no hay autenticación ni pasarela de pago reales.
+Al arrancar, Flyway aplica las migraciones y Hibernate valida el esquema. Los datos se conservan entre ejecuciones. Las identidades, los proveedores de email y push y los SkillCoins son de demostración: no hay autenticación ni pasarela de pago reales.
 
 ## Requisitos
 
 - JDK 17 o superior.
 - Apache Maven 3.9 o superior.
 - Git.
-
-No se necesitan variables de entorno ni credenciales para ejecutar el modo en memoria. El modo JPA requiere una base MySQL 8.4 y las variables indicadas abajo.
+- MySQL 8.4 para ejecutar la aplicación (por ejemplo, con Docker) y para las pruebas de integración con MySQL.
 
 ## Obtener el proyecto
 
@@ -29,7 +28,7 @@ cd skillswap-tpo-pds-grupo-03
 mvn clean test
 ```
 
-Maven compila con Java 17 y ejecuta las pruebas automatizadas con JUnit.
+Maven compila con Java 17 y ejecuta las pruebas automatizadas con JUnit. Las pruebas de persistencia y de integración usan los repositorios JPA sobre una base H2 en memoria, creada para cada prueba; no necesitan MySQL. Las pruebas que dependen de MySQL real (migraciones de Flyway, colación sin acentos, concurrencia) se habilitan con el perfil `mysql-it`, como se explica en [Pruebas de MySQL](docs/pruebas-mysql.md); sin ese perfil se omiten.
 
 Para medir y exigir al menos **80% de líneas en Domain y Application por separado**:
 
@@ -42,28 +41,26 @@ El HTML queda en `target/site/jacoco/index.html`. La revisión local del PR #65 
 
 ## Ejecutar la aplicación
 
-```bash
-mvn exec:java
+La aplicación necesita una base MySQL vacía y un usuario con permisos sobre ella (incluidos los de migraciones y tablas temporales). Con Docker, en PowerShell:
+
+```powershell
+docker run --detach --name skillswap-mysql --publish 127.0.0.1:3306:3306 --env MYSQL_ROOT_PASSWORD=<contraseña de root> --env MYSQL_DATABASE=skillswap --env MYSQL_USER=skillswap --env MYSQL_PASSWORD=<contraseña de la demo> mysql:8.4 --default-time-zone=+00:00
 ```
 
-Se abre la ventana **SkillSwap · Mock UI Kit**. Para cerrarla, cerrá la ventana normalmente.
-
-### Ejecutar con persistencia MySQL
-
-Crear primero una base vacía dedicada a la demo y un usuario con permisos sobre ella, incluidos los necesarios para migraciones y tablas temporales. En PowerShell, configurar los datos de esa base:
+Si el contenedor ya existe, alcanza con `docker start skillswap-mysql`. Después, desde la raíz del proyecto:
 
 ```powershell
 $env:SKILLSWAP_DB_URL = 'jdbc:mysql://127.0.0.1:3306/skillswap?connectionTimeZone=UTC'
 $env:SKILLSWAP_DB_USER = 'skillswap'
-$env:SKILLSWAP_DB_PASSWORD = '<contraseña del usuario de la demo>'
-mvn exec:java '-Dexec.args=--persistence=jpa'
+$env:SKILLSWAP_DB_PASSWORD = '<contraseña de la demo>'
+mvn compile exec:java
 ```
 
-La ventana indica **SkillSwap · MySQL**. En la primera ejecución se crean perfiles, billeteras y publicaciones de muestra. Al reiniciar no se reemplazan perfiles, no se reinician saldos ni se duplican la bienvenida o las publicaciones, incluso si estas fueron pausadas. Al cerrar se liberan las conexiones JPA. Para cambiar de usuario se hace clic en el recuadro del perfil activo, abajo en la barra lateral: lista los perfiles activos guardados con su tipo (con el seed, Mateo, Ana y Lucía), tanto en memoria como con JPA. No reemplaza una autenticación real.
+Sin esas variables, la aplicación no arranca e indica cuál falta. Se abre la ventana **SkillSwap**. En la primera ejecución se crean perfiles, billeteras y publicaciones de muestra. Al reiniciar no se reemplazan perfiles, no se reinician saldos ni se duplican la bienvenida o las publicaciones, incluso si estas fueron pausadas. Al cerrar se liberan las conexiones JPA. Para cambiar de usuario se hace clic en el recuadro del perfil activo, abajo en la barra lateral: lista los perfiles activos guardados con su tipo (con los datos de muestra, Mateo, Ana y Lucía). No reemplaza una autenticación real.
 
 ## Recorrido de demostración
 
-El guion detallado está en [`docs/guion-demo.md`](docs/guion-demo.md). Describe los flujos conectados, el selector de identidad de demo y las limitaciones de la persistencia en memoria.
+El guion detallado está en [`docs/guion-demo.md`](docs/guion-demo.md). Describe los flujos conectados, el selector de identidad de demo y los límites de la demo.
 
 ## Diseño y defensa
 
@@ -73,6 +70,7 @@ El guion detallado está en [`docs/guion-demo.md`](docs/guion-demo.md). Describe
 - [Informe de decisiones de diseño](docs/informe-diseno.md) y [versión PDF](output/pdf/informe-diseno-skillswap.pdf).
 - [Auditoría de patrones, GRASP y SOLID](docs/auditoria-patrones-y-grasp.md), con estado verificado en `main` y pendientes de integración.
 - [Decisión e implementación de CQRS para el Issue #42](docs/issue-42-cqrs.md), con alcance, puertos y flujos de lectura/escritura.
+- [Persistencia solo con JPA y MySQL](docs/decision-persistencia-solo-jpa.md): por qué se eliminaron los repositorios en memoria y cómo se prueban los JPA.
 
 ## Estructura principal
 
@@ -81,7 +79,7 @@ src/main/java/ar/edu/uade/skillswap/
 ├── controllers/  # Contratos que consume la vista
 ├── domain/       # Modelo y reglas del dominio
 ├── application/  # Casos de uso, modelos y puertos
-├── infrastructure/ # Repositorios y wiring en memoria
+├── infrastructure/ # Repositorios JPA, migraciones, adapters y wiring
 ├── mock/         # Controller alternativo para pruebas de UI
 ├── model/        # Modelos usados por el Mock UI Kit
 └── ui/           # Interfaz Java Swing
