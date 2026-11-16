@@ -185,7 +185,7 @@ class MySqlPersistenceIntegrationTest {
     @Test
     void profileLifecyclePersistsCollectionsPreferencesAvailabilityAndLogicalDeletion() {
         initializeJpa();
-        var service = new ProfileApplicationService(profiles, () -> "profile-user", transactions);
+        var service = new ProfileApplicationService(profiles, bookings, () -> "profile-user", transactions);
         LocalDateTime start = LocalDateTime.now().plusDays(3).withNano(0);
         var input = new ProfileData.RegisterCommand("Nombre", "Bio", "UTC", List.of("Java", "SQL"),
                 List.of("Diseño"), Set.of(NotificationChannelType.EMAIL, NotificationChannelType.IN_APP),

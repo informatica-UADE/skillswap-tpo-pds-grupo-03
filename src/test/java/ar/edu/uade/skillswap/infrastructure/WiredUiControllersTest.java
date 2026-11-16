@@ -27,10 +27,47 @@ class WiredUiControllersTest {
             var buyerView = freshUi.contrataciones().listarContrataciones("mentor-ana").get(0);
             assertEquals(publication.titulo(), buyerView.titulo());
             assertEquals("Mateo Silva", buyerView.contraparte());
+            assertEquals("user-mateo", buyerView.contraparteId());
             freshUi.sesionDemo().cambiarUsuario("user-mateo");
             var providerView = freshUi.contrataciones().listarContrataciones("user-mateo").get(0);
             assertEquals(publication.titulo(), providerView.titulo());
             assertEquals("Ana García", providerView.contraparte());
+            assertEquals("mentor-ana", providerView.contraparteId());
+        }
+    }
+
+    @Test
+    void elPerfilPublicoDelAutorReflejaSuHistorialYReseniasDesdeLaUi() {
+        try (var wiring = new SkillSwapApplicationWiring()) {
+            var ui = new WiredUiControllers(wiring);
+            var publication = ui.busqueda().buscar(
+                    new FiltrosBusqueda("entrevistas", "Todas", null, 0, "Relevancia")).items().get(0);
+            assertEquals("mentor-ana", publication.proveedorId());
+
+            var before = ui.perfiles().verPerfilPublico(publication.proveedorId(), 0);
+            assertEquals("Ana García", before.perfil().nombre());
+            assertTrue(before.publicaciones().items().stream().anyMatch(item -> item.id().equals(publication.id())));
+            assertEquals(0, before.completadasComoProveedor());
+            assertTrue(before.ultimasResenas().isEmpty());
+
+            var booking = ui.contrataciones().solicitar("user-mateo", publication.id(), "", "Practicar",
+                    publication.franjasDisponibles().get(0).id());
+            ui.sesionDemo().cambiarUsuario("mentor-ana");
+            ui.contrataciones().aceptar("mentor-ana", booking.id());
+            ui.sesionDemo().cambiarUsuario("user-mateo");
+            ui.contrataciones().pagar("user-mateo", booking.id());
+            ui.sesionDemo().cambiarUsuario("mentor-ana");
+            ui.contrataciones().iniciar("mentor-ana", booking.id());
+            ui.sesionDemo().cambiarUsuario("user-mateo");
+            ui.contrataciones().completar("user-mateo", booking.id());
+            ui.calificaciones().calificar("user-mateo", booking.id(), 5, "Muy útil");
+
+            var after = ui.perfiles().verPerfilPublico("mentor-ana", 0);
+            assertEquals(1, after.completadasComoProveedor());
+            assertEquals(1, after.perfil().proyectosCompletados());
+            assertEquals(5.0, after.perfil().reputacion());
+            assertEquals("Muy útil", after.ultimasResenas().get(0).comentario());
+            assertEquals(1, ui.perfiles().verPerfil("user-mateo").proyectosCompletados());
         }
     }
 

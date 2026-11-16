@@ -25,6 +25,7 @@ package "Application" {
     interface WalletUseCases
     interface RatingUseCases
     interface NotificationUseCases
+    interface PublicProfileUseCases
   }
 
   package "Use case services" {
@@ -260,5 +261,12 @@ note bottom of PublicationRepository
   implementa búsqueda, filtros, orden y paginación (#16).
   Se muestra como contexto del repositorio, no como
   parte de las entregas de dominio documentadas aparte.
+end note
+note bottom of Facade
+Facade (#40): un punto de entrada para el perfil público.
+Coordina perfiles, publicaciones activas (página),
+contrataciones completadas (conteos) y últimas calificaciones
+en una transacción de lectura; no agrega reglas de negocio.
+Contrato ejecutable: PublicProfileQueriesContract.
 end note
 @enduml

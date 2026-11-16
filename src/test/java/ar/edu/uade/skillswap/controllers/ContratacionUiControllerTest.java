@@ -17,7 +17,7 @@ class ContratacionUiControllerTest {
     private final Spy service = new Spy();
     private ContratacionUiController controller(String actor) {
         return new ContratacionUiController(service, () -> actor, new UiOperationExecutor(),
-                view -> new Models.Contratacion(view.id(), "Mentoría", "Mentor", view.createdAt(),
+                view -> new Models.Contratacion(view.id(), "Mentoría", "Mentor", "mentor", view.createdAt(),
                         view.priceInSkillCoins(), new ar.edu.uade.skillswap.controllers.mapper.UiModelMapper()
                         .toEstadoContratacion(view.status()), view.objective(), view.clientMessage(), view.slotId()));
     }

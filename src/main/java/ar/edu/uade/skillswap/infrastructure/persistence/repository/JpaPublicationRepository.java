@@ -149,6 +149,44 @@ public final class JpaPublicationRepository extends JpaRepositorySupport
         });
     }
 
+    @Override
+    public PageResult<Publication> findPublishedByAuthor(String authorUserId, int page, int size) {
+        Objects.requireNonNull(authorUserId, "Falta el ID del autor");
+        requireValidPage(page, size);
+
+        return query(em -> {
+            List<Publication> items = em.createQuery(
+                            "SELECT p FROM PublicationEntity p "
+                                    + "WHERE p.authorUserId = :author AND p.status = :status "
+                                    + "ORDER BY p.createdAt DESC, p.id ASC",
+                            PublicationEntity.class)
+                    .setParameter("author", authorUserId)
+                    .setParameter("status", "PUBLISHED")
+                    .setFirstResult(Math.multiplyExact(page, size))
+                    .setMaxResults(size)
+                    .getResultList()
+                    .stream()
+                    .map(PublicationMapper::toDomain)
+                    .toList();
+
+            long total = em.createQuery(
+                            "SELECT COUNT(p) FROM PublicationEntity p "
+                                    + "WHERE p.authorUserId = :author AND p.status = :status",
+                            Long.class)
+                    .setParameter("author", authorUserId)
+                    .setParameter("status", "PUBLISHED")
+                    .getSingleResult();
+
+            return new PageResult<>(items, page, size, total);
+        });
+    }
+
+    private static void requireValidPage(int page, int size) {
+        if (page < 0 || size < 1) {
+            throw new IllegalArgumentException("La paginación es inválida");
+        }
+    }
+
     private Predicate[] buildPredicates(
             CriteriaBuilder cb,
             CriteriaQuery<?> criteria,

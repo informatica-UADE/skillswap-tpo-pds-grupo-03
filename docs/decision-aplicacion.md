@@ -13,6 +13,7 @@ La capa de aplicación coordina los casos de uso. Recibe comandos y consultas, o
 | `WalletService` | Consultar saldo y movimientos; los débitos y créditos se coordinan desde el caso de uso que los origina. | #19 |
 | `RatingService` | Evitar duplicados y delegar al dominio la verificación de contratación y participantes; luego coordinar reputación y evento. | #21 |
 | `NotificationService` | Consultar y marcar la bandeja del usuario; enviar avisos a través de un puerto. | #21, #25 |
+| `PublicProfileFacade` | Consultar el perfil público de cualquier usuario activo: coordina en una lectura los datos públicos y la reputación del perfil, una página de publicaciones activas, los conteos de contrataciones completadas y las últimas calificaciones. Es una Facade: solo compone, sin reglas propias. Ver [decisión del perfil público](decision-perfil-publico.md). | #40 |
 
 Los servicios concretos se implementan en sus issues específicos para evitar que una única clase concentre toda la lógica y para permitir trabajo paralelo sin duplicar responsabilidades. Las interfaces de entrada de este cambio fijan el contrato común; los puertos de salida aíslan repositorios, identidad, transacciones, eventos y entrega de notificaciones.
 

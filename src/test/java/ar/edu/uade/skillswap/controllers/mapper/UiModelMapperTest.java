@@ -5,6 +5,7 @@ import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchOrder;
 import ar.edu.uade.skillswap.application.model.NotificationData.NotificationView;
 import ar.edu.uade.skillswap.application.model.ProfileData.AvailabilityView;
 import ar.edu.uade.skillswap.application.model.ProfileData.ProfileView;
+import ar.edu.uade.skillswap.application.model.PublicProfileData.CompletedBookingsSummary;
 import ar.edu.uade.skillswap.application.model.PublicationData.AuthorView;
 import ar.edu.uade.skillswap.application.model.PublicationData.PublicationView;
 import ar.edu.uade.skillswap.application.model.WalletData.MovementView;
@@ -55,6 +56,7 @@ class UiModelMapperTest {
         assertEquals(60, dto.duracionMinutos());
         assertEquals(120, dto.precio());
         assertEquals("Julieta", dto.proveedor());
+        assertEquals("u1", dto.proveedorId());
         assertEquals(4.5, dto.reputacion());
         assertEquals(List.of("Java"), dto.etiquetas());
         assertEquals(Models.EstadoPublicacion.PUBLICADA, dto.estado());
@@ -69,18 +71,19 @@ class UiModelMapperTest {
         var view = new BookingView("b1", "p1", "comprador", "proveedor", "Aprender Java",
                 "Hola", "f1", 120, 0, BookingStatus.PENDING, fecha, null, "Java");
 
-        assertEquals(new Models.Contratacion("b1", "Java", "Julieta", fecha, 120,
+        assertEquals(new Models.Contratacion("b1", "Java", "Julieta", "proveedor", fecha, 120,
                 Models.EstadoContratacion.PENDIENTE, "Aprender Java", "Hola", "f1"),
-                mapper.toContratacion(view, "Java", "Julieta"));
+                mapper.toContratacion(view, "Java", "Julieta", "proveedor"));
     }
 
     @Test
     void conviertePerfilMovimientosYNotificaciones() {
         var view = new ProfileView("perfil", "u1", ActorType.PROFESSIONAL, "Julieta", "Mentora", "UTC",
-                List.of("Java"), List.of(), Set.of(), List.of(), 4.5, 3, true);
+                List.of("Java"), List.of(), Set.of(), List.of(), 4.5, 3, true, new CompletedBookingsSummary(2, 1));
 
-        assertEquals(new Models.Perfil("u1", "Julieta", "Mentora", "Mentora",
-                List.of("Java"), 4.5, 3, 2), mapper.toPerfil(view, "Mentora", 2));
+        assertEquals(new Models.Perfil("u1", "Julieta", "Profesional", "Mentora",
+                List.of("Java"), 4.5, 3, 3), mapper.toPerfil(view));
+        assertEquals("Organización", mapper.toRol(ActorType.ORGANIZATION));
         assertEquals(new Models.Movimiento("Pago", fecha, -120, 380),
                 mapper.toMovimiento(new MovementView("m1", "Pago", -120, 380, fecha)));
         assertEquals(new Models.Notificacion("n1", "Pago", "Confirmado", fecha, false, "PAGO"),

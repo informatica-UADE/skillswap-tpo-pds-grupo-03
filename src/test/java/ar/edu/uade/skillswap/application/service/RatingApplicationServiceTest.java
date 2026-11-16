@@ -146,6 +146,16 @@ class RatingApplicationServiceTest {
                 }
 
                 @Override
+                public long countCompletedByProvider(String providerUserId) {
+                    return 0;
+                }
+
+                @Override
+                public long countCompletedByBuyer(String buyerUserId) {
+                    return 0;
+                }
+
+                @Override
                 public Booking save(Booking value) {
                     return value;
                 }
@@ -208,6 +218,11 @@ class RatingApplicationServiceTest {
                         .filter(rating ->
                                 rating.subjectUserId().equals(subjectUserId))
                         .toList();
+            }
+
+            @Override
+            public List<Rating> findRecentBySubjectUserId(String subjectUserId, int limit) {
+                return findBySubjectUserId(subjectUserId).stream().limit(limit).toList();
             }
 
             @Override
