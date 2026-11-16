@@ -83,3 +83,9 @@ La consigna (§4.3) pide buscar publicaciones por texto, categoría, modalidad, 
 | `DiscoveryApplicationServiceTest` | Delegación sin modificar criterios, autor en una sola lectura de perfiles (búsqueda y recomendaciones), autor sin perfil como inconsistencia, validación, propagación de fallas, búsqueda sin autenticación. |
 | `PublicationApplicationServiceTest` | Vistas de gestión con autor, borrador sin perfil rechazado, listado vacío sin perfil. |
 | `UiModelMapperTest` / `SkillSwapUiControllersTest` | Conversión de filtros de UI y nombre/reputación reales del autor en las tarjetas. |
+
+## Revisión de integración del 05/11/2026
+
+`main` en `2d6e9fd` ya contenía la búsqueda y los contratos paginados incorporados por #71. Una actualización anterior de #70 había restaurado accidentalmente el mapeo previo, eliminado el helper de caché `remember` y quitado pruebas de filtros, paginación y permisos. Esta revisión conserva los archivos Java y las pruebas vigentes en `main`; no vuelve a introducir el contrato anterior ni duplica la implementación de búsqueda. El cambio restante de este PR es este registro de reconciliación.
+
+Validación registrada el 05/11/2026: `mvn -Pmysql-it test`, 208 pruebas, 0 fallos, 0 errores y 0 omitidas, contra MySQL 8.4.13. También se verificaron `git diff --check`, Analyze Java, CodeQL, Dependency Review y Security Gate. Esta evidencia corresponde al estado de esa fecha; los checks actuales del PR se ejecutarán al actualizar la rama.
