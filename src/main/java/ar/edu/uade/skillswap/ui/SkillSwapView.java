@@ -1,6 +1,7 @@
 package ar.edu.uade.skillswap.ui;
 
 import ar.edu.uade.skillswap.controllers.UiControllers;
+import ar.edu.uade.skillswap.controllers.error.PresentationException;
 import ar.edu.uade.skillswap.model.Models.*;
 
 import javax.swing.*;
@@ -18,9 +19,7 @@ import static ar.edu.uade.skillswap.ui.Theme.*;
 public final class SkillSwapView extends JPanel {
     private String USER_ID="user-mateo";
     private final UiControllers controllers;
-    private final UiActionHandler actions = new UiActionHandler(error ->
-            JOptionPane.showMessageDialog(this, error.mensaje(),
-                    "No se pudo completar la operación", JOptionPane.ERROR_MESSAGE));
+    private final UiActionHandler actions = new UiActionHandler(this::showError);
     private final JPanel content=new JPanel(new BorderLayout());
     private final JLabel pageTitle=label("Inicio",H1,TEXT);
     private final JLabel badge=label("",new Font("SansSerif",Font.BOLD,10),Color.WHITE);
@@ -338,7 +337,26 @@ public final class SkillSwapView extends JPanel {
 
     private void showListings(){JPanel p=base();JPanel title=new JPanel(new BorderLayout());title.setOpaque(false);title.add(label("Gestioná tus publicaciones",H2,TEXT));JButton create=button("+ Nueva publicación",true);create.addActionListener(uiAction(e->createListing()));title.add(create,BorderLayout.EAST);title.setMaximumSize(new Dimension(Integer.MAX_VALUE,45));title.setAlignmentX(LEFT_ALIGNMENT);p.add(title);p.add(Box.createVerticalStrut(15));List<Publicacion> own=controllers.publicaciones().listarPropias(USER_ID);if(own.isEmpty()){p.add(empty("Todavía no publicaste servicios","Creá tu primera propuesta para comenzar a compartir tu talento."));}else for(Publicacion x:own){JPanel row=card(new BorderLayout(12,0));row.setMaximumSize(new Dimension(Integer.MAX_VALUE,90));row.add(label(x.tipo()==null?x.titulo():x.tipo()+" · "+x.titulo(),H3,TEXT),BorderLayout.WEST);row.add(pill(x.estado().name(),x.estado()==EstadoPublicacion.PUBLICADA?TEAL:MUTED),BorderLayout.CENTER);JButton toggle=button(x.estado()==EstadoPublicacion.PUBLICADA?"Pausar":"Publicar",false);toggle.addActionListener(uiAction(e->{controllers.publicaciones().cambiarEstado(USER_ID,x.id(),x.estado()==EstadoPublicacion.PUBLICADA?EstadoPublicacion.PAUSADA:EstadoPublicacion.PUBLICADA);showListings();}));row.add(toggle,BorderLayout.EAST);p.add(row);p.add(Box.createVerticalStrut(10));}page("Mis publicaciones",p);}
 
-    private void createListing(){JTextField title=new JTextField();JTextArea desc=new JTextArea(4,26);JComboBox<Categoria> cat=new JComboBox<>(controllers.busqueda().categorias().toArray(Categoria[]::new));JComboBox<TipoPublicacion> type=new JComboBox<>(controllers.publicaciones().tiposPublicacion(USER_ID).toArray(TipoPublicacion[]::new));JPanel form=new JPanel(new GridLayout(0,1,4,5));form.add(new JLabel("Tipo"));form.add(type);form.add(new JLabel("Título"));form.add(title);form.add(new JLabel("Descripción"));form.add(new JScrollPane(desc));form.add(new JLabel("Categoría"));form.add(cat);if(JOptionPane.showConfirmDialog(this,form,"Nueva publicación",JOptionPane.OK_CANCEL_OPTION,JOptionPane.PLAIN_MESSAGE)==JOptionPane.OK_OPTION&&!title.getText().isBlank()){controllers.publicaciones().crearBorrador(USER_ID,title.getText(),desc.getText(),((Categoria)cat.getSelectedItem()).nombre(),Modalidad.REMOTA,60,150,(TipoPublicacion)type.getSelectedItem());message("Borrador creado","La publicación quedó lista para que tus alumnos conecten su flujo real.");showListings();}}
+    /**
+     * Nueva publicación con todos los datos del borrador. Si el dominio rechaza algo, se muestra el
+     * error y el formulario vuelve a abrirse con lo que se había cargado.
+     */
+    private void createListing() {
+        NuevaPublicacionForm form = new NuevaPublicacionForm(controllers.publicaciones().tiposPublicacion(USER_ID),
+                controllers.busqueda().categorias());
+        while (JOptionPane.showConfirmDialog(this, form, "Nueva publicación", JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE) == JOptionPane.OK_OPTION) {
+            try {
+                controllers.publicaciones().crearBorrador(USER_ID, form.datos());
+            } catch (PresentationException error) {
+                showError(error.error());
+                continue;
+            }
+            message("Borrador creado", "Publicalo desde Mis publicaciones para que aparezca en la búsqueda.");
+            showListings();
+            return;
+        }
+    }
 
     private void showContracts() {
         JPanel p = base();
@@ -544,6 +562,11 @@ public final class SkillSwapView extends JPanel {
 
     private ActionListener uiAction(ActionListener listener) {
         return event -> actions.run(() -> listener.actionPerformed(event));
+    }
+
+    private void showError(ErrorPresentacion error) {
+        JOptionPane.showMessageDialog(this, error.mensaje(), "No se pudo completar la operación",
+                JOptionPane.ERROR_MESSAGE);
     }
 
     private void message(String title,String body){JOptionPane.showMessageDialog(this,body,title,JOptionPane.INFORMATION_MESSAGE);}
