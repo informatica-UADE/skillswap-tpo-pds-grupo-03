@@ -35,7 +35,7 @@ Cualquier pantalla nueva o cambio de contrato tocaba esa clase, que dependía de
 | Pantalla | Controller | Caso de uso (puerto) | El controller hace | Las reglas están en |
 | --- | --- | --- | --- | --- |
 | Explorar / Inicio | `BusquedaUiController` | `DiscoveryUseCases` | Convierte filtros y página; recomendaciones del usuario activo. | Repositorio (filtros y paginación), `RecommendationStrategy`. |
-| Mis publicaciones | `PublicacionUiController` | `PublicationUseCases` | Convierte borradores y estados; valida el usuario activo. | `Publication`, `PublicationBuilder`, estados (State). |
+| Mis publicaciones | `PublicacionUiController` | `PublicationCommandUseCases`, `PublicationQueryUseCases` | Convierte borradores y estados; valida el usuario activo. | `Publication`, `PublicationBuilder`, estados (State). |
 | Contrataciones | `ContratacionUiController` | `BookingUseCases` | Convierte comandos; arma la contraparte con el usuario activo. | `Booking`, estados, `Wallet`, `RefundPolicy`, `BookingApplicationService` (transacciones). |
 | Calificar | `CalificacionUiController` | `RatingUseCases` | Valida usuario y contratación, delega y convierte. | `Rating` (puntaje 1 a 5, participantes, no autocalificarse), `RatingApplicationService` (una por autor y contratación). |
 | SkillCoins | `WalletUiController` | `WalletUseCases` | Valida el usuario activo; convierte saldo y movimientos. | `Wallet` (saldo no negativo, importe positivo, movimientos en orden). |

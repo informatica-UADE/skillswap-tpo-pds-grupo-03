@@ -304,22 +304,11 @@ class BookingApplicationServiceTest {
                 }
 
                 @Override
-                public PageResult<Publication> searchPublished(SearchQuery query) {
-                    List<Publication> items = findPublished();
-                    return new PageResult<>(
-                            items.stream().limit(query.size()).toList(),
-                            query.page(),
-                            query.size(),
-                            items.size());
-                }
-
-                @Override
                 public PageResult<Publication> findPublishedByAuthor(
                         String authorUserId, int page, int size) {
                     return new PageResult<>(List.of(), page, size, 0);
                 }
 
-                @Override
                 public Publication save(Publication value) {
                     publications.put(value.id(), value);
                     return value;

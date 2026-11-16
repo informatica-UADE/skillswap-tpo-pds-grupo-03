@@ -27,7 +27,8 @@ public record SkillSwapUiControllers(BusquedaController busqueda, PublicacionCon
         ControllerExecutor operations = new UiOperationExecutor();
         return new SkillSwapUiControllers(
                 new BusquedaUiController(wiring.discoveryService(), identity, operations),
-                new PublicacionUiController(wiring.publicationService(), identity, operations),
+                new PublicacionUiController(wiring.publicationService(), wiring.publicationService(),
+                        identity, operations),
                 new ContratacionUiController(wiring.bookingService(), identity, operations),
                 new CalificacionUiController(wiring.ratingService(), identity, operations),
                 new WalletUiController(wiring.walletService(), identity, operations),

@@ -70,6 +70,7 @@ El guion detallado está en [`docs/guion-demo.md`](docs/guion-demo.md). Describe
 - [Modelo editable de clases en StarUML](docs/modelo-skill-swap.mdj), con diagramas de Domain y Application.
 - [Informe de decisiones actualizado](docs/informe-diseno.md) y [PDF actualizado sin UML](output/pdf/informe-diseno-actualizado.pdf). El [PDF histórico con diagramas](output/pdf/informe-diseno-skillswap.pdf) se conserva sin modificaciones.
 - [Auditoría de patrones, GRASP y SOLID](docs/auditoria-patrones-y-grasp.md), con estado verificado en `main` y pendientes de integración.
+- [Decisión e implementación de CQRS para el Issue #42](docs/issue-42-cqrs.md), con alcance, puertos y flujos de lectura/escritura.
 
 ## Estructura principal
 

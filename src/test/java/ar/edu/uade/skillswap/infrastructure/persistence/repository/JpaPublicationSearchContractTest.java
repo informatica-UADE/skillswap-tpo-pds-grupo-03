@@ -1,6 +1,7 @@
 package ar.edu.uade.skillswap.infrastructure.persistence.repository;
 
 import ar.edu.uade.skillswap.application.port.out.PublicationRepository;
+import ar.edu.uade.skillswap.application.port.out.PublicationQueryPort;
 import ar.edu.uade.skillswap.application.port.out.PublicationSearchContract;
 import ar.edu.uade.skillswap.domain.model.Profile;
 import ar.edu.uade.skillswap.domain.model.Publication;
@@ -31,6 +32,7 @@ class JpaPublicationSearchContractTest extends PublicationSearchContract {
     private JpaTransactionManager transactions;
     private JpaProfileRepository profiles;
     private JpaPublicationRepository publications;
+    private JpaPublicationQueryAdapter publicationQueries;
 
     @BeforeEach
     void createIsolatedSchema() throws Exception {
@@ -64,7 +66,7 @@ class JpaPublicationSearchContractTest extends PublicationSearchContract {
     }
 
     @Override
-    protected PublicationRepository createRepository(List<Publication> items, List<Profile> authors) {
+    protected PublicationQueryPort createRepository(List<Publication> items, List<Profile> authors) {
         Flyway.configure().dataSource(url, user, password)
                 .locations("classpath:db/migration").load().migrate();
         factory = Persistence.createEntityManagerFactory("skillswap-persistence", Map.of(
@@ -76,11 +78,12 @@ class JpaPublicationSearchContractTest extends PublicationSearchContract {
         transactions = new JpaTransactionManager(factory);
         profiles = new JpaProfileRepository(transactions);
         publications = new JpaPublicationRepository(transactions);
+        publicationQueries = new JpaPublicationQueryAdapter(transactions);
 
         return transactions.required(() -> {
             authors.forEach(profiles::save);
             items.forEach(publications::save);
-            return publications;
+            return publicationQueries;
         });
     }
 
