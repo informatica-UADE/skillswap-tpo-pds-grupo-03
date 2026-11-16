@@ -25,6 +25,14 @@ public final class Models {
     public enum EstadoContratacion { PENDIENTE, ACEPTADA, CONFIRMADA, EN_CURSO, COMPLETADA, RECHAZADA, CANCELADA }
     public enum CanalNotificacion { EMAIL, PUSH, IN_APP }
 
+    /**
+     * Perfil guardado con el que se puede probar la demo y su tipo ("Profesional" u "Organización").
+     * {@code toString()} es lo que muestra el selector de perfiles.
+     */
+    public record UsuarioDemo(String id, String nombre, String rol) {
+        @Override public String toString() { return nombre + " · " + rol; }
+    }
+
     public record Disponibilidad(String id, LocalDateTime inicio, LocalDateTime fin, int cupos) {}
 
     public record NuevoPerfil(String nombre, String bio, String zonaHoraria,
@@ -94,7 +102,7 @@ public final class Models {
 
     public record Publicacion(String id, String titulo, String descripcion,
                               String categoria, Modalidad modalidad, int duracionMinutos,
-                              int precio, double reputacion, String proveedor,
+                              int precio, double reputacion, String proveedor, String proveedorId,
                               List<String> etiquetas, EstadoPublicacion estado,
                               boolean destacada, List<FranjaDisponibilidad> franjasDisponibles,
                               TipoPublicacion tipo) {
@@ -105,14 +113,37 @@ public final class Models {
         }
     }
 
-    public record Contratacion(String id, String titulo, String contraparte,
+    /** {@code contraparteId} identifica al otro participante para abrir su perfil público; vacío si no se conoce. */
+    public record Contratacion(String id, String titulo, String contraparte, String contraparteId,
                                LocalDateTime fecha, int precio, EstadoContratacion estado,
                                String objetivo, String mensajeCliente, String franjaId) {
         public Contratacion(String id, String titulo, String contraparte, LocalDateTime fecha,
                             int precio, EstadoContratacion estado) {
-            this(id, titulo, contraparte, fecha, precio, estado, "", "", "");
+            this(id, titulo, contraparte, "", fecha, precio, estado, "", "", "");
         }
     }
+
+    /** Reseña recibida que muestra el perfil público, sin identificar a quien la escribió. */
+    public record Resena(int puntaje, String comentario, LocalDateTime fecha) {}
+
+    /**
+     * Perfil público de cualquier usuario activo: sus datos de presentación, una página de sus
+     * publicaciones activas, las contrataciones completadas según el rol y las últimas reseñas.
+     */
+    public record PerfilPublico(Perfil perfil, PaginaPublicaciones publicaciones,
+                                int completadasComoProveedor, int completadasComoCliente,
+                                List<Resena> ultimasResenas) {
+        public static final int TAMANIO_PAGINA = 6;
+
+        public PerfilPublico {
+            Objects.requireNonNull(perfil, "Falta el perfil");
+            Objects.requireNonNull(publicaciones, "Faltan las publicaciones");
+            ultimasResenas = List.copyOf(ultimasResenas == null ? List.of() : ultimasResenas);
+        }
+    }
+
+    public record Calificacion(String id, String contratacionId, int puntaje,
+                               String comentario, LocalDateTime fecha) {}
 
     public record Movimiento(String concepto, LocalDateTime fecha, int importe, int saldo) {}
 

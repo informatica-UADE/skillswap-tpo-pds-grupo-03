@@ -15,9 +15,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PresentationContractsTest {
     @Test
-    void losControllersDePerfilYPublicacionesDependenDePuertosSinDetallesDePersistencia() {
+    void losControllersDependenDePuertosSinDetallesDeInfraestructuraNiPersistencia() {
         for (Class<?> controller : List.of(PerfilUiController.class, PublicacionUiController.class,
-                ContratacionUiController.class)) {
+                ContratacionUiController.class, BusquedaUiController.class, CalificacionUiController.class,
+                WalletUiController.class, NotificacionUiController.class)) {
             for (var field : controller.getDeclaredFields()) {
                 String packageName = field.getType().getPackageName();
                 assertFalse(packageName.startsWith("ar.edu.uade.skillswap.infrastructure"));
@@ -29,8 +30,8 @@ class PresentationContractsTest {
     @Test
     void losDtosSoloContienenDatosSimplesYOtrosDtos() {
         for (Class<?> container : List.of(Models.class, BookingData.class, DiscoveryData.class,
-                ProfileData.class, PublicationData.class, RatingData.class, WalletData.class,
-                NotificationData.class)) {
+                ProfileData.class, PublicProfileData.class, PublicationData.class, RatingData.class,
+                WalletData.class, NotificationData.class)) {
             for (Class<?> nested : container.getDeclaredClasses()) {
                 if (nested.isRecord()) assertDataType(nested, new HashSet<>());
             }
@@ -61,7 +62,8 @@ class PresentationContractsTest {
     private void assertDataType(Type type, Set<Type> visited) {
         if (!visited.add(type)) return;
         if (type instanceof ParameterizedType parameterized) {
-            assertTrue(parameterized.getRawType() == List.class || parameterized.getRawType() == Set.class,
+            assertTrue(parameterized.getRawType() == List.class || parameterized.getRawType() == Set.class
+                            || parameterized.getRawType() == PageResult.class,
                     "Colección no prevista en el contrato: " + type);
             for (Type argument : parameterized.getActualTypeArguments()) assertDataType(argument, visited);
             return;

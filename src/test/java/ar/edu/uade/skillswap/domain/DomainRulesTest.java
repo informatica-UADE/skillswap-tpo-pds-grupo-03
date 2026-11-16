@@ -123,7 +123,9 @@ class DomainRulesTest {
 
         booking.accept("provider");
         booking.confirmPayment("buyer");
+        assertThrows(SecurityException.class, () -> booking.start("buyer"));
         booking.start("provider");
+        assertThrows(SecurityException.class, () -> booking.complete("provider"));
         booking.complete("buyer");
 
         assertEquals(BookingStatus.COMPLETED, booking.status());

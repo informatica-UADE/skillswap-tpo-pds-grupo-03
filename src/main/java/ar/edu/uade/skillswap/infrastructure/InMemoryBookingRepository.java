@@ -2,6 +2,7 @@ package ar.edu.uade.skillswap.infrastructure;
 
 import ar.edu.uade.skillswap.application.port.out.BookingRepository;
 import ar.edu.uade.skillswap.domain.model.Booking;
+import ar.edu.uade.skillswap.domain.model.BookingStatus;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -27,6 +28,22 @@ public final class InMemoryBookingRepository implements BookingRepository {
                 .filter(booking -> booking.buyerUserId().equals(userId)
                         || booking.providerUserId().equals(userId))
                 .toList();
+    }
+
+    @Override
+    public long countCompletedByProvider(String providerUserId) {
+        return bookings.values().stream()
+                .filter(booking -> booking.providerUserId().equals(providerUserId))
+                .filter(booking -> booking.status() == BookingStatus.COMPLETED)
+                .count();
+    }
+
+    @Override
+    public long countCompletedByBuyer(String buyerUserId) {
+        return bookings.values().stream()
+                .filter(booking -> booking.buyerUserId().equals(buyerUserId))
+                .filter(booking -> booking.status() == BookingStatus.COMPLETED)
+                .count();
     }
 
     @Override

@@ -19,7 +19,7 @@ Se verifican:
 - Registro, consulta, actualización de habilidades/intereses, preferencias y disponibilidad, baja lógica y reactivación de perfiles.
 - Calificación persistida, actualización de reputación, rollback conjunto y unicidad por contratación/autor, comprobada en Application y directamente en MySQL. Las calificaciones duplicadas simultáneas también se verifican tres veces.
 - Bandejas de notificaciones por destinatario, lectura individual y masiva, permisos y rollback.
-- Reinicio del punto de composición JPA y conexión a `WiredUiControllers`: se conservan perfiles, saldo/ledger, contratación, calificación/reputación y lectura de la bienvenida. No se duplican publicaciones pausadas ni se resetean datos iniciales. La fábrica JPA se cierra correctamente.
+- Reinicio del punto de composición JPA y conexión a `SkillSwapUiControllers`: se conservan perfiles, saldo/ledger, contratación, calificación/reputación y lectura de la bienvenida. No se duplican publicaciones pausadas ni se resetean datos iniciales. La fábrica JPA se cierra correctamente.
 
 Las carreras usan conexiones y transacciones independientes en dos hilos, coordinados por barreras con tiempos máximos. Un error SQL, timeout o deadlock no cuenta como un rechazo de negocio válido. Estos escenarios no sustituyen pruebas de carga ni certifican todos los intercalados posibles.
 
@@ -66,7 +66,7 @@ docker rm skillswap-mysql-it
 
 ## Integración continua
 
-`.github/workflows/mysql-integration.yml` crea un servicio MySQL separado y ejecuta `mvn -Pmysql-it clean test` en PR hacia `main`. Los resultados locales y los checks remotos se reportan por separado; una ejecución pendiente no equivale a una aprobación. Este cambio no fusiona PR ni modifica UML.
+`.github/workflows/mysql-integration.yml` crea un servicio MySQL separado y ejecuta `mvn -Pmysql-it,coverage clean verify` en PR hacia `main`. Además de los tests, genera cobertura y exige 80% de líneas en Domain y Application por separado. Los resultados locales y los checks remotos se reportan por separado; una ejecución pendiente no equivale a una aprobación. Este cambio no fusiona PR ni modifica UML.
 
 ## Resultado registrado el 02/11/2026
 
@@ -85,8 +85,8 @@ Ese resultado inicial cubría los escenarios existentes hasta ese cambio. La amp
 - Incluye **23 ejecuciones de integración**: las 14 anteriores más perfiles, reputación/ordenamiento, calificaciones/rollback/unicidad/concurrencia, notificaciones y reinicio del punto de composición JPA.
 - El modo `--persistence=jpa` se inició desde `SkillSwapApplication` con las variables `SKILLSWAP_DB_*` y generó una captura de Swing. Se repitió el arranque sobre la misma base temporal. Flyway no reaplicó migraciones ni se duplicaron los datos iniciales.
 - Las tarjetas muestran el nombre y reputación del autor mediante un DTO público de Discovery; no se generan puntuaciones ficticias desde el controller.
-- El reinicio automatizado cierra y abre una fábrica JPA nueva, verifica datos persistidos y ejercita `WiredUiControllers` sobre la composición real. El cierre libera la fábrica y sus conexiones.
+- El reinicio automatizado cierra y abre una fábrica JPA nueva, verifica datos persistidos y ejercita `SkillSwapUiControllers` sobre la composición real. El cierre libera la fábrica y sus conexiones.
 - Para una captura mediante `exec:java` puede usarse `-Dcom.mysql.cj.disableAbandonedConnectionCleanup=true` como propiedad de Maven: evita que el hilo de limpieza del driver sobreviva al grupo de hilos del plugin después de cerrar las conexiones. Esta opción no se requiere en las pruebas de Surefire.
 - `git diff --check`: limpio.
 
-Pendientes fuera de este alcance: recorrido visual completo de todas las pantallas, integración del selector/calificación de #65, medición de cobertura y carga de producción. Las pruebas no certifican todos los intercalados posibles ni entrega durable de notificaciones externas.
+Esos resultados históricos no certificaban el selector/calificación de #65 ni la cobertura. La revisión del 15/11 registra esa integración, la medición por capa y el recorrido interactivo en [issue33-integracion-y-validacion.md](issue33-integracion-y-validacion.md). Siguen fuera de alcance la carga de producción, todos los intercalados posibles y la entrega durable de notificaciones externas.

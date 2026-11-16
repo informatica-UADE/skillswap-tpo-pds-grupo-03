@@ -45,6 +45,22 @@ public interface UiControllers {
         boolean puedeAvanzar(String userId, String contratacionId);
     }
 
+    interface CalificacionController {
+        Calificacion calificar(String userId, String contratacionId, int puntaje, String comentario);
+    }
+
+    /**
+     * Login simulado de la demostración local: los usuarios con los que se puede probar la demo y
+     * el que está activo. No es un controller ni autenticación real; no hay caso de uso detrás.
+     */
+    interface SesionDemo {
+        /** Perfiles activos guardados (los precargados y los que se registren), ordenados por nombre. */
+        List<UsuarioDemo> usuariosDisponibles();
+        String usuarioActual();
+        /** Cambia el usuario activo; tiene que ser uno de {@link #usuariosDisponibles()}. */
+        void cambiarUsuario(String userId);
+    }
+
     interface WalletController {
         int consultarSaldo(String userId);
         List<Movimiento> listarMovimientos(String userId);
@@ -60,11 +76,19 @@ public interface UiControllers {
     interface PerfilController {
         Perfil crearPerfil(String userId, NuevoPerfil datos);
         Perfil verPerfil(String userId);
+        /**
+         * Perfil público de cualquier usuario activo. No modifica información, así que no exige
+         * ser el usuario activo. {@code pagina} empieza en cero y pagina las publicaciones activas.
+         */
+        PerfilPublico verPerfilPublico(String perfilUserId, int pagina);
     }
 
     BusquedaController busqueda();
     PublicacionController publicaciones();
     ContratacionController contrataciones();
+    CalificacionController calificaciones();
+    /** Solo la composición de la demo tiene sesión; el Mock UI Kit no. */
+    default SesionDemo sesionDemo() { return null; }
     WalletController wallet();
     NotificacionController notificaciones();
     PerfilController perfiles();

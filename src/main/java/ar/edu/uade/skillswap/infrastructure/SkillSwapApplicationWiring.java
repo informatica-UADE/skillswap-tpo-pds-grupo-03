@@ -12,12 +12,14 @@ import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaBookingRep
 import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaNotificationRepository;
 import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaProfileRepository;
 import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaPublicationRepository;
+import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaPublicationQueryAdapter;
 import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaRatingRepository;
 import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaWalletRepository;
 import jakarta.persistence.EntityManagerFactory;
-import ar.edu.uade.skillswap.application.port.out.CurrentUserProvider;
+import ar.edu.uade.skillswap.application.port.in.PublicProfileUseCases;
 import ar.edu.uade.skillswap.application.port.out.ProfileRepository;
 import ar.edu.uade.skillswap.application.port.out.PublicationRepository;
+import ar.edu.uade.skillswap.application.port.out.PublicationQueryPort;
 import ar.edu.uade.skillswap.application.port.out.RatingRepository;
 import ar.edu.uade.skillswap.application.port.out.TransactionManager;
 import ar.edu.uade.skillswap.application.port.out.WalletRepository;
@@ -26,6 +28,7 @@ import ar.edu.uade.skillswap.application.service.DiscoveryApplicationService;
 import ar.edu.uade.skillswap.application.service.NotificationApplicationService;
 import ar.edu.uade.skillswap.application.service.ProfileApplicationService;
 import ar.edu.uade.skillswap.application.service.PublicationApplicationService;
+import ar.edu.uade.skillswap.application.service.PublicProfileFacade;
 import ar.edu.uade.skillswap.application.service.RatingApplicationService;
 import ar.edu.uade.skillswap.application.service.WalletApplicationService;
 import ar.edu.uade.skillswap.infrastructure.identity.IdentityProviderAdapter;
@@ -54,6 +57,8 @@ import java.util.UUID;
 
 /** Composition root shared by the in-memory demo and the JPA execution mode. */
 public final class SkillSwapApplicationWiring implements AutoCloseable {
+    private record InMemoryPublicationAdapters(InMemoryPublicationRepository repository) {}
+
     private final BookingRepository bookings;
     private final WalletRepository wallets;
     private final NotificationRepository notifications;
@@ -63,7 +68,8 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
     private final RatingRepository ratings;
     private final ProfileRepository profiles;
     private final PublicationRepository publications;
-    private final CurrentUserProvider currentUser;
+    private final PublicationQueryPort publicationQueries;
+    private final DemoCurrentUserProvider currentUser;
     private final TransactionManager transactions;
     private final Runnable closeResources;
     private final RecommendationStrategy recommendationStrategy = new SkillAffinityStrategy();
@@ -76,6 +82,7 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
     private final RatingApplicationService ratingService;
     private final WalletApplicationService walletService;
     private final NotificationApplicationService notificationService;
+    private final PublicProfileUseCases publicProfiles;
 
     public SkillSwapApplicationWiring() {
         this(new MockIdentityClient("user-mateo"), new MockEmailClient(), new MockPushClient());
@@ -89,10 +96,20 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
     public SkillSwapApplicationWiring(MockIdentityClient identityClient,
                                       MockEmailClient emailClient, MockPushClient pushClient,
                                       ProfileRepository profiles) {
-        this(identityClient, emailClient, pushClient, profiles,
-                new InMemoryPublicationRepository(profiles), new InMemoryBookingRepository(),
+        this(identityClient, emailClient, pushClient, profiles, inMemoryPublicationAdapters(profiles),
+                new InMemoryBookingRepository(),
                 new InMemoryWalletRepository(), new InMemoryRatingRepository(),
                 new InMemoryNotificationRepository(), new SynchronousTransactionManager(), () -> {});
+    }
+
+    private SkillSwapApplicationWiring(MockIdentityClient identityClient,
+            MockEmailClient emailClient, MockPushClient pushClient, ProfileRepository profiles,
+            InMemoryPublicationAdapters publicationAdapters, BookingRepository bookings,
+            WalletRepository wallets, RatingRepository ratings, NotificationRepository notifications,
+            TransactionManager transactions, Runnable closeResources) {
+        this(identityClient, emailClient, pushClient, profiles,
+                publicationAdapters.repository(), publicationAdapters.repository(),
+                bookings, wallets, ratings, notifications, transactions, closeResources);
     }
 
     /** Runs Flyway before Hibernate validates the database configured through the environment. */
@@ -110,6 +127,7 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
             var tx = new JpaTransactionManager(factory);
             return new SkillSwapApplicationWiring(identity, email, push,
                     new JpaProfileRepository(tx), new JpaPublicationRepository(tx),
+                    new JpaPublicationQueryAdapter(tx),
                     new JpaBookingRepository(tx), new JpaWalletRepository(tx),
                     new JpaRatingRepository(tx), new JpaNotificationRepository(tx), tx,
                     () -> { if (factory.isOpen()) factory.close(); });
@@ -121,33 +139,41 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
 
     private SkillSwapApplicationWiring(MockIdentityClient identityClient,
             MockEmailClient emailClient, MockPushClient pushClient, ProfileRepository profiles,
-            PublicationRepository publications, BookingRepository bookings, WalletRepository wallets,
+            PublicationRepository publications, PublicationQueryPort publicationQueries,
+            BookingRepository bookings, WalletRepository wallets,
             RatingRepository ratings, NotificationRepository notifications,
             TransactionManager transactions, Runnable closeResources) {
         this.profiles = Objects.requireNonNull(profiles);
         this.publications = Objects.requireNonNull(publications);
+        this.publicationQueries = Objects.requireNonNull(publicationQueries);
         this.bookings = Objects.requireNonNull(bookings);
         this.wallets = Objects.requireNonNull(wallets);
         this.ratings = Objects.requireNonNull(ratings);
         this.notifications = Objects.requireNonNull(notifications);
         this.transactions = Objects.requireNonNull(transactions);
         this.closeResources = Objects.requireNonNull(closeResources);
-        currentUser = new IdentityProviderAdapter(identityClient);
+        currentUser = new DemoCurrentUserProvider(new IdentityProviderAdapter(identityClient), profiles);
         NotificationFactory factory = new NotificationFactory(notifications, emailClient, pushClient);
         notificationObserver = new NotificationEventObserver(profiles, factory);
         ratingNotifications = new RatingNotificationEventPublisher(profiles, factory);
 
-        profileService = new ProfileApplicationService(profiles, currentUser, transactions);
+        profileService = new ProfileApplicationService(profiles, bookings, currentUser, transactions);
         publicationService = new PublicationApplicationService(publications, profiles, currentUser, transactions);
-        discoveryService = new DiscoveryApplicationService(publications, profiles, currentUser, recommendationStrategy);
-        bookingService = new BookingApplicationService(bookings, publications, wallets,
+        discoveryService = new DiscoveryApplicationService(
+                publications, publicationQueries, profiles, currentUser, recommendationStrategy);
+        bookingService = new BookingApplicationService(bookings, publications, profiles, wallets,
                 currentUser, transactions, refundPolicy, events);
         ratingService = new RatingApplicationService(bookings, ratings, profiles, currentUser, transactions, events);
         walletService = new WalletApplicationService(wallets, currentUser, transactions);
         notificationService = new NotificationApplicationService(notifications, currentUser, transactions);
+        publicProfiles = new PublicProfileFacade(profiles, publications, bookings, ratings, transactions);
 
         subscribeNotifications();
         transactions.required(() -> { seedDemoData(); return null; });
+    }
+
+    private static InMemoryPublicationAdapters inMemoryPublicationAdapters(ProfileRepository profiles) {
+        return new InMemoryPublicationAdapters(new InMemoryPublicationRepository(profiles));
     }
 
     @Override
@@ -267,7 +293,8 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
         publications.save(publication);
     }
 
-    public CurrentUserProvider currentUserProvider() {
+    /** Identidad de la demo: los casos de uso la leen como puerto y el login simulado la cambia. */
+    public DemoCurrentUserProvider currentUserProvider() {
         return currentUser;
     }
 
@@ -297,5 +324,9 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
 
     public RatingApplicationService ratingService() {
         return ratingService;
+    }
+
+    public PublicProfileUseCases publicProfiles() {
+        return publicProfiles;
     }
 }

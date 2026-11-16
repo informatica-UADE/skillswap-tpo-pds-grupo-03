@@ -44,4 +44,18 @@ jobs:
       - name: Run unit and real MySQL integration tests
         env:
           SKILLSWAP_MYSQL_TEST_URL: jdbc:mysql://127.0.0.1:${{ job.services.mysql.ports[3306] }}/?allowPublicKeyRetrieval=true&useSSL=false&connectionTimeZone=UTC
-        run: mvn --batch-mode --no-transfer-progress -Pmysql-it clean test
+        run: mvn --batch-mode --no-transfer-progress -Pmysql-it,coverage clean verify
+      - name: Summarize layer coverage
+        shell: pwsh
+        run: ./scripts/coverage-summary.ps1
+      - name: Publish tests and coverage
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tests-and-coverage
+          path: |
+            target/surefire-reports/
+            target/site/jacoco/
+            target/coverage-summary.json
+          if-no-files-found: warn
+          retention-days: 14

@@ -13,5 +13,8 @@ public interface ProfileRepository {
     /** Perfiles de varios usuarios en una única lectura (evita N+1); omite los usuarios sin perfil. */
     List<Profile> findByUserIds(Collection<String> userIds);
 
+    /** Perfiles activos ordenados por nombre visible; el login simulado de la demo los ofrece como usuarios. */
+    List<Profile> findActive();
+
     Profile save(Profile profile);
 }

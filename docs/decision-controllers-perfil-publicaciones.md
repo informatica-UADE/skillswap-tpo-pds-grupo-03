@@ -4,13 +4,14 @@
 
 `PerfilUiController` y `PublicacionUiController` implementan las interfaces Java de
 `UiControllers`. Reciben puertos de aplicación y la identidad activa por constructor.
-`WiredUiControllers` conserva la fachada que consume Swing y delega estas operaciones
-en los nuevos controllers.
+Desde #32 la vista los recibe directamente a través de `SkillSwapUiControllers`, sin una
+clase intermedia que delegue (ver [decisión de controllers](decision-controllers-ui.md)).
 
 | Operación de UI | Puerto de aplicación |
 | --- | --- |
 | `crearPerfil(userId, NuevoPerfil)` | `ProfileUseCases.register` |
 | `verPerfil(userId)` | `ProfileUseCases.viewMyProfile` |
+| `verPerfilPublico(perfilUserId, pagina)` | `PublicProfileUseCases.viewPublicProfile` (#40) |
 | `crearBorrador(userId, DatosBorrador)` | `PublicationUseCases.createDraft` |
 | `crearBorrador` con los parámetros del kit | `PublicationUseCases.createDraft` |
 | `editarBorrador(userId, publicacionId, EdicionBorrador)` | `PublicationUseCases.editDraft` |
@@ -46,8 +47,9 @@ de JPA, repositorios concretos ni clases de infraestructura.
 simples, enums y colecciones copiadas. `UiModelMapper` los convierte a comandos y
 transforma las respuestas del servicio. No se exponen entidades de dominio o JPA.
 
-El perfil usa un rol genérico y cero proyectos porque ese contador no existe en
-`ProfileView`. Para las publicaciones propias, `PublicationView` aporta el id del
+El rol se muestra según el tipo de actor y los proyectos son las contrataciones
+completadas que informa `ProfileView` (#40; ver
+[decisión del perfil público](decision-perfil-publico.md)). Para las publicaciones propias, `PublicationView` aporta el id del
 autor; la búsqueda y el enriquecimiento completo de tarjetas conservan su recorrido
 existente. Esta issue no incorpora nuevos campos al dominio.
 

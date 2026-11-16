@@ -6,7 +6,9 @@ import ar.edu.uade.skillswap.application.mapper.ProfileApplicationMapper;
 import ar.edu.uade.skillswap.application.model.ProfileData.ProfileView;
 import ar.edu.uade.skillswap.application.model.ProfileData.RegisterCommand;
 import ar.edu.uade.skillswap.application.model.ProfileData.UpdateCommand;
+import ar.edu.uade.skillswap.application.model.PublicProfileData.CompletedBookingsSummary;
 import ar.edu.uade.skillswap.application.port.in.ProfileUseCases;
+import ar.edu.uade.skillswap.application.port.out.BookingRepository;
 import ar.edu.uade.skillswap.application.port.out.CurrentUserProvider;
 import ar.edu.uade.skillswap.application.port.out.ProfileRepository;
 import ar.edu.uade.skillswap.application.port.out.TransactionManager;
@@ -16,12 +18,14 @@ import java.util.Objects;
 /** Orchestrates profile use cases while Profile owns its invariants. */
 public final class ProfileApplicationService implements ProfileUseCases {
     private final ProfileRepository profiles;
+    private final BookingRepository bookings;
     private final CurrentUserProvider currentUser;
     private final TransactionManager transactions;
 
-    public ProfileApplicationService(ProfileRepository profiles, CurrentUserProvider currentUser,
-                                     TransactionManager transactions) {
+    public ProfileApplicationService(ProfileRepository profiles, BookingRepository bookings,
+                                     CurrentUserProvider currentUser, TransactionManager transactions) {
         this.profiles = Objects.requireNonNull(profiles);
+        this.bookings = Objects.requireNonNull(bookings);
         this.currentUser = Objects.requireNonNull(currentUser);
         this.transactions = Objects.requireNonNull(transactions);
     }
@@ -38,7 +42,7 @@ public final class ProfileApplicationService implements ProfileUseCases {
             Profile profile = Profile.register(actor, command.actorType(), command.displayName(),
                     command.biography(), command.timeZone(), command.skills(), command.interests(),
                     command.notificationChannels(), ProfileApplicationMapper.toAvailabilitySlots(command.availability()));
-            return ProfileApplicationMapper.toView(profiles.save(profile));
+            return toView(profiles.save(profile));
         }));
     }
 
@@ -51,16 +55,15 @@ public final class ProfileApplicationService implements ProfileUseCases {
                     .orElseThrow(() -> notFound("No existe un perfil para el usuario autenticado"));
             profile.updateDetails(actor, command.displayName(), command.biography(), command.timeZone(),
                     command.skills(), command.interests());
-            return ProfileApplicationMapper.toView(profiles.save(profile));
+            return toView(profiles.save(profile));
         }));
     }
 
     @Override
     public ProfileView viewMyProfile() {
         String actor = UseCaseSupport.currentUserId(currentUser);
-        Profile profile = profiles.findByUserId(actor)
-                .orElseThrow(() -> notFound("No existe un perfil para el usuario autenticado"));
-        return ProfileApplicationMapper.toView(profile);
+        return transactions.required(() -> toView(profiles.findByUserId(actor)
+                .orElseThrow(() -> notFound("No existe un perfil para el usuario autenticado"))));
     }
 
     @Override
@@ -83,6 +86,13 @@ public final class ProfileApplicationService implements ProfileUseCases {
             profile.deactivate(actor);
             profiles.save(profile);
         }));
+    }
+
+    /** El historial completado se cuenta en la base, igual que en el perfil público. */
+    private ProfileView toView(Profile profile) {
+        String userId = profile.userId();
+        return ProfileApplicationMapper.toView(profile, new CompletedBookingsSummary(
+                bookings.countCompletedByProvider(userId), bookings.countCompletedByBuyer(userId)));
     }
 
     private static ApplicationException notFound(String message) {

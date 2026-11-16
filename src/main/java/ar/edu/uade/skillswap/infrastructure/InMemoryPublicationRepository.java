@@ -2,8 +2,12 @@ package ar.edu.uade.skillswap.infrastructure;
 
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchQuery;
 import ar.edu.uade.skillswap.application.model.PageResult;
+import ar.edu.uade.skillswap.application.model.PublicationData.PublicationView;
+import ar.edu.uade.skillswap.application.mapper.PublicationApplicationMapper;
 import ar.edu.uade.skillswap.application.port.out.ProfileRepository;
+import ar.edu.uade.skillswap.application.port.out.PublicationQueryPort;
 import ar.edu.uade.skillswap.application.port.out.PublicationRepository;
+import ar.edu.uade.skillswap.domain.model.AvailabilitySlot;
 import ar.edu.uade.skillswap.domain.model.Profile;
 import ar.edu.uade.skillswap.domain.model.Publication;
 import ar.edu.uade.skillswap.domain.model.PublicationStatus;
@@ -24,7 +28,7 @@ import java.util.stream.Collectors;
  * The search reads author profiles through the {@link ProfileRepository} port: it is the in-memory
  * equivalent of the join with the profiles table that the JPA query performs.
  */
-public final class InMemoryPublicationRepository implements PublicationRepository {
+public final class InMemoryPublicationRepository implements PublicationRepository, PublicationQueryPort {
     private final Map<String, Publication> publications = new HashMap<>();
     private final ProfileRepository profiles;
 
@@ -57,7 +61,23 @@ public final class InMemoryPublicationRepository implements PublicationRepositor
     }
 
     @Override
-    public PageResult<Publication> searchPublished(SearchQuery query) {
+    public PageResult<Publication> findPublishedByAuthor(String authorUserId, int page, int size) {
+        Objects.requireNonNull(authorUserId, "Falta el ID del autor");
+        if (page < 0 || size < 1) throw new IllegalArgumentException("La paginación es inválida");
+        List<Publication> active = publications.values().stream()
+                .filter(item -> item.authorUserId().equals(authorUserId))
+                .filter(item -> item.status() == PublicationStatus.PUBLISHED)
+                .sorted(Comparator.comparing(Publication::createdAt).reversed().thenComparing(Publication::id))
+                .toList();
+        List<Publication> items = active.stream()
+                .skip((long) page * size)
+                .limit(size)
+                .toList();
+        return new PageResult<>(items, page, size, active.size());
+    }
+
+    @Override
+    public PageResult<PublicationView> searchPublished(SearchQuery query) {
         Objects.requireNonNull(query, "Faltan los criterios de búsqueda");
         List<Publication> published = findPublished();
         Map<String, Profile> authors = profiles.findByUserIds(published.stream()
@@ -65,7 +85,6 @@ public final class InMemoryPublicationRepository implements PublicationRepositor
                         .collect(Collectors.toSet()))
                 .stream()
                 .collect(Collectors.toMap(Profile::userId, Function.identity()));
-
         List<Publication> matches = published.stream()
                 .filter(matches(query, authors))
                 .sorted(orderFor(query, authors))
@@ -73,7 +92,20 @@ public final class InMemoryPublicationRepository implements PublicationRepositor
 
         int from = Math.min(query.page() * query.size(), matches.size());
         int to = Math.min(from + query.size(), matches.size());
-        return new PageResult<>(matches.subList(from, to), query.page(), query.size(), matches.size());
+        List<PublicationView> views = matches.subList(from, to).stream()
+                .map(publication -> PublicationApplicationMapper.toView(
+                        publication, Objects.requireNonNull(authors.get(publication.authorUserId()))))
+                .toList();
+        return new PageResult<>(views, query.page(), query.size(), matches.size());
+    }
+
+    @Override
+    public List<String> categories() {
+        return findPublished().stream()
+                .map(Publication::category)
+                .distinct()
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .toList();
     }
 
     @Override
