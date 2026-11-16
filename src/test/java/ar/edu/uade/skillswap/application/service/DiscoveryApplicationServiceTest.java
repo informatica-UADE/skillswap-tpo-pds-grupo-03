@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import ar.edu.uade.skillswap.application.error.ApplicationErrorCode;
 import ar.edu.uade.skillswap.application.error.ApplicationException;
+import ar.edu.uade.skillswap.application.model.DiscoveryData.CategoryView;
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchOrder;
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchQuery;
 import ar.edu.uade.skillswap.application.model.PageResult;
@@ -16,6 +17,8 @@ import ar.edu.uade.skillswap.application.model.PublicationData.PublicationView;
 import ar.edu.uade.skillswap.application.port.out.ProfileRepository;
 import ar.edu.uade.skillswap.application.port.out.PublicationRepository;
 import ar.edu.uade.skillswap.application.port.out.PublicationQueryPort;
+import ar.edu.uade.skillswap.domain.catalog.CatalogCategory;
+import ar.edu.uade.skillswap.domain.catalog.CatalogSkill;
 import ar.edu.uade.skillswap.domain.model.ActorType;
 import ar.edu.uade.skillswap.domain.model.AvailabilitySlot;
 import ar.edu.uade.skillswap.domain.model.Modality;
@@ -37,6 +40,8 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 class DiscoveryApplicationServiceTest {
+    private static final FixedCatalog CATALOG = FixedCatalog.withRoots("Tecnología", "Diseño");
+
     @Test
     void delegaLaBusquedaSinModificarLosCriteriosYConservaLaPaginacion() {
         var publications = new StubPublications(List.of(), new PageResult<>(
@@ -117,7 +122,7 @@ class DiscoveryApplicationServiceTest {
         var page = new PageResult<>(List.of(view(publication("p1", "ana"), profile("ana", 0, 0))), 0, 20, 1);
         var repository = new StubPublications(List.of(), page);
         var service = new DiscoveryApplicationService(repository, repository,
-                new StubProfiles(List.of(profile("ana", 0, 0))), () -> null, strategyReturningFirst());
+                new StubProfiles(List.of(profile("ana", 0, 0))), CATALOG, () -> null, strategyReturningFirst());
 
         assertEquals(1, service.search(anyQuery()).totalElements());
     }
@@ -129,7 +134,7 @@ class DiscoveryApplicationServiceTest {
         var repository = new StubPublications(List.of(publication("Java", "provider-1")), emptyPage());
         var strategy = new CapturingStrategy();
         var profiles = new StubProfiles(List.of(profile, profile("provider-1", 4.2, 3)));
-        var service = new DiscoveryApplicationService(repository, repository, profiles, () -> "user-1", strategy);
+        var service = new DiscoveryApplicationService(repository, repository, profiles, CATALOG, () -> "user-1", strategy);
 
         List<PublicationView> result = service.recommend(3);
 
@@ -142,18 +147,34 @@ class DiscoveryApplicationServiceTest {
     }
 
     @Test
-    void listsDistinctPublishedCategoriesInStableOrder() {
-        var repository = new StubPublications(List.of(
-                publication("Java", "provider-1", "Tecnología"), publication("UX", "provider-1", "Diseño"),
-                publication("SQL", "provider-1", "Tecnología")), emptyPage());
-        var service = service(repository, new StubProfiles(List.of()));
+    void rechazaBuscarPorUnaCategoriaQueNoEstaEnElCatalogoSinConsultarPublicaciones() {
+        var publications = new StubPublications(List.of(), emptyPage());
+        var service = service(publications, new StubProfiles(List.of()));
+        var query = new SearchQuery(null, "Astrología", null, null, null, null, null, null, 0, 20);
 
-        assertEquals(List.of("Diseño", "Tecnología"), service.categories());
+        var error = assertThrows(ApplicationException.class, () -> service.search(query));
+
+        assertEquals(ApplicationErrorCode.VALIDATION, error.code());
+        assertNull(publications.receivedQuery);
+    }
+
+    @Test
+    void lasCategoriasSonLasDelCatalogoEnPreordenConSuProfundidadYSinHabilidades() {
+        var backend = new CatalogCategory("backend", "Backend").add(new CatalogSkill("java", "Java"));
+        var technology = new CatalogCategory("tecnologia", "Tecnología").add(backend)
+                .add(new CatalogSkill("carrera", "Carrera"));
+        var publications = new StubPublications(List.of(), emptyPage());
+        var service = new DiscoveryApplicationService(publications, publications, new StubProfiles(List.of()),
+                new FixedCatalog(technology, new CatalogCategory("diseno", "Diseño")), () -> null,
+                strategyReturningFirst());
+
+        assertEquals(List.of(new CategoryView("Tecnología", 0), new CategoryView("Backend", 1),
+                new CategoryView("Diseño", 0)), service.categories());
     }
 
     private static DiscoveryApplicationService service(StubPublications publications, ProfileRepository profiles) {
         return new DiscoveryApplicationService(
-                publications, publications, profiles, () -> "user-1", strategyReturningFirst());
+                publications, publications, profiles, CATALOG, () -> "user-1", strategyReturningFirst());
     }
 
     private static SearchQuery anyQuery() {
@@ -228,9 +249,6 @@ class DiscoveryApplicationServiceTest {
         @Override public PageResult<PublicationView> searchPublished(SearchQuery query) {
             receivedQuery = query;
             return searchResult;
-        }
-        @Override public List<String> categories() {
-            return published.stream().map(Publication::category).distinct().sorted().toList();
         }
         @Override public PageResult<Publication> findPublishedByAuthor(String authorUserId, int page, int size) {
             return new PageResult<>(List.of(), page, size, 0);

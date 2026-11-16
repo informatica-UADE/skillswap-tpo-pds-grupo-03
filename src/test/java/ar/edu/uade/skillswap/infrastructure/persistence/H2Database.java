@@ -1,9 +1,11 @@
 package ar.edu.uade.skillswap.infrastructure.persistence;
 
+import ar.edu.uade.skillswap.infrastructure.DemoCatalog;
 import ar.edu.uade.skillswap.infrastructure.SkillSwapApplicationWiring;
 import ar.edu.uade.skillswap.infrastructure.identity.MockIdentityClient;
 import ar.edu.uade.skillswap.infrastructure.notification.email.MockEmailClient;
 import ar.edu.uade.skillswap.infrastructure.notification.push.MockPushClient;
+import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaCatalogFixtures;
 import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.Persistence;
 
@@ -30,13 +32,23 @@ public final class H2Database {
                 "hibernate.show_sql", "false"));
     }
 
-    /** La aplicación completa, con los datos de demostración, sobre una base nueva. */
+    /**
+     * Base nueva con el catálogo de categorías de la demostración, que en MySQL carga la migración V6:
+     * sin él no se puede publicar ni buscar por categoría.
+     */
+    public static EntityManagerFactory factoryWithDemoCatalog(String name) {
+        EntityManagerFactory factory = factory(name);
+        JpaCatalogFixtures.persist(factory, DemoCatalog.tree());
+        return factory;
+    }
+
+    /** La aplicación completa, con el catálogo y los datos de demostración, sobre una base nueva. */
     public static SkillSwapApplicationWiring wiring() {
         return wiring(new MockIdentityClient("user-mateo"), new MockEmailClient(), new MockPushClient());
     }
 
     public static SkillSwapApplicationWiring wiring(MockIdentityClient identity, MockEmailClient email,
                                                     MockPushClient push) {
-        return SkillSwapApplicationWiring.usingJpa(factory("app"), identity, email, push);
+        return SkillSwapApplicationWiring.usingJpa(factoryWithDemoCatalog("app"), identity, email, push);
     }
 }

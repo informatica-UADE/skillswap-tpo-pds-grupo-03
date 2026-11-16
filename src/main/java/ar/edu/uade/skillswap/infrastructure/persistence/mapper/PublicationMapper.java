@@ -34,7 +34,7 @@ public final class PublicationMapper {
         entity.setType(publication.type().name());
         entity.setTitle(publication.title());
         entity.setDescription(publication.description());
-        entity.setCategory(publication.category());
+        entity.setCategory(categoryColumn(publication.category()));
         entity.setModality(publication.modality().name());
         entity.setDurationMinutes(publication.durationMinutes());
         entity.setCapacity(publication.capacity());
@@ -139,5 +139,13 @@ public final class PublicationMapper {
                 entity.getVersion(),
                 history
         );
+    }
+
+    /**
+     * Un borrador puede no tener categoría todavía. Se guarda como {@code NULL} porque la columna
+     * referencia al catálogo (#37) y una cadena vacía no es una categoría.
+     */
+    public static String categoryColumn(String category) {
+        return category == null || category.isBlank() ? null : category;
     }
 }

@@ -1,6 +1,7 @@
 package ar.edu.uade.skillswap.controllers.mapper;
 
 import ar.edu.uade.skillswap.application.model.BookingData.BookingView;
+import ar.edu.uade.skillswap.application.model.DiscoveryData.CategoryView;
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchOrder;
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchQuery;
 import ar.edu.uade.skillswap.application.model.NotificationData.NotificationView;
@@ -24,6 +25,7 @@ import ar.edu.uade.skillswap.application.model.ProfileData.RegisterCommand;
 import ar.edu.uade.skillswap.application.model.PublicationData.CreateDraftCommand;
 import ar.edu.uade.skillswap.application.model.PublicationData.EditDraftCommand;
 import ar.edu.uade.skillswap.domain.model.NotificationChannelType;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -135,6 +137,11 @@ public final class UiModelMapper {
     public Models.Perfil toPerfil(ProfileView view) {
         return new Models.Perfil(view.userId(), view.displayName(), toRol(view.actorType()), view.biography(),
                 view.skills(), view.reputation(), view.ratingCount(), total(view.completedBookings()));
+    }
+
+    /** Aplana el árbol del catálogo en preorden; las habilidades no son opciones de categoría. */
+    public List<Models.Categoria> toCategorias(List<CategoryView> categories) {
+        return categories.stream().map(category -> new Models.Categoria(category.name(), category.depth())).toList();
     }
 
     public PublicProfileQuery toPublicProfileQuery(String perfilUserId, int pagina) {

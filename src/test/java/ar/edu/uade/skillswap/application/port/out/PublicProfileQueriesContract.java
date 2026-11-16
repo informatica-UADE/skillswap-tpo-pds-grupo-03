@@ -140,7 +140,7 @@ public abstract class PublicProfileQueriesContract {
     private static Publication publication(String id, String author, PublicationState state, LocalDateTime created) {
         LocalDateTime startsAt = T0.plusDays(30);
         return new Publication(id, author, PublicationType.MENTORSHIP, "Mentoría " + id, "Sesión " + id,
-                "General", Modality.REMOTE, 60, 5, new SkillCoins(100), Set.of(),
+                "Productividad", Modality.REMOTE, 60, 5, new SkillCoins(100), Set.of(),
                 List.of(new AvailabilitySlot(slotOf(id), startsAt, startsAt.plusHours(1), 5, 0)),
                 state, created, 0, null, 0, List.of());
     }

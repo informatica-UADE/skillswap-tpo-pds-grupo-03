@@ -8,7 +8,7 @@ Revisión del 15/11/2026 para el PR #65, sobre main en e64048c (#63/#64 y #75 in
 
 La aplicación es una demo Java 17/Swing. Permite publicar, buscar y solicitar propuestas, aceptar, pagar con SkillCoins ficticios, iniciar, completar y calificar. El selector permite alternar entre Mateo, Ana y Lucía. Las identidades, email y push son simulados: no hay autenticación, envío externo ni pagos reales.
 
-La aplicación siempre persiste en MySQL con repositorios JPA: no hay un modo en memoria. Flyway aplica migraciones V1-V5 y Hibernate valida el esquema. Las pruebas usan los mismos repositorios JPA sobre H2 y, con el perfil mysql-it, sobre MySQL real. #75 distingue profesionales y organizaciones y exige tipos explícitos. La demo no agrega alta visual de organizaciones ni un desafío inicial, pendientes de sus tareas correspondientes.
+La aplicación siempre persiste en MySQL con repositorios JPA: no hay un modo en memoria. Flyway aplica migraciones V1-V6 y Hibernate valida el esquema. Las pruebas usan los mismos repositorios JPA sobre H2 y, con el perfil mysql-it, sobre MySQL real. #75 distingue profesionales y organizaciones y exige tipos explícitos. La demo no agrega alta visual de organizaciones ni un desafío inicial, pendientes de sus tareas correspondientes.
 
 ## 2. Capas y dependencias
 
@@ -47,13 +47,14 @@ El controller valida el usuario contra la identidad activa. Application/Domain c
 | Builder | PublicationBuilder reúne datos obligatorios/opcionales y construye un borrador válido con tipos explícitos. |
 | Decorator | Promociones fijas/porcentuales acumulables en domain/pricing, probadas a nivel de cotización. La contratación toma el precio base: no se afirma integración de promociones desde la UI. |
 | Facade | PublicProfileFacade implementa PublicProfileUseCases: una sola consulta arma el perfil público (§4.1) coordinando perfiles, publicaciones, contrataciones y calificaciones en una transacción de lectura. Solo compone; las reglas quedan en las entidades y las consultas. Decisión en decision-perfil-publico.md (#40). |
+| Composite | CatalogItem (componente), CatalogCategory (compuesto) y CatalogSkill (hoja) forman el catálogo jerárquico de categorías y habilidades. El mismo recorrido funciona para una hoja y para una rama; la categoría protege el árbol (un padre, sin ciclos, nombres únicos). Buscar por una categoría incluye toda su rama, resuelto en la consulta con la ruta materializada. Decisión en decision-catalogo-composite.md (#37). |
 | Singleton localizado | Los enums reutilizan estados inmutables. No hay un Singleton mutable de aplicación o sesión. |
 | Repository / DAO | Puertos y adaptadores aíslan almacenamiento. Patrón de acceso a datos, distinto del catálogo GoF. |
 | MVC / Controller | Swing presenta, controllers convierten/delegan y Application/Domain ejecutan. La fachada no justifica concentrar reglas de todas las áreas. |
 
 Agregar un canal modifica el enum y switch de Simple Factory, su adapter y configuración; los casos de uso conservan el contrato. No se afirma OCP sin modificaciones en toda la solución.
 
-Factory Method se descartó por ausencia de una variación de creación mediante subclases; ver decision-factory-method-vs-simple-factory.md. El nombre create o la ausencia de static no cambian esa clasificación. Abstract Factory no tiene una familia de productos relacionados que construir. Composite (#37) y la decisión formal de CQRS (#42) permanecen fuera de esta entrega.
+Factory Method se descartó por ausencia de una variación de creación mediante subclases; ver decision-factory-method-vs-simple-factory.md. El nombre create o la ausencia de static no cambian esa clasificación. Abstract Factory no tiene una familia de productos relacionados que construir. La decisión formal de CQRS (#42) permanece fuera de esta entrega.
 
 ## 5. GRASP y SOLID
 
@@ -63,7 +64,7 @@ SRP separa crear, adaptar, coordinar y persistir. DIP mantiene contratos interno
 
 ## 6. Persistencia y consistencia
 
-Flyway versiona esquema y restricciones: V2 conserva el mensaje opcional, V3 ordena el ledger, V4 adapta comparaciones de búsqueda y V5 agrega tipos. Hibernate usa validate.
+Flyway versiona esquema y restricciones: V2 conserva el mensaje opcional, V3 ordena el ledger, V4 adapta comparaciones de búsqueda, V5 agrega tipos y V6 crea el catálogo jerárquico con la clave foránea de la categoría de cada publicación. Hibernate usa validate.
 
 JpaTransactionManager comparte EntityManager, confirma o revierte y ejecuta callbacks después del commit. Los repositorios bloquean recursos para cupos, pagos y calificaciones; las billeteras se adquieren en orden estable. MySQL usa READ_COMMITTED. La búsqueda pagina/filtra en persistencia y completa autores por lotes.
 

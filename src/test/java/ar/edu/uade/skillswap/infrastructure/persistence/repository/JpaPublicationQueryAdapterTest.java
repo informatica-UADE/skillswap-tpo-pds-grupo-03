@@ -74,7 +74,6 @@ class JpaPublicationQueryAdapterTest {
             assertEquals(2, page.items().get(0).author().ratingCount());
             assertEquals(1, page.items().get(0).availability().size());
             assertEquals(2, page.items().get(0).availability().get(0).capacity());
-            assertEquals(List.of("Tecnología"), queries.categories());
         } finally {
             factory.close();
         }

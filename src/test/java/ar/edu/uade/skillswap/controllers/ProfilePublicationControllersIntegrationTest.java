@@ -10,6 +10,7 @@ import ar.edu.uade.skillswap.infrastructure.UiOperationExecutor;
 import ar.edu.uade.skillswap.infrastructure.persistence.H2Database;
 import ar.edu.uade.skillswap.infrastructure.persistence.JpaTransactionManager;
 import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaBookingRepository;
+import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaCatalogRepository;
 import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaProfileRepository;
 import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaPublicationQueryAdapter;
 import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaPublicationRepository;
@@ -30,9 +31,10 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Controllers, casos de uso y dominio reales sobre los repositorios JPA en una base H2. */
 class ProfilePublicationControllersIntegrationTest {
     private String actor = "u1";
-    private final EntityManagerFactory database = H2Database.factory("profile_publication");
+    private final EntityManagerFactory database = H2Database.factoryWithDemoCatalog("profile_publication");
     private final JpaTransactionManager transactions = new JpaTransactionManager(database);
     private final JpaProfileRepository profileRepository = new JpaProfileRepository(transactions);
+    private final JpaCatalogRepository catalogRepository = new JpaCatalogRepository(transactions);
     private final JpaPublicationRepository publicationRepository = new JpaPublicationRepository(transactions);
     private final JpaBookingRepository bookingRepository = new JpaBookingRepository(transactions);
     private final PerfilUiController profiles = new PerfilUiController(new ProfileApplicationService(
@@ -40,7 +42,7 @@ class ProfilePublicationControllersIntegrationTest {
             new PublicProfileFacade(profileRepository, publicationRepository, bookingRepository,
                     new JpaRatingRepository(transactions), transactions), () -> actor, new UiOperationExecutor());
     private final PublicationApplicationService publicationService = new PublicationApplicationService(
-            publicationRepository, profileRepository, () -> actor, transactions);
+            publicationRepository, profileRepository, catalogRepository, () -> actor, transactions);
     private final PublicacionUiController publications = new PublicacionUiController(
             publicationService, publicationService, () -> actor, new UiOperationExecutor());
 
@@ -68,7 +70,7 @@ class ProfilePublicationControllersIntegrationTest {
         assertCode(Models.CodigoError.PERMISOS, () -> publications.crearBorrador("u1", draft()));
         assertEquals(1, publications.listarPropias("u1").size());
         var catalog = new DiscoveryApplicationService(publicationRepository, new JpaPublicationQueryAdapter(transactions),
-                profileRepository, () -> actor, new RecentPopularityStrategy())
+                profileRepository, catalogRepository, () -> actor, new RecentPopularityStrategy())
                 .search(new SearchQuery("", null, null, null, null, null, null, null, 0, 20));
         assertTrue(catalog.items().stream().anyMatch(item -> item.id().equals(challenge.id())));
     }

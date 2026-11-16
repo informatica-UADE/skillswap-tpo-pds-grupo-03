@@ -19,7 +19,8 @@ package "Presentation" {
 package "Application" {
   package "Input ports" {
     interface ProfileUseCases
-    interface PublicationUseCases
+    interface PublicationCommandUseCases
+    interface PublicationQueryUseCases
     interface DiscoveryUseCases
     interface BookingUseCases
     interface WalletUseCases
@@ -42,6 +43,7 @@ package "Application" {
   package "Output ports" {
     interface ProfileRepository
     interface PublicationRepository
+    interface PublicationQueryPort
     interface BookingRepository
     interface WalletRepository
     interface RatingRepository
@@ -70,17 +72,21 @@ package "Domain" {
   interface RecommendationStrategy
   class PricingStrategies
   class StateImplementations
+  abstract class CatalogItem <<Composite: componente>>
+  class CatalogCategory <<Composite: compuesto>>
+  class CatalogSkill <<Composite: hoja>>
 }
 
 package "Infrastructure" {
   class SkillSwapApplicationWiring <<composition root>>
-  class WiredUiControllers <<presentation adapter>>
+  class SkillSwapUiControllers <<UI composition>>
   class BusquedaUiController
   class PerfilUiController
 
   package "JPA adapters" {
     class JpaProfileRepository
     class JpaPublicationRepository
+    class JpaPublicationQueryAdapter
     class JpaBookingRepository
     class JpaWalletRepository
     class JpaRatingRepository
@@ -106,13 +112,14 @@ package "Infrastructure" {
 }
 
 ' Input adapters expose UI contracts; application services implement input ports.
-WiredUiControllers ..|> UiControllers
-WiredUiControllers --> SkillSwapApplicationWiring
+SkillSwapUiControllers ..|> UiControllers
+SkillSwapUiControllers ..> SkillSwapApplicationWiring : from(wiring)
 BusquedaUiController --> DiscoveryApplicationService
 PerfilUiController --> PublicProfileUseCases
 
 ProfileUseCases <|.. ProfileApplicationService
-PublicationUseCases <|.. PublicationApplicationService
+PublicationCommandUseCases <|.. PublicationApplicationService
+PublicationQueryUseCases <|.. PublicationApplicationService
 DiscoveryUseCases <|.. DiscoveryApplicationService
 BookingUseCases <|.. BookingApplicationService
 WalletUseCases <|.. WalletApplicationService
@@ -131,11 +138,13 @@ PublicationApplicationService --> CurrentUserProvider
 PublicationApplicationService --> TransactionManager
 
 DiscoveryApplicationService --> PublicationRepository
+DiscoveryApplicationService --> PublicationQueryPort
 DiscoveryApplicationService --> ProfileRepository
 DiscoveryApplicationService --> CurrentUserProvider
 DiscoveryApplicationService --> RecommendationStrategy
 
 BookingApplicationService --> BookingRepository
+BookingApplicationService --> ProfileRepository
 BookingApplicationService --> PublicationRepository
 BookingApplicationService --> WalletRepository
 BookingApplicationService --> CurrentUserProvider
@@ -178,9 +187,15 @@ RatingApplicationService ..> Rating
 RatingApplicationService ..> Profile
 WalletApplicationService ..> Wallet
 
+' Catálogo jerárquico de categorías y habilidades (Composite, #37).
+CatalogCategory --|> CatalogItem
+CatalogSkill --|> CatalogItem
+CatalogCategory o--> "0..*" CatalogItem : contiene
+
 ' Infrastructure adapters implement application output ports.
 JpaProfileRepository ..|> ProfileRepository
 JpaPublicationRepository ..|> PublicationRepository
+JpaPublicationQueryAdapter ..|> PublicationQueryPort
 JpaBookingRepository ..|> BookingRepository
 JpaWalletRepository ..|> WalletRepository
 JpaRatingRepository ..|> RatingRepository
@@ -252,8 +267,8 @@ note bottom of UiControllers
 end note
 
 note bottom of PublicationRepository
-  searchPublished(SearchQuery): PageResult<Publication>
-  implementa búsqueda, filtros, orden y paginación (#16).
+  Los agregados se cargan y guardan por este puerto.
+  La búsqueda del catálogo usa PublicationQueryPort (#42).
   Se muestra como contexto del repositorio, no como
   parte de las entregas de dominio documentadas aparte.
 end note

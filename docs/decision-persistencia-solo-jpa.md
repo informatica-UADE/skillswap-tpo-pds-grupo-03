@@ -18,6 +18,7 @@ Eso traía tres problemas:
    - Las que no necesitan MySQL real corren sobre H2 en memoria, con una base nueva por prueba (`H2Database`, solo en `src/test`). Hibernate genera el esquema desde las entidades.
    - Lo propio de MySQL (migraciones de Flyway, colación sin acentos, bloqueos y concurrencia) sigue en las pruebas del perfil `mysql-it`.
 4. **Se elimina `InAppNotificationGateway`**, que no usaba nadie y dependía del repositorio en memoria de notificaciones.
+5. **El catálogo (#37) también queda solo en JPA.** Se eliminan `InMemoryCatalogRepository` y su test, y el filtro por rama queda únicamente en `JpaPublicationQueryAdapter`. `DemoCatalog` pasa a `src/test`: en MySQL el catálogo lo carga la migración V6, y en H2 (donde no corre Flyway) `H2Database.factoryWithDemoCatalog` guarda ese mismo árbol. `MySqlCatalogRepositoryTest` verifica que `DemoCatalog` y V6 no se separen.
 
 ## Lo que se mantiene
 
@@ -41,8 +42,9 @@ Eso traía tres problemas:
 | Domain y services (`*ApplicationServiceTest`, `DomainRulesTest`, etc.) | Ninguna, con dobles | Reglas de negocio y orquestación. Sin cambios. |
 | `SkillSwapUiControllersTest`, `SkillSwapViewTest`, `SkillSwapApplicationWiringTest`, `ProfilePublicationControllersIntegrationTest` | H2 | Controllers, casos de uso y repositorios JPA juntos, con los datos de demostración. |
 | `DemoCurrentUserProviderTest`, `NotificationEventObserverTest` | H2 | Identidad de la demo y notificaciones sobre los repositorios JPA. |
-| `JpaPublicProfileQueriesTest`, `JpaPublicationQueryAdapterTest`, `JpaBookingClientMessageTest` | H2 | Consultas y mapeos JPA. |
-| `MySqlPersistenceIntegrationTest`, `JpaPublicationSearchContractTest`, `MySqlPublicProfileQueriesTest` | MySQL (`mysql-it`) | Migraciones, búsqueda sin acentos, rollback, bloqueos y concurrencia. |
+| `JpaPublicProfileQueriesTest`, `JpaPublicationQueryAdapterTest`, `JpaBookingClientMessageTest`, `JpaCatalogRepositoryTest` | H2 | Consultas y mapeos JPA. |
+| `NuevaPublicacionFormTest` | H2 | El formulario crea, publica y encuentra una publicación con la aplicación completa. |
+| `MySqlPersistenceIntegrationTest`, `JpaPublicationSearchContractTest`, `MySqlPublicProfileQueriesTest`, `MySqlCatalogRepositoryTest` | MySQL (`mysql-it`) | Migraciones, búsqueda sin acentos, rollback, bloqueos y concurrencia. |
 
 Al eliminar la versión en memoria, el contrato de búsqueda (`PublicationSearchContract`) corre solo contra MySQL, porque depende de la colación de la base. `mvn test` sin perfil ya no lo ejecuta; lo ejecuta el CI, que corre `mysql-it`.
 

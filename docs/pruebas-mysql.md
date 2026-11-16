@@ -16,6 +16,7 @@ Se verifican:
 - Pagos de contrataciones distintas sobre la misma billetera con fondos para una sola: no hay doble gasto.
 - Filtros por texto, categoría, modalidad, precio y reputación; conteo total, orden por precio, páginas sucesivas sin duplicados y página fuera de rango. Desempate por ID cuando precio y fecha son idénticos.
 - Orden por reputación del autor antes de la fecha, con paginación y filtro mínimo de reputación.
+- Catálogo jerárquico (#37, `MySqlCatalogRepositoryTest`): el árbol que carga V6 coincide con `DemoCatalog`; los nombres se comparan sin acentos; la clave foránea rechaza una categoría que no está en el catálogo y acepta `NULL` en un borrador; la actualización desde V5 conserva las categorías anteriores como raíces y deja en `NULL` los borradores sin categoría. El filtro por rama se verifica con `PublicationSearchContract` sobre MySQL.
 - Registro, consulta, actualización de habilidades/intereses, preferencias y disponibilidad, baja lógica y reactivación de perfiles.
 - Calificación persistida, actualización de reputación, rollback conjunto y unicidad por contratación/autor, comprobada en Application y directamente en MySQL. Las calificaciones duplicadas simultáneas también se verifican tres veces.
 - Bandejas de notificaciones por destinatario, lectura individual y masiva, permisos y rollback.
