@@ -1,112 +1,119 @@
-# SkillSwap - informe de decisiones de diseño
+# SkillSwap - informe de diseño e integración
 
-**Trabajo Práctico Final - Proceso de Desarrollo de Software**<br>
-Tecnicatura en Desarrollo de Software<br>
-Corte revisado: `main` en `36b07b0`, 26/10/2026. Los cambios de este informe y del modelo se proponen en un PR separado.
+Trabajo Práctico Final - Proceso de Desarrollo de Software. Grupo 03.
 
-## 1. Objetivo y alcance
+Revisión del 15/11/2026 para el PR #65, sobre main en e64048c (#63/#64 y #75 integrados). Este informe documenta el código y la validación de la rama; no certifica funcionalidades de otros issues abiertos. Los diagramas y el PDF histórico que los contiene permanecen intactos. La versión actual sin UML se entrega en output/pdf/informe-diseno-actualizado.pdf.
 
-SkillSwap es un marketplace académico de mentorías. Este informe explica la ubicación de responsabilidades, las reglas que se protegen en el dominio y los patrones que ya tienen un caso concreto. El proyecto ejecutable que existe hoy es un Mock UI Kit de escritorio. Los contratos de Application y el modelo de dominio están integrados, pero los services de casos de uso, los repositorios JPA y la integración real de Presentation todavía no.
+## 1. Alcance ejecutable
 
-El informe no presenta el diseño futuro como funcionalidad terminada. Las decisiones se contrastan con el código disponible en el corte indicado.
+La aplicación es una demo Java 17/Swing. Permite publicar, buscar y solicitar propuestas, aceptar, pagar con SkillCoins ficticios, iniciar, completar y calificar. El selector permite alternar entre Mateo, Ana y Lucía. Las identidades, email y push son simulados: no hay autenticación, envío externo ni pagos reales.
 
-## 2. Arquitectura por capas
+La aplicación siempre persiste en MySQL con repositorios JPA: no hay un modo en memoria. Flyway aplica migraciones V1-V6 y Hibernate valida el esquema. Las pruebas usan los mismos repositorios JPA sobre H2 y, con el perfil mysql-it, sobre MySQL real. #75 distingue profesionales y organizaciones y exige tipos explícitos. La demo no agrega alta visual de organizaciones ni un desafío inicial, pendientes de sus tareas correspondientes.
 
-| Capa | Responsabilidad | Evidencia y límite actual |
-| --- | --- | --- |
-| Presentation | Recibir acciones del usuario, convertir formatos de interfaz y delegar. | `ui/SkillSwapView`, `controllers/UiControllers` y `mock/MockSkillSwapControllers`; el controlador actual es un mock. |
-| Application | Exponer puertos de entrada/salida y coordinar un caso de uso, seguridad del actor, transacciones y colaboraciones. | Hay contratos y modelos bajo `application/`. Los services concretos todavía no están implementados. |
-| Domain | Proteger invariantes del negocio mediante agregados, value objects, estados y políticas. | `domain/model`, `domain/state`, `domain/policy` y `domain/pricing`; no depende de framework o almacenamiento. |
-| Infrastructure | Implementar persistencia, transacciones, migraciones y clientes externos requeridos por los puertos. | Hibernate, MySQL y Flyway aparecen como dependencias previstas; los adapters concretos siguen pendientes. |
+## 2. Capas y dependencias
 
-La dirección de dependencia entra hacia el dominio: Presentation consume puertos de entrada de Application; un service implementa esos casos y depende de puertos de salida; Infrastructure implementa esos puertos. La configuración externa ensambla las implementaciones. Domain no conoce controllers, services, repositorios concretos, DTOs, JPA/Hibernate ni APIs externas.
+| Capa | Responsabilidad y evidencia |
+| --- | --- |
+| Presentation | SkillSwapView, UiControllers y controllers de búsqueda, perfil, publicaciones, contratación y calificación. Convierten datos y delegan. PresentationException y UiActionHandler muestran errores estables. |
+| Application | Servicios por capacidad, puertos y comandos/resultados. Identifican al actor, coordinan agregados, transacciones y eventos. No importan Swing ni JPA. |
+| Domain | Profile, Publication, Booking, Wallet, Rating, estados, políticas, Builder y cotizaciones. Conserva invariantes y depende de Java estándar. |
+| Infrastructure | Repositorios JPA, mappers, migraciones, transacciones y adapters. Implementa los puertos internos. |
+| Composición | SkillSwapApplicationWiring selecciona implementaciones. SkillSwapUiControllers (#32) arma un controller por pantalla (búsqueda, publicaciones, contrataciones, calificaciones, billetera, notificaciones y perfil) y la vista habla con cada uno; no delega métodos ni tiene lógica. La sesión demo no es un controller: DemoCurrentUserProvider es la identidad activa y lista los perfiles activos de la base para cambiar de usuario. |
 
-### Responsabilidad de los futuros services
+Las entidades JPA no atraviesan los puertos. Los resultados de Application y DTOs de UI contienen datos, enums y colecciones copiadas. PresentationContractsTest comprueba que los controllers dedicados no expongan entidades ni dependan de persistencia.
 
-Los contratos actuales son `ProfileUseCases`, `PublicationUseCases`, `DiscoveryUseCases`, `BookingUseCases`, `WalletUseCases`, `RatingUseCases` y `NotificationUseCases`. Las implementaciones deben seguir esa separación de capacidades.
+## 3. Responsabilidades del negocio
 
-| Service | Orquestación a su cargo | Regla que permanece en Domain |
-| --- | --- | --- |
-| ProfileService | Identificar al actor, cargar/guardar perfil y proyectar `ProfileView`. | Titularidad, perfil activo, campos, disponibilidad y reputación derivada. |
-| PublicationService | Crear/cargar/guardar publicaciones y convertir comandos/resultados. | Edición de borrador, permisos, disponibilidad y transiciones de estado. |
-| DiscoveryService | Validar contexto, consultar resultados paginados y aplicar recomendación elegida. | Criterios de recomendación delegados a `RecommendationStrategy`. |
-| BookingService | En una transacción, verificar actor, reservar franja, cambiar wallet y persistir el booking. | Participantes, transiciones, pago permitido, cancelación, reintegro y reprogramación. |
-| WalletService | Leer la billetera del usuario autenticado y mapear el resultado. | Reglas de saldo, monto y registro de movimientos. |
-| RatingService | Verificar unicidad con el repositorio, cargar booking/perfil y actualizar datos relacionados atómica y consistentemente. | Contratación completada, autor participante, puntaje y promedio del perfil. |
-| NotificationService | Consultar/actualizar bandeja y despachar notificación/eventos mediante puertos. | Preferencias y tipos de canal permanecen en el modelo de negocio. |
+| Componente | Regla o coordinación |
+| --- | --- |
+| Profile | Titularidad, actividad, habilidades/intereses y reputación derivada. Tipo de actor fijo al registrar. |
+| Publication | Autoría, borrador, estados y disponibilidad. ActorType valida el tipo elegido. |
+| Booking | Participantes, transiciones, mensaje, objetivo y franja independientes; reprogramación e historial. Cada transición tiene su actor: el proveedor acepta, rechaza e inicia; el cliente paga y completa (#32). |
+| Wallet / SkillCoins | Montos, saldo y ledger. Application coordina transferencias entre billeteras. |
+| Rating | Contratación completada, participantes y puntaje. Application y una restricción persistente protegen unicidad. |
+| Servicios | Cargan mediante puertos, delegan reglas, guardan resultados y publican eventos después del commit. |
 
-Un service no repite validaciones que ya protegen las entidades ni concentra reglas de todos los agregados. Sus transacciones y repositorios son puertos; JPA, locks y APIs externas no se filtran al dominio.
+El controller valida el usuario contra la identidad activa. Application/Domain conservan la autorización sobre recursos. El selector demo no sustituye estas reglas ni sirve como autenticación de producción.
 
-## 3. Expertos de información y reglas de negocio
+## 4. Patrones implementados
 
-| Tipo del dominio | Regla que conoce/protege | Colaboración principal |
-| --- | --- | --- |
-| `Profile` | Solo su titular activo puede modificar el perfil; normaliza habilidades/intereses; administra preferencias y disponibilidad; calcula reputación a partir de calificaciones recibidas. | `AvailabilitySlot`, `Rating`. |
-| `AvailabilitySlot` | Valida intervalo y capacidad; calcula lugares restantes. | `Publication` y reserva de `Booking`. |
-| `Publication` | Protege el borrador, publicación/pausa/cierre, permisos del autor, disponibilidad y solicitud de reserva. | `PublicationState`, `AvailabilitySlot`, `SkillCoins`. |
-| `PublicationBuilder` | Acumula los datos necesarios y produce un borrador válido. | Crea `Publication` y disponibilidad asociada. |
-| `Booking` | Verifica participantes, transiciones permitidas, pago, cancelación, reintegro y acuerdo de ambas partes para reprogramar; conserva historial. | `BookingState`, `Publication`, `StatusHistoryEntry`, `SkillCoins`. |
-| `Wallet` y `SkillCoins` | Evitan montos/saldos inválidos y representan créditos, débitos y movimientos. | `LedgerEntry`; Application coordina cambios de dos billeteras en una transacción. |
-| `Rating` | Solo permite calificar una contratación completada y por uno de sus participantes; valida el puntaje. | `Booking`, `Profile`. La unicidad persistente se coordina fuera de la entidad. |
-| `PriceQuote` y políticas | Calculan una cotización con promociones; `RefundPolicy` calcula reintegros según su regla. | `PriceDecorator`, promociones y estrategias de reintegro. |
+| Patrón | Implementación y justificación |
+| --- | --- |
+| Adapter | IdentityProviderAdapter convierte la respuesta externa a currentUserId(). Email/Push traducen NotificationMessage a clientes mock; InApp adapta el envío al guardado. Aísla contratos mediante composición. |
+| Simple Factory | NotificationFactory.create(channel) selecciona Email, Push o InApp y devuelve NotificationGateway. Centraliza creación. Es una técnica creacional, fuera de los 23 patrones GoF. |
+| Observer | InMemoryDomainEventPublisher registra suscriptores. Eventos de contratación/calificación activan notificaciones. Es síncrono y en memoria, sin entrega durable. |
+| Strategy | RecommendationStrategy: afinidad/popularidad. RefundPolicy: estándar/flexible. El wiring elige afinidad y estándar; las alternativas están probadas, no seleccionadas por una pantalla. |
+| State | BookingStates y PublicationStates determinan transiciones válidas; el agregado cambia estado y conserva historial. |
+| Builder | PublicationBuilder reúne datos obligatorios/opcionales y construye un borrador válido con tipos explícitos. |
+| Decorator | Promociones fijas/porcentuales acumulables en domain/pricing, probadas a nivel de cotización. La contratación toma el precio base: no se afirma integración de promociones desde la UI. |
+| Facade | PublicProfileFacade implementa PublicProfileUseCases: una sola consulta arma el perfil público (§4.1) coordinando perfiles, publicaciones, contrataciones y calificaciones en una transacción de lectura. Solo compone; las reglas quedan en las entidades y las consultas. Decisión en decision-perfil-publico.md (#40). |
+| Composite | CatalogItem (componente), CatalogCategory (compuesto) y CatalogSkill (hoja) forman el catálogo jerárquico de categorías y habilidades. El mismo recorrido funciona para una hoja y para una rama; la categoría protege el árbol (un padre, sin ciclos, nombres únicos). Buscar por una categoría incluye toda su rama, resuelto en la consulta con la ruta materializada. Decisión en decision-catalogo-composite.md (#37). |
+| Singleton localizado | Los enums reutilizan estados inmutables. No hay un Singleton mutable de aplicación o sesión. |
+| Repository / DAO | Puertos y adaptadores aíslan almacenamiento. Patrón de acceso a datos, distinto del catálogo GoF. |
+| MVC / Controller | Swing presenta, controllers convierten/delegan y Application/Domain ejecutan. La fachada no justifica concentrar reglas de todas las áreas. |
 
-Esta asignación sigue Information Expert: la entidad que tiene la información valida sus propios invariantes. El caso de uso puede combinar entidades y fuentes, pero no sustituir ese conocimiento.
+Agregar un canal modifica el enum y switch de Simple Factory, su adapter y configuración; los casos de uso conservan el contrato. No se afirma OCP sin modificaciones en toda la solución.
 
-## 4. Patrones con necesidad concreta
+Factory Method se descartó por ausencia de una variación de creación mediante subclases; ver decision-factory-method-vs-simple-factory.md. El nombre create o la ausencia de static no cambian esa clasificación. Abstract Factory no tiene una familia de productos relacionados que construir. La decisión formal de CQRS (#42) permanece fuera de esta entrega.
 
-| Patrón | Necesidad y colaboración | Evidencia en `main` |
-| --- | --- | --- |
-| Strategy | Cambia el algoritmo de recomendación o política de reintegro sin cambiar su consumidor. | `RecommendationStrategy` con afinidad/popularidad; `RefundPolicy` con reglas estándar/flexible; `DomainRulesTest`. |
-| State | El conjunto de acciones permitidas depende del estado de una publicación o contratación. | `PublicationState` / `BookingState`, implementaciones en `PublicationStates` / `BookingStates` y pruebas de transiciones. |
-| Builder | Una publicación tiene datos obligatorios y opcionales y se debe construir solo cuando está completa. | `PublicationBuilder` y `PublicationBuilderTest`. |
-| Decorator | Una cotización recibe promociones acumulables sin alterar el cálculo del precio base. | `PriceQuote`, `PriceDecorator`, `FixedAmountPromotion`, `PercentagePromotion`, `PromotionDecoratorTest`. |
+## 5. GRASP y SOLID
 
-Estos cuatro patrones GoF están implementados y probados en el alcance actual, cumpliendo el mínimo de la consigna. El `Singleton` existe de forma localizada en enums de estado: cada estado es una instancia inmutable. No se agrega un Singleton mutable de aplicación.
+Information Expert ubica reglas en quien conoce los datos. Creator aparece en métodos de creación y Builder. Controller recibe acciones. Polymorphism se aplica a State, Strategy y cotizaciones. Low Coupling, Indirection y Protected Variations se apoyan en puertos/adapters. Pure Fabrication ubica mappers/transacciones fuera del dominio. High Cohesion exige separar capacidades.
 
-### Patrones registrados sin implementación artificial
+SRP separa crear, adaptar, coordinar y persistir. DIP mantiene contratos internos independientes. ISP agrupa capacidades. OCP/LSP permiten sustituir estrategias/adapters respetando contratos, con el compromiso explícito de la fábrica. #32 separó billetera y notificaciones en controllers propios, dejó la sesión demo como contexto de identidad y eliminó la clase que concentraba todas las pantallas; no se declara una aplicación perfecta de todos los principios.
 
-- **Adapter:** todavía no hay SDK/proveedor externo incompatible que adaptar. `NotificationGateway` y `CurrentUserProvider` son puertos requeridos por Application; cuando se incorpore un proveedor concreto, un adapter en Infrastructure traducirá su interfaz. Un puerto no es, por sí solo, un Adapter.
-- **Observer:** `DomainEventPublisher` solo define un puerto. El patrón requiere suscriptores y notificación desacoplada a varios interesados; eso aún no está implementado.
-- **Simple Factory / Factory Method / Abstract Factory:** no hay aún una selección real de canales ni una familia de proveedores que justifique fábricas. Reconsiderar cuando haya variantes concretas, no crear capas de construcción vacías.
-- **Composite:** no hay una jerarquía de categorías/habilidades compuestas que se recorra uniformemente.
-- **Facade:** no hay una consulta integrada sobre varias fuentes que necesite simplificarse.
-- **MVC:** el Mock UI Kit separa vista, contrato de controller y mock. Falta su controller real hacia los casos de uso.
-- **Repository / DAO:** están los contratos de repositorio en Application; JPA/DAO concretos y sus pruebas están pendientes. DAO se registra como técnica de acceso a datos, no como GoF.
-- **CQRS:** los puertos separan capacidades y nombran comandos/consultas, pero aún no existe una separacion formal de modelos de lectura/escritura o de almacenamientos.
+## 6. Persistencia y consistencia
 
-## 5. GRASP, SOLID y decisiones de colaboración
+Flyway versiona esquema y restricciones: V2 conserva el mensaje opcional, V3 ordena el ledger, V4 adapta comparaciones de búsqueda, V5 agrega tipos y V6 crea el catálogo jerárquico con la clave foránea de la categoría de cada publicación. Hibernate usa validate.
 
-- **Creator:** `Profile.register`, `Publication.draft`, `Booking.request` y `Wallet.open` construyen objetos desde la información que requieren; `PublicationBuilder` maneja su construcción gradual.
-- **Controller:** el controller de Presentation recibe la acción del usuario y delega; el mock actual solo permite demostrar el flujo simulado.
-- **Polymorphism:** State, Strategy y Decorator varian comportamiento mediante contratos.
-- **Low Coupling / Protected Variations:** la UI conoce un contrato; Application publica puertos; el dominio depende de Java estándar. Cambiar MySQL o un proveedor no debería cambiar las entidades.
-- **High Cohesion:** cada agregado protege reglas de un área; cada puerto agrupa capacidades relacionadas; mappers y adaptadores quedan fuera de las entidades.
-- **Single Responsibility:** entidades, contratos, services, controllers y adapters tienen responsabilidades diferentes. Un service coordina, no hace persistencia directamente ni contiene todas las reglas.
-- **Open/Closed y Liskov:** nuevas estrategias, estados o promociones deben cumplir su contrato y poder agregarse sin invalidar consumidores existentes; las pruebas de dominio cubren las variantes actuales.
-- **Interface Segregation:** los puertos se separan por área funcional en lugar de un `SkillSwapService` con todas las operaciones.
-- **Dependency Inversion:** Application declara interfaces que necesita; Infrastructure debe implementarlas y depender hacia adentro. El wiring concreto sigue pendiente.
+JpaTransactionManager comparte EntityManager, confirma o revierte y ejecuta callbacks después del commit. Los repositorios bloquean recursos para cupos, pagos y calificaciones; las billeteras se adquieren en orden estable. MySQL usa READ_COMMITTED. La búsqueda pagina/filtra en persistencia y completa autores por lotes.
 
-Los DTOs/modelos de Application (`ProfileData`, `BookingData`, etc.) son distintos de las entidades; la presentación debe recibir modelos de respuesta y nunca la entidad de dominio directamente. Los controllers convierten y delegan; las implementaciones JPA traducen entre persistencia y agregados. No se ubican DTOs dentro de entidades ni dependencias de framework en Domain.
+Los repositorios en memoria y SynchronousTransactionManager se eliminaron: no aportaban rollback ni garantías de concurrencia y duplicaban cada consulta con una segunda implementación que había que mantener igual a la de JPA. JPA conserva datos y el seed evita duplicados.
 
-## 6. Riesgos y trabajo pendiente
+El pago de main transfiere directamente al proveedor. No existe custodia ni liberación al completar. Esta diferencia respecto del criterio de #19 es una brecha de negocio preexistente, fuera de la integración #65, que se debe resolver por separado. El guion ya no describe una custodia inexistente. Preparar este PR no certifica terminado todo el proyecto.
 
-1. Implementar services de Application y probar orquestación mediante puertos simulados.
-2. Implementar repositorios y mapeos JPA, esquema y migraciones MySQL/Flyway.
-3. Definir transacciones y lectura/bloqueo para evitar dos reservas de la última franja, doble pago y calificaciones duplicadas.
-4. Conectar controllers reales al Mock UI Kit, manteniendo las conversiones fuera del dominio.
-5. Agregar pruebas de persistencia e integración y generar un reporte de cobertura reproducible.
-6. Revisar Adapter, Observer y fábricas solo cuando se elija un proveedor o flujo que demuestre su necesidad.
+## 7. Correcciones encontradas al probar Swing
 
-## 7. Guía breve para la defensa oral
+BorderLayout colocaba texto y estado de una contratación en la misma región; la etiqueta tapaba título, contraparte, objetivo y mensaje. Ahora el estado integra el panel de texto y los datos permanecen visibles.
 
-**¿Por qué no se valida todo en el service?** Porque las invariantes pertenecen a las entidades que tienen esos datos. El service coordina el caso de uso y delega el cambio al agregado.
+BookingView incorpora el título que Application obtiene desde la publicación. Presentation deja de depender de una caché de búsquedas; cambiar de usuario o crear otra fachada conserva el título. La contraparte se calcula con la identidad activa, sin fijar Mateo.
 
-**¿Qué está completo y qué no?** El dominio y los puertos/modelos de Application; el ejecutable sigue siendo una demo en memoria. No se presenta JPA ni los services concretos como implementados.
+SkillSwapViewTest reproduce el problema de layout y verifica dimensiones visibles. SkillSwapUiControllersTest comprueba título sin caché y contraparte desde ambos participantes. Se mantienen permisos, saldo, unicidad, tipos y paginación. No se editaron diagramas.
 
-**¿Por qué usar Strategy?** Recomendación y reintegro tienen reglas alternativas reales, seleccionables por el consumidor sin modificar la entidad.
+## 8. Cobertura reproducible
 
-**¿Por qué State?** Cada estado permite un conjunto distinto de transiciones; cada clase de estado responde si la acción es válida y `Booking`/`Publication` mantiene su estado e historial.
+JaCoCo 0.8.16 se activa con el perfil coverage. Para el objetivo de #33 se exige al menos 80% de líneas en Domain y 80% en Application por separado. No se excluyen clases de esas capas para mejorar resultados. Las ramas se informan como métrica adicional.
 
-**¿Por qué no se implementó Adapter/Observer?** No hay proveedor externo con interfaz incompatible ni despacho a suscriptores reales. Los puertos preparan el límite, pero no justifican afirmar que el patrón ya está aplicado.
+| Capa | Líneas cubiertas / total | Líneas | Ramas |
+| --- | --- | --- | --- |
+| Domain | 658 / 720 | 91,39% | 248 / 374 = 66,31% |
+| Application | 534 / 627 | 85,17% | 120 / 194 = 61,86% |
 
-**¿Cómo se evita devolver entidades a la UI?** Los puertos de entrada usan modelos de Application como `BookingView` y `PublicationView`; el controller convierte solicitudes y respuestas. El PDF adjunta 22 diagramas UML editables desde `docs/modelo-skill-swap.mdj`; muestran contratos existentes y no inventan implementaciones pendientes.
+Son resultados locales sin MySQL, suficientes para superar el umbral. mysql-it agrega las pruebas reales; consultar los checks de cada SHA. La cobertura no demuestra ausencia de errores ni ejercicio de todas las ramas.
+
+Comandos reproducibles:
+
+- mvn -Pcoverage clean verify
+- powershell -File scripts/coverage-summary.ps1
+- mvn -Pmysql-it,coverage clean verify (con las variables de pruebas documentadas)
+
+HTML/XML: target/site/jacoco. Resumen: target/coverage-summary.json. Evidencia de esta revisión: docs/evidencia/pr65/cobertura-local.json. Maven falla si alguna de las dos capas baja del 80% de líneas. GitHub ejecuta pruebas y cobertura juntos.
+
+## 9. Validación y entrega
+
+La suite local ejecuta 224 pruebas correctamente y omite explícitamente 39 de MySQL sin el perfil: 263 detectadas, cero fallos y errores. La suite real cubre migraciones, round-trip, rollback, carreras de último cupo/doble pago/calificación y reinicio, más el recorrido mediante controllers. Los checks del PR registran el resultado exacto de la cabeza final.
+
+El recorrido interactivo se registra en validacion-visual-pr65.md con capturas de publicación, solicitud, saldo, finalización y calificación. Usa datos ficticios y memoria; no se presenta como recorrido visual sobre MySQL ni prueba de carga. El flujo JPA equivalente se verifica automáticamente.
+
+Este Markdown es fuente del PDF actualizado, generado con scripts/generar-informe.py. Los .mdj, .puml y el PDF histórico con diagramas permanecen intactos. La revisión humana de la cabeza final corresponde a la persona revisora; no se fabrica ni se sustituye.
+
+## 10. Referencias y trazabilidad
+
+- #65 / #33: integración, sesión demo, calificación, pruebas y entrega.
+- #63/#64: controllers dedicados integrados en la base.
+- #75: profesionales/organizaciones y tipos explícitos.
+- #25 / #41: Adapter, Simple Factory y decisión de Factory Method.
+- #19, #32, #37, #40, #42: diferencias o tareas del equipo que este PR no cierra.
+- JaCoCo: https://www.jacoco.org/jacoco/trunk/doc/maven.html
+- Umbrales: https://www.jacoco.org/jacoco/trunk/doc/check-mojo.html
+- Repositorio: https://github.com/informatica-UADE/skillswap-tpo-pds-grupo-03

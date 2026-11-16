@@ -1,7 +1,5 @@
 package ar.edu.uade.skillswap.infrastructure.persistence.repository;
 
-import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchOrder;
-import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchQuery;
 import ar.edu.uade.skillswap.application.model.PageResult;
 import ar.edu.uade.skillswap.application.port.out.PublicationRepository;
 import ar.edu.uade.skillswap.domain.model.AvailabilitySlot;
@@ -9,7 +7,6 @@ import ar.edu.uade.skillswap.domain.model.Publication;
 import ar.edu.uade.skillswap.domain.model.StatusHistoryEntry;
 import ar.edu.uade.skillswap.infrastructure.persistence.JpaRepositorySupport;
 import ar.edu.uade.skillswap.infrastructure.persistence.JpaTransactionManager;
-import ar.edu.uade.skillswap.infrastructure.persistence.entity.ProfileEntity;
 import ar.edu.uade.skillswap.infrastructure.persistence.entity.PublicationAvailabilityEntity;
 import ar.edu.uade.skillswap.infrastructure.persistence.entity.PublicationEntity;
 import ar.edu.uade.skillswap.infrastructure.persistence.entity.PublicationStatusHistoryEntity;
@@ -17,16 +14,8 @@ import ar.edu.uade.skillswap.infrastructure.persistence.entity.PublicationTagEnt
 import ar.edu.uade.skillswap.infrastructure.persistence.mapper.PublicationMapper;
 
 import jakarta.persistence.LockModeType;
-import jakarta.persistence.criteria.CriteriaBuilder;
-import jakarta.persistence.criteria.CriteriaQuery;
-import jakarta.persistence.criteria.Predicate;
-import jakarta.persistence.criteria.Root;
-
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -105,156 +94,43 @@ public final class JpaPublicationRepository extends JpaRepositorySupport
     }
 
     @Override
-    public PageResult<Publication> searchPublished(SearchQuery search) {
-        Objects.requireNonNull(search, "Faltan los criterios de búsqueda");
+    public PageResult<Publication> findPublishedByAuthor(String authorUserId, int page, int size) {
+        Objects.requireNonNull(authorUserId, "Falta el ID del autor");
+        requireValidPage(page, size);
 
         return query(em -> {
-            CriteriaBuilder cb = em.getCriteriaBuilder();
-
-            CriteriaQuery<PublicationEntity> resultQuery =
-                    cb.createQuery(PublicationEntity.class);
-            Root<PublicationEntity> publication =
-                    resultQuery.from(PublicationEntity.class);
-            Root<ProfileEntity> author = resultQuery.from(ProfileEntity.class);
-            Predicate[] predicates = buildPredicates(
-                    cb, resultQuery, publication, author, search);
-            resultQuery.select(publication)
-                    .where(predicates)
-                    .orderBy(orderBy(cb, publication, author, search.order()));
-
-            int firstResult = Math.multiplyExact(
-                    search.page(), search.size());
-
-            List<Publication> items = em.createQuery(resultQuery)
-                    .setFirstResult(firstResult)
-                    .setMaxResults(search.size())
+            List<Publication> items = em.createQuery(
+                            "SELECT p FROM PublicationEntity p "
+                                    + "WHERE p.authorUserId = :author AND p.status = :status "
+                                    + "ORDER BY p.createdAt DESC, p.id ASC",
+                            PublicationEntity.class)
+                    .setParameter("author", authorUserId)
+                    .setParameter("status", "PUBLISHED")
+                    .setFirstResult(Math.multiplyExact(page, size))
+                    .setMaxResults(size)
                     .getResultList()
                     .stream()
                     .map(PublicationMapper::toDomain)
                     .toList();
 
-            CriteriaQuery<Long> countQuery = cb.createQuery(Long.class);
-            Root<PublicationEntity> countRoot =
-                    countQuery.from(PublicationEntity.class);
-            Root<ProfileEntity> countAuthor = countQuery.from(ProfileEntity.class);
+            long total = em.createQuery(
+                            "SELECT COUNT(p) FROM PublicationEntity p "
+                                    + "WHERE p.authorUserId = :author AND p.status = :status",
+                            Long.class)
+                    .setParameter("author", authorUserId)
+                    .setParameter("status", "PUBLISHED")
+                    .getSingleResult();
 
-            countQuery.select(cb.countDistinct(countRoot))
-                    .where(buildPredicates(
-                            cb, countQuery, countRoot, countAuthor, search));
-
-            long total = em.createQuery(countQuery).getSingleResult();
-
-            return new PageResult<>(
-                    items, search.page(), search.size(), total);
+            return new PageResult<>(items, page, size, total);
         });
     }
 
-    private Predicate[] buildPredicates(
-            CriteriaBuilder cb,
-            CriteriaQuery<?> criteria,
-            Root<PublicationEntity> publication,
-            Root<ProfileEntity> author,
-            SearchQuery search) {
-
-        List<Predicate> predicates = new ArrayList<>();
-
-        predicates.add(cb.equal(publication.get("status"), "PUBLISHED"));
-        predicates.add(cb.equal(author.get("userId"), publication.get("authorUserId")));
-        predicates.add(cb.isTrue(author.get("active")));
-
-        if (!search.text().isBlank()) {
-            String pattern = containsPattern(search.text());
-            var tagMatches = criteria.subquery(Integer.class);
-            Root<PublicationTagEntity> tag = tagMatches.from(PublicationTagEntity.class);
-            tagMatches.select(cb.literal(1)).where(
-                    cb.equal(tag.get("publication").get("id"), publication.get("id")),
-                    cb.like(cb.lower(tag.get("id").get("tag")), pattern, '\\'));
-
-            predicates.add(cb.or(
-                    cb.like(cb.lower(publication.get("title")), pattern, '\\'),
-                    cb.like(cb.lower(publication.get("description")), pattern, '\\'),
-                    cb.like(cb.lower(publication.get("category")), pattern, '\\'),
-                    cb.exists(tagMatches)
-            ));
+    private static void requireValidPage(int page, int size) {
+        if (page < 0 || size < 1) {
+            throw new IllegalArgumentException("La paginación es inválida");
         }
-
-        if (search.category() != null && !search.category().isBlank()) {
-            predicates.add(cb.equal(
-                    cb.lower(publication.get("category")),
-                    search.category().toLowerCase(Locale.ROOT)));
-        }
-
-        if (search.modality() != null) {
-            predicates.add(cb.equal(
-                    publication.get("modality"),
-                    search.modality().name()));
-        }
-
-        if (search.minimumPrice() != null) {
-            predicates.add(cb.greaterThanOrEqualTo(
-                    publication.<Integer>get("basePrice"),
-                    search.minimumPrice()));
-        }
-
-        if (search.maximumPrice() != null) {
-            predicates.add(cb.lessThanOrEqualTo(
-                    publication.<Integer>get("basePrice"),
-                    search.maximumPrice()));
-        }
-
-        if (search.skill() != null && !search.skill().isBlank()) {
-            var skillMatches = criteria.subquery(Integer.class);
-            Root<PublicationTagEntity> tag = skillMatches.from(PublicationTagEntity.class);
-            skillMatches.select(cb.literal(1)).where(
-                    cb.equal(tag.get("publication").get("id"), publication.get("id")),
-                    cb.equal(cb.lower(tag.get("id").get("tag")),
-                            search.skill().toLowerCase(Locale.ROOT)));
-            predicates.add(cb.exists(skillMatches));
-        }
-
-        if (search.minimumReputation() != null) {
-            predicates.add(cb.greaterThanOrEqualTo(
-                    author.<java.math.BigDecimal>get("reputation"),
-                    java.math.BigDecimal.valueOf(search.minimumReputation())));
-        }
-
-        return predicates.toArray(Predicate[]::new);
     }
 
-    private List<jakarta.persistence.criteria.Order> orderBy(
-            CriteriaBuilder cb,
-            Root<PublicationEntity> publication,
-            Root<ProfileEntity> author,
-            SearchOrder order) {
-
-        List<jakarta.persistence.criteria.Order> orders = new ArrayList<>(switch (order) {
-            case LOWEST_PRICE -> List.of(
-                    cb.asc(publication.get("basePrice")),
-                    cb.desc(publication.get("createdAt")));
-            case MOST_RECENT -> List.of(
-                    cb.desc(publication.get("createdAt")));
-            case BEST_RATING -> List.of(
-                    cb.desc(author.get("reputation")),
-                    cb.desc(author.get("ratingCount")),
-                    cb.desc(publication.get("createdAt")));
-            case RELEVANCE -> List.of(
-                    cb.desc(publication.get("requestCount")),
-                    cb.desc(publication.get("createdAt")));
-        });
-        // A unique final key keeps page boundaries stable when prices/dates tie.
-        orders.add(cb.asc(publication.get("id")));
-        return orders;
-    }
-
-    private static String containsPattern(String value) {
-        String escaped = value.toLowerCase(Locale.ROOT)
-                .replace("\\", "\\\\")
-                .replace("%", "\\%")
-                .replace("_", "\\_");
-        return "%" + escaped + "%";
-    }
-
-    @Override
     public Publication save(Publication publication) {
         Objects.requireNonNull(publication, "Falta la publicación");
 
@@ -271,9 +147,10 @@ public final class JpaPublicationRepository extends JpaRepositorySupport
         }
 
         managed.setAuthorUserId(publication.authorUserId());
+        managed.setType(publication.type().name());
         managed.setTitle(publication.title());
         managed.setDescription(publication.description());
-        managed.setCategory(publication.category());
+        managed.setCategory(PublicationMapper.categoryColumn(publication.category()));
         managed.setModality(publication.modality().name());
         managed.setDurationMinutes(publication.durationMinutes());
         managed.setCapacity(publication.capacity());

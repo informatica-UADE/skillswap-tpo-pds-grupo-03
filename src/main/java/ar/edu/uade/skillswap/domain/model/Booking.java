@@ -134,14 +134,16 @@ public final class Booking {
         state.pay(this);
     }
 
+    /** Inicia la sesión quien la da: el proveedor. */
     public void start(String actor) {
-        requireParticipant(actor);
+        requireActor(actor, providerUserId);
         if (proposedSlotId != null) throw new IllegalStateException("No se puede iniciar con una reprogramación pendiente");
         transition(state.start(this), actor, "Sesión iniciada");
     }
 
+    /** Completa el cliente: confirma que recibió el servicio, y eso habilita las calificaciones. */
     public void complete(String actor) {
-        requireParticipant(actor);
+        requireActor(actor, buyerUserId);
         transition(state.complete(this), actor, "Sesión completada");
     }
 

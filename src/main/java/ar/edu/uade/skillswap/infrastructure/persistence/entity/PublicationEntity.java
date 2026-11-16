@@ -24,13 +24,16 @@ public class PublicationEntity {
     @Column(name = "author_user_id", length = 100, nullable = false)
     private String authorUserId;
 
+    @Column(name = "publication_type", length = 20, nullable = false)
+    private String type;
+
     @Column(name = "title", length = 200, nullable = false)
     private String title;
 
     @Column(name = "description", columnDefinition = "TEXT", nullable = false)
     private String description;
 
-    @Column(name = "category", length = 150, nullable = false)
+    @Column(name = "category", length = 150)
     private String category;
 
     @Column(name = "modality", length = 20, nullable = false)
@@ -94,6 +97,10 @@ public class PublicationEntity {
 
     public String getAuthorUserId() {
         return authorUserId;
+    }
+
+    public String getType() {
+        return type;
     }
 
     public String getTitle() {
@@ -162,6 +169,10 @@ public class PublicationEntity {
 
     public void setAuthorUserId(String authorUserId) {
         this.authorUserId = authorUserId;
+    }
+
+    public void setType(String type) {
+        this.type = type;
     }
 
     public void setTitle(String title) {

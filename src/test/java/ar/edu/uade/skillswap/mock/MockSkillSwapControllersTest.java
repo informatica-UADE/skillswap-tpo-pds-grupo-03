@@ -1,8 +1,12 @@
 package ar.edu.uade.skillswap.mock;
 
+import ar.edu.uade.skillswap.model.Models.EstadoPublicacion;
 import ar.edu.uade.skillswap.model.Models.FiltrosBusqueda;
 import ar.edu.uade.skillswap.model.Models.EstadoContratacion;
+import ar.edu.uade.skillswap.model.Models.Modalidad;
 import ar.edu.uade.skillswap.model.Models.Publicacion;
+import ar.edu.uade.skillswap.model.Models.TipoPublicacion;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
@@ -15,12 +19,13 @@ class MockSkillSwapControllersTest {
         var controllers = new MockSkillSwapControllers();
         var profile = controllers.perfiles().crearPerfil("nuevo-usuario",
                 new ar.edu.uade.skillswap.model.Models.NuevoPerfil("Julieta", "Bio", "UTC",
-                        java.util.List.of("Java"), java.util.List.of(), java.util.Set.of(), java.util.List.of()));
+                        java.util.List.of("Java"), java.util.List.of(), java.util.Set.of(), java.util.List.of(),
+                        ar.edu.uade.skillswap.model.Models.TipoActor.PROFESIONAL));
         assertEquals(profile, controllers.perfiles().verPerfil("nuevo-usuario"));
         var draft = controllers.publicaciones().crearBorrador("nuevo-usuario",
                 new ar.edu.uade.skillswap.model.Models.DatosBorrador("Java", "Mentoría", "Tecnología",
                         ar.edu.uade.skillswap.model.Models.Modalidad.REMOTA, 60, 2, 100,
-                        java.util.List.of("Java"), java.util.List.of()));
+                        java.util.List.of("Java"), java.util.List.of(), TipoPublicacion.MENTORIA));
         var edited = controllers.publicaciones().editarBorrador("nuevo-usuario", draft.id(),
                 new ar.edu.uade.skillswap.model.Models.EdicionBorrador("Java avanzado", "Bio", "Tecnología",
                         ar.edu.uade.skillswap.model.Models.Modalidad.HIBRIDA, 60, 2, java.util.List.of("OO")));
@@ -37,6 +42,22 @@ class MockSkillSwapControllersTest {
 
         assertFalse(resultados.isEmpty());
         assertTrue(resultados.stream().anyMatch(p -> p.titulo().contains("Arquitectura")));
+    }
+
+    @Test
+    void ofreceLosTiposDelProfesionalYConservaElTipoElegido() {
+        var controllers = new MockSkillSwapControllers();
+
+        assertEquals(List.of(TipoPublicacion.MENTORIA, TipoPublicacion.SERVICIO),
+                controllers.publicaciones().tiposPublicacion("user-mateo"));
+        var draft = controllers.publicaciones().crearBorrador("user-mateo", "Revisión de CV", "Correcciones",
+                "Tecnología", Modalidad.REMOTA, 60, 90, TipoPublicacion.SERVICIO);
+        var published = controllers.publicaciones().cambiarEstado("user-mateo", draft.id(),
+                EstadoPublicacion.PUBLICADA);
+
+        assertEquals(TipoPublicacion.SERVICIO, published.tipo());
+        assertThrows(IllegalArgumentException.class, () -> controllers.publicaciones().crearBorrador("user-mateo",
+                "Hackatón", "Desafío", "Tecnología", Modalidad.REMOTA, 60, 90, TipoPublicacion.DESAFIO));
     }
 
     @Test

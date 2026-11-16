@@ -5,7 +5,8 @@ import ar.edu.uade.skillswap.application.error.ApplicationException;
 import ar.edu.uade.skillswap.application.model.ProfileData.AvailabilityInput;
 import ar.edu.uade.skillswap.application.model.ProfileData.AvailabilityView;
 import ar.edu.uade.skillswap.application.model.PublicationData.*;
-import ar.edu.uade.skillswap.application.port.in.PublicationUseCases;
+import ar.edu.uade.skillswap.application.port.in.PublicationCommandUseCases;
+import ar.edu.uade.skillswap.application.port.in.PublicationQueryUseCases;
 import ar.edu.uade.skillswap.controllers.error.PresentationException;
 import ar.edu.uade.skillswap.domain.model.Modality;
 import ar.edu.uade.skillswap.domain.model.PublicationStatus;
@@ -22,7 +23,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PublicacionUiControllerTest {
     private final PublicationSpy service = new PublicationSpy();
-    private final PublicacionUiController controller = new PublicacionUiController(service, () -> "u1", new UiOperationExecutor());
+    private final PublicacionUiController controller =
+            new PublicacionUiController(service, service, () -> "u1", new UiOperationExecutor());
     private final LocalDateTime start = LocalDateTime.of(2026, 11, 4, 15, 0);
 
     @Test
@@ -31,7 +33,7 @@ class PublicacionUiControllerTest {
 
         assertEquals(new CreateDraftCommand("Java", "Mentoría", "Tecnología", Modality.HYBRID,
                 60, 3, 120, Set.of("Java"), List.of(new AvailabilityInput("slot", start,
-                start.plusHours(1), 3))), service.create);
+                start.plusHours(1), 3)), ar.edu.uade.skillswap.domain.model.PublicationType.MENTORSHIP), service.create);
         assertEquals(1, service.calls);
         assertEquals("p1", result.id());
         assertEquals("Resultado del servicio", result.titulo());
@@ -44,7 +46,7 @@ class PublicacionUiControllerTest {
 
     @Test
     void conservaLaFirmaQueUsaLaPantallaYAgregaUnaFranjaDemo() {
-        controller.crearBorrador("u1", "Java", "Mentoría", "Tecnología", Models.Modalidad.REMOTA, 45, 80);
+        controller.crearBorrador("u1", "Java", "Mentoría", "Tecnología", Models.Modalidad.REMOTA, 45, 80, Models.TipoPublicacion.MENTORIA);
         assertEquals(1, service.calls);
         assertEquals(6, service.create.capacity());
         assertEquals(80, service.create.priceInSkillCoins());
@@ -85,7 +87,7 @@ class PublicacionUiControllerTest {
 
     @Test
     void rechazaIdentidadAusenteEnTodasLasOperaciones() {
-        var anonymous = new PublicacionUiController(service, () -> null, new UiOperationExecutor());
+        var anonymous = new PublicacionUiController(service, service, () -> null, new UiOperationExecutor());
         for (Supplier<?> action : actions(anonymous, "u1")) {
             assertCode(Models.CodigoError.NO_AUTENTICADO, action);
         }
@@ -115,14 +117,15 @@ class PublicacionUiControllerTest {
 
     private List<Supplier<?>> actions(PublicacionUiController target, String user) {
         return List.of(() -> target.listarPropias(user), () -> target.crearBorrador(user, input()),
-                () -> target.crearBorrador(user, "Java", "Mentoría", "Tecnología", Models.Modalidad.REMOTA, 60, 80),
+                () -> target.crearBorrador(user, "Java", "Mentoría", "Tecnología", Models.Modalidad.REMOTA, 60, 80, Models.TipoPublicacion.MENTORIA),
+                () -> target.tiposPublicacion(user),
                 () -> target.editarBorrador(user, "p1", edition()),
                 () -> target.cambiarEstado(user, "p1", Models.EstadoPublicacion.PUBLICADA));
     }
 
     private Models.DatosBorrador input() {
         return new Models.DatosBorrador("Java", "Mentoría", "Tecnología", Models.Modalidad.HIBRIDA,
-                60, 3, 120, List.of("Java"), List.of(new Models.Disponibilidad("slot", start, start.plusHours(1), 3)));
+                60, 3, 120, List.of("Java"), List.of(new Models.Disponibilidad("slot", start, start.plusHours(1), 3)), Models.TipoPublicacion.MENTORIA);
     }
 
     private Models.EdicionBorrador edition() {
@@ -134,7 +137,7 @@ class PublicacionUiControllerTest {
         assertEquals(code, assertThrows(PresentationException.class, action::get).error().codigo());
     }
 
-    private class PublicationSpy implements PublicationUseCases {
+    private class PublicationSpy implements PublicationCommandUseCases, PublicationQueryUseCases {
         private CreateDraftCommand create;
         private EditDraftCommand edit;
         private ChangeStatusCommand change;
@@ -151,10 +154,16 @@ class PublicacionUiControllerTest {
             change = command; return view();
         }
         @Override public List<PublicationView> listMyPublications() { return List.of(view()); }
+        @Override public List<ar.edu.uade.skillswap.domain.model.PublicationType> allowedPublicationTypes() {
+            calls++;
+            return List.of(ar.edu.uade.skillswap.domain.model.PublicationType.MENTORSHIP,
+                    ar.edu.uade.skillswap.domain.model.PublicationType.SERVICE);
+        }
         private PublicationView view() {
             calls++;
             if (failure != null) throw failure;
-            return new PublicationView("p1", "u1", "Resultado del servicio", "Descripción", "Tecnología",
+            return new PublicationView("p1", "u1", ar.edu.uade.skillswap.domain.model.PublicationType.MENTORSHIP,
+                    "Resultado del servicio", "Descripción", "Tecnología",
                     Modality.IN_PERSON, 60, 3, 120, Set.of("Java"), PublicationStatus.DRAFT,
                     List.of(new AvailabilityView("slot", start, start.plusHours(1), 3, 1)), start, 0,
                     new AuthorView("u1", "Julieta", 4.2, 5));

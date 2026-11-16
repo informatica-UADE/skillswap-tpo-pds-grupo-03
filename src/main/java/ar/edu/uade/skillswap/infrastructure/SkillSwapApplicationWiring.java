@@ -1,21 +1,27 @@
 package ar.edu.uade.skillswap.infrastructure;
 
 import ar.edu.uade.skillswap.application.port.out.BookingRepository;
+import ar.edu.uade.skillswap.application.port.out.CatalogRepository;
 import ar.edu.uade.skillswap.application.model.NotificationMessage;
 import ar.edu.uade.skillswap.application.port.out.NotificationRepository;
+import ar.edu.uade.skillswap.domain.model.ActorType;
+import ar.edu.uade.skillswap.domain.model.PublicationType;
 import ar.edu.uade.skillswap.infrastructure.config.FlywayConfig;
 import ar.edu.uade.skillswap.infrastructure.config.HibernateConfig;
 import ar.edu.uade.skillswap.infrastructure.persistence.JpaTransactionManager;
 import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaBookingRepository;
+import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaCatalogRepository;
 import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaNotificationRepository;
 import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaProfileRepository;
 import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaPublicationRepository;
+import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaPublicationQueryAdapter;
 import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaRatingRepository;
 import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaWalletRepository;
 import jakarta.persistence.EntityManagerFactory;
-import ar.edu.uade.skillswap.application.port.out.CurrentUserProvider;
+import ar.edu.uade.skillswap.application.port.in.PublicProfileUseCases;
 import ar.edu.uade.skillswap.application.port.out.ProfileRepository;
 import ar.edu.uade.skillswap.application.port.out.PublicationRepository;
+import ar.edu.uade.skillswap.application.port.out.PublicationQueryPort;
 import ar.edu.uade.skillswap.application.port.out.RatingRepository;
 import ar.edu.uade.skillswap.application.port.out.TransactionManager;
 import ar.edu.uade.skillswap.application.port.out.WalletRepository;
@@ -24,6 +30,7 @@ import ar.edu.uade.skillswap.application.service.DiscoveryApplicationService;
 import ar.edu.uade.skillswap.application.service.NotificationApplicationService;
 import ar.edu.uade.skillswap.application.service.ProfileApplicationService;
 import ar.edu.uade.skillswap.application.service.PublicationApplicationService;
+import ar.edu.uade.skillswap.application.service.PublicProfileFacade;
 import ar.edu.uade.skillswap.application.service.RatingApplicationService;
 import ar.edu.uade.skillswap.application.service.WalletApplicationService;
 import ar.edu.uade.skillswap.infrastructure.identity.IdentityProviderAdapter;
@@ -50,7 +57,10 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
-/** Composition root shared by the in-memory demo and the JPA execution mode. */
+/**
+ * Punto de composición: arma los casos de uso sobre los repositorios JPA. La aplicación usa MySQL
+ * ({@link #persistent()}); las pruebas pasan su propia fábrica ({@link #usingJpa}).
+ */
 public final class SkillSwapApplicationWiring implements AutoCloseable {
     private final BookingRepository bookings;
     private final WalletRepository wallets;
@@ -61,7 +71,8 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
     private final RatingRepository ratings;
     private final ProfileRepository profiles;
     private final PublicationRepository publications;
-    private final CurrentUserProvider currentUser;
+    private final PublicationQueryPort publicationQueries;
+    private final DemoCurrentUserProvider currentUser;
     private final TransactionManager transactions;
     private final Runnable closeResources;
     private final RecommendationStrategy recommendationStrategy = new SkillAffinityStrategy();
@@ -74,40 +85,27 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
     private final RatingApplicationService ratingService;
     private final WalletApplicationService walletService;
     private final NotificationApplicationService notificationService;
+    private final PublicProfileUseCases publicProfiles;
 
-    public SkillSwapApplicationWiring() {
-        this(new MockIdentityClient("user-mateo"), new MockEmailClient(), new MockPushClient());
-    }
-
-    public SkillSwapApplicationWiring(MockIdentityClient identityClient,
-                                      MockEmailClient emailClient, MockPushClient pushClient) {
-        this(identityClient, emailClient, pushClient, new InMemoryProfileRepository());
-    }
-
-    public SkillSwapApplicationWiring(MockIdentityClient identityClient,
-                                      MockEmailClient emailClient, MockPushClient pushClient,
-                                      ProfileRepository profiles) {
-        this(identityClient, emailClient, pushClient, profiles,
-                new InMemoryPublicationRepository(profiles), new InMemoryBookingRepository(),
-                new InMemoryWalletRepository(), new InMemoryRatingRepository(),
-                new InMemoryNotificationRepository(), new SynchronousTransactionManager(), () -> {});
-    }
-
-    /** Runs Flyway before Hibernate validates the database configured through the environment. */
+    /**
+     * Arma la aplicación sobre la base MySQL configurada en las variables de entorno: Flyway aplica
+     * las migraciones antes de que Hibernate valide el esquema.
+     */
     public static SkillSwapApplicationWiring persistent() {
         FlywayConfig.migrate();
         return usingJpa(HibernateConfig.createEntityManagerFactory(),
                 new MockIdentityClient("user-mateo"), new MockEmailClient(), new MockPushClient());
     }
 
-    /** Takes ownership of the factory; close the wiring to release its connections. */
+    /** Toma la fábrica JPA y la cierra junto con la wiring, liberando sus conexiones. */
     public static SkillSwapApplicationWiring usingJpa(EntityManagerFactory factory,
             MockIdentityClient identity, MockEmailClient email, MockPushClient push) {
         Objects.requireNonNull(factory, "Falta la fábrica JPA");
         try {
             var tx = new JpaTransactionManager(factory);
             return new SkillSwapApplicationWiring(identity, email, push,
-                    new JpaProfileRepository(tx), new JpaPublicationRepository(tx),
+                    new JpaProfileRepository(tx), new JpaCatalogRepository(tx),
+                    new JpaPublicationRepository(tx), new JpaPublicationQueryAdapter(tx),
                     new JpaBookingRepository(tx), new JpaWalletRepository(tx),
                     new JpaRatingRepository(tx), new JpaNotificationRepository(tx), tx,
                     () -> { if (factory.isOpen()) factory.close(); });
@@ -119,30 +117,36 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
 
     private SkillSwapApplicationWiring(MockIdentityClient identityClient,
             MockEmailClient emailClient, MockPushClient pushClient, ProfileRepository profiles,
-            PublicationRepository publications, BookingRepository bookings, WalletRepository wallets,
+            CatalogRepository catalog, PublicationRepository publications, PublicationQueryPort publicationQueries,
+            BookingRepository bookings, WalletRepository wallets,
             RatingRepository ratings, NotificationRepository notifications,
             TransactionManager transactions, Runnable closeResources) {
         this.profiles = Objects.requireNonNull(profiles);
+        Objects.requireNonNull(catalog);
         this.publications = Objects.requireNonNull(publications);
+        this.publicationQueries = Objects.requireNonNull(publicationQueries);
         this.bookings = Objects.requireNonNull(bookings);
         this.wallets = Objects.requireNonNull(wallets);
         this.ratings = Objects.requireNonNull(ratings);
         this.notifications = Objects.requireNonNull(notifications);
         this.transactions = Objects.requireNonNull(transactions);
         this.closeResources = Objects.requireNonNull(closeResources);
-        currentUser = new IdentityProviderAdapter(identityClient);
+        currentUser = new DemoCurrentUserProvider(new IdentityProviderAdapter(identityClient), profiles);
         NotificationFactory factory = new NotificationFactory(notifications, emailClient, pushClient);
         notificationObserver = new NotificationEventObserver(profiles, factory);
         ratingNotifications = new RatingNotificationEventPublisher(profiles, factory);
 
-        profileService = new ProfileApplicationService(profiles, currentUser, transactions);
-        publicationService = new PublicationApplicationService(publications, profiles, currentUser, transactions);
-        discoveryService = new DiscoveryApplicationService(publications, profiles, currentUser, recommendationStrategy);
-        bookingService = new BookingApplicationService(bookings, publications, wallets,
+        profileService = new ProfileApplicationService(profiles, bookings, currentUser, transactions);
+        publicationService = new PublicationApplicationService(publications, profiles, catalog, currentUser,
+                transactions);
+        discoveryService = new DiscoveryApplicationService(
+                publications, publicationQueries, profiles, catalog, currentUser, recommendationStrategy);
+        bookingService = new BookingApplicationService(bookings, publications, profiles, wallets,
                 currentUser, transactions, refundPolicy, events);
         ratingService = new RatingApplicationService(bookings, ratings, profiles, currentUser, transactions, events);
         walletService = new WalletApplicationService(wallets, currentUser, transactions);
         notificationService = new NotificationApplicationService(notifications, currentUser, transactions);
+        publicProfiles = new PublicProfileFacade(profiles, publications, bookings, ratings, transactions);
 
         subscribeNotifications();
         transactions.required(() -> { seedDemoData(); return null; });
@@ -165,6 +169,7 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
         if (profiles.findByUserId(currentUser.currentUserId()).isEmpty()) {
             profiles.save(Profile.register(
                 currentUser.currentUserId(),
+                ActorType.PROFESSIONAL,
                 "Mateo Silva",
                 "Construyo productos digitales y acompaño personas que quieren crecer en tecnología.",
                 "America/Argentina/Buenos_Aires",
@@ -196,7 +201,8 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
             Modality.REMOTE,
             90,
             220,
-            Set.of("Java", "Arquitectura", "Clean Code")
+            Set.of("Java", "Arquitectura", "Clean Code"),
+            PublicationType.MENTORSHIP
         );
 
         seedPublishedPublication(
@@ -207,7 +213,8 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
             Modality.HYBRID,
             60,
             180,
-            Set.of("Entrevistas", "Backend", "Carrera")
+            Set.of("Entrevistas", "Backend", "Carrera"),
+            PublicationType.MENTORSHIP
         );
 
         seedPublishedPublication(
@@ -218,14 +225,15 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
             Modality.IN_PERSON,
             45,
             150,
-            Set.of("Portfolio", "UX", "Diseño")
+            Set.of("Portfolio", "UX", "Diseño"),
+            PublicationType.SERVICE
         );
     }
 
     private void seedProfile(String userId, String displayName, List<String> skills,
                              Set<NotificationChannelType> channels) {
         if (profiles.findByUserId(userId).isEmpty()) {
-            profiles.save(Profile.register(userId, displayName,
+            profiles.save(Profile.register(userId, ActorType.PROFESSIONAL, displayName,
                     "Mentor de la comunidad SkillSwap.", "America/Argentina/Buenos_Aires",
                     skills, List.of(), channels, List.of()));
         }
@@ -233,7 +241,7 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
 
     private void seedPublishedPublication(String authorId, String title, String description, String category,
                                           Modality modality, int durationMinutes, int price,
-                                          Set<String> tags) {
+                                          Set<String> tags, PublicationType type) {
         wallets.findByUserId(authorId).orElseGet(() -> wallets.save(Wallet.open(authorId, 0)));
         boolean exists = publications.findByAuthorUserId(authorId).stream()
             .anyMatch(item -> item.title().equalsIgnoreCase(title));
@@ -241,7 +249,8 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
             return;
         }
 
-        var publication = Publication.builder(authorId)
+        Profile author = profiles.findByUserId(authorId).orElseThrow();
+        var publication = Publication.builder(authorId, author.actorType(), type)
             .title(title)
             .description(description)
             .category(category)
@@ -260,7 +269,8 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
         publications.save(publication);
     }
 
-    public CurrentUserProvider currentUserProvider() {
+    /** Identidad de la demo: los casos de uso la leen como puerto y el login simulado la cambia. */
+    public DemoCurrentUserProvider currentUserProvider() {
         return currentUser;
     }
 
@@ -290,5 +300,9 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
 
     public RatingApplicationService ratingService() {
         return ratingService;
+    }
+
+    public PublicProfileUseCases publicProfiles() {
+        return publicProfiles;
     }
 }

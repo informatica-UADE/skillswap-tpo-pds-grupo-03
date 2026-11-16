@@ -1,31 +1,93 @@
 package ar.edu.uade.skillswap.controllers;
 
+import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchQuery;
+import ar.edu.uade.skillswap.application.service.DiscoveryApplicationService;
 import ar.edu.uade.skillswap.application.service.ProfileApplicationService;
+import ar.edu.uade.skillswap.application.service.PublicProfileFacade;
 import ar.edu.uade.skillswap.application.service.PublicationApplicationService;
 import ar.edu.uade.skillswap.controllers.error.PresentationException;
-import ar.edu.uade.skillswap.infrastructure.InMemoryProfileRepository;
-import ar.edu.uade.skillswap.infrastructure.InMemoryPublicationRepository;
-import ar.edu.uade.skillswap.infrastructure.SynchronousTransactionManager;
 import ar.edu.uade.skillswap.infrastructure.UiOperationExecutor;
+import ar.edu.uade.skillswap.infrastructure.persistence.H2Database;
+import ar.edu.uade.skillswap.infrastructure.persistence.JpaTransactionManager;
+import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaBookingRepository;
+import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaCatalogRepository;
+import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaProfileRepository;
+import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaPublicationQueryAdapter;
+import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaPublicationRepository;
+import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaRatingRepository;
 import ar.edu.uade.skillswap.model.Models;
+import ar.edu.uade.skillswap.domain.model.RecentPopularityStrategy;
+import jakarta.persistence.EntityManagerFactory;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Real use cases and domain, with memory repositories; no JPA or database connection. */
+/** Controllers, casos de uso y dominio reales sobre los repositorios JPA en una base H2. */
 class ProfilePublicationControllersIntegrationTest {
     private String actor = "u1";
-    private final InMemoryProfileRepository profileRepository = new InMemoryProfileRepository();
-    private final InMemoryPublicationRepository publicationRepository = new InMemoryPublicationRepository(profileRepository);
-    private final SynchronousTransactionManager transactions = new SynchronousTransactionManager();
+    private final EntityManagerFactory database = H2Database.factoryWithDemoCatalog("profile_publication");
+    private final JpaTransactionManager transactions = new JpaTransactionManager(database);
+    private final JpaProfileRepository profileRepository = new JpaProfileRepository(transactions);
+    private final JpaCatalogRepository catalogRepository = new JpaCatalogRepository(transactions);
+    private final JpaPublicationRepository publicationRepository = new JpaPublicationRepository(transactions);
+    private final JpaBookingRepository bookingRepository = new JpaBookingRepository(transactions);
     private final PerfilUiController profiles = new PerfilUiController(new ProfileApplicationService(
-            profileRepository, () -> actor, transactions), () -> actor, new UiOperationExecutor());
-    private final PublicacionUiController publications = new PublicacionUiController(new PublicationApplicationService(
-            publicationRepository, profileRepository, () -> actor, transactions), () -> actor, new UiOperationExecutor());
+            profileRepository, bookingRepository, () -> actor, transactions),
+            new PublicProfileFacade(profileRepository, publicationRepository, bookingRepository,
+                    new JpaRatingRepository(transactions), transactions), () -> actor, new UiOperationExecutor());
+    private final PublicationApplicationService publicationService = new PublicationApplicationService(
+            publicationRepository, profileRepository, catalogRepository, () -> actor, transactions);
+    private final PublicacionUiController publications = new PublicacionUiController(
+            publicationService, publicationService, () -> actor, new UiOperationExecutor());
+
+    @AfterEach
+    void closeDatabase() {
+        database.close();
+    }
+
+    @Test
+    void registraUnaOrganizacionYCreaEditaYPublicaSuDesafioDesdeLosControllers() {
+        profiles.crearPerfil("u1", new Models.NuevoPerfil("Organización", "Bio", "UTC",
+                List.of(), List.of(), Set.of(), List.of(), Models.TipoActor.ORGANIZACION));
+        assertEquals(ar.edu.uade.skillswap.domain.model.ActorType.ORGANIZATION,
+                profileRepository.findByUserId("u1").orElseThrow().actorType());
+        assertEquals(List.of(Models.TipoPublicacion.DESAFIO), publications.tiposPublicacion("u1"));
+        var input = draft();
+        var challenge = publications.crearBorrador("u1", new Models.DatosBorrador(input.titulo(),
+                input.descripcion(), input.categoria(), input.modalidad(), input.duracionMinutos(),
+                input.cupos(), input.precio(), input.etiquetas(), input.disponibilidad(), Models.TipoPublicacion.DESAFIO));
+        var edited = publications.editarBorrador("u1", challenge.id(), edition("Desafío actualizado"));
+        assertEquals(Models.TipoPublicacion.DESAFIO, edited.tipo());
+        var published = publications.cambiarEstado("u1", challenge.id(), Models.EstadoPublicacion.PUBLICADA);
+        assertEquals(Models.TipoPublicacion.DESAFIO, published.tipo());
+        assertEquals(Models.EstadoPublicacion.PUBLICADA, published.estado());
+        assertCode(Models.CodigoError.PERMISOS, () -> publications.crearBorrador("u1", draft()));
+        assertEquals(1, publications.listarPropias("u1").size());
+        var catalog = new DiscoveryApplicationService(publicationRepository, new JpaPublicationQueryAdapter(transactions),
+                profileRepository, catalogRepository, () -> actor, new RecentPopularityStrategy())
+                .search(new SearchQuery("", null, null, null, null, null, null, null, 0, 20));
+        assertTrue(catalog.items().stream().anyMatch(item -> item.id().equals(challenge.id())));
+    }
+
+    @Test
+    void rechazaTiposAusentesEnLosDtosSinGuardarDatos() {
+        assertCode(Models.CodigoError.VALIDACION, () -> profiles.crearPerfil("u1",
+                new Models.NuevoPerfil("Julieta", "Bio", "UTC", List.of(), List.of(), Set.of(), List.of(), null)));
+        assertTrue(profileRepository.findByUserId("u1").isEmpty());
+        profiles.crearPerfil("u1", profile("Julieta"));
+        var input = draft();
+        assertCode(Models.CodigoError.VALIDACION, () -> publications.crearBorrador("u1",
+                new Models.DatosBorrador(input.titulo(), input.descripcion(), input.categoria(),
+                        input.modalidad(), input.duracionMinutos(), input.cupos(), input.precio(),
+                        input.etiquetas(), input.disponibilidad(), null)));
+        assertTrue(publications.listarPropias("u1").isEmpty());
+    }
 
     @Test
     void creaConsultaYRechazaUnPerfilDuplicado() {
@@ -79,22 +141,22 @@ class ProfilePublicationControllersIntegrationTest {
                 () -> publications.editarBorrador("u1", "inexistente", edition("Java")));
         assertCode(Models.CodigoError.NO_ENCONTRADO,
                 () -> publications.cambiarEstado("u1", "inexistente", Models.EstadoPublicacion.PUBLICADA));
-        var start = LocalDateTime.now().plusDays(2);
+        var start = LocalDateTime.now().plusDays(2).truncatedTo(ChronoUnit.MINUTES);
         var invalid = new Models.DatosBorrador("Java", "Mentoría", "Tecnología", Models.Modalidad.REMOTA,
-                60, 2, 100, List.of(), List.of(new Models.Disponibilidad(null, start, start.minusHours(1), 2)));
+                60, 2, 100, List.of(), List.of(new Models.Disponibilidad(null, start, start.minusHours(1), 2)), Models.TipoPublicacion.MENTORIA);
         assertCode(Models.CodigoError.VALIDACION, () -> publications.crearBorrador("u1", invalid));
         assertTrue(publications.listarPropias("u1").isEmpty());
     }
 
     private Models.NuevoPerfil profile(String name) {
         return new Models.NuevoPerfil(name, "Bio", "UTC", List.of("Java"), List.of("SQL"),
-                Set.of(Models.CanalNotificacion.IN_APP), List.of());
+                Set.of(Models.CanalNotificacion.IN_APP), List.of(), Models.TipoActor.PROFESIONAL);
     }
 
     private Models.DatosBorrador draft() {
-        var start = LocalDateTime.now().plusDays(2);
+        var start = LocalDateTime.now().plusDays(2).truncatedTo(ChronoUnit.MINUTES);
         return new Models.DatosBorrador("Java", "Mentoría", "Tecnología", Models.Modalidad.REMOTA,
-                60, 2, 100, List.of("OO"), List.of(new Models.Disponibilidad(null, start, start.plusHours(2), 2)));
+                60, 2, 100, List.of("OO"), List.of(new Models.Disponibilidad(null, start, start.plusHours(2), 2)), Models.TipoPublicacion.MENTORIA);
     }
 
     private Models.EdicionBorrador edition(String title) {
