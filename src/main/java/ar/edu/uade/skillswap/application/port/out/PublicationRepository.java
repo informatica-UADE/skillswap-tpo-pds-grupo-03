@@ -1,6 +1,7 @@
 package ar.edu.uade.skillswap.application.port.out;
 
 import ar.edu.uade.skillswap.domain.model.Publication;
+import ar.edu.uade.skillswap.application.model.PageResult;
 import java.util.List;
 import java.util.Optional;
 
@@ -10,6 +11,9 @@ public interface PublicationRepository {
     Optional<Publication> findByIdForUpdate(String publicationId);
     List<Publication> findByAuthorUserId(String authorUserId);
     List<Publication> findPublished();
+
+    /** Publicaciones PUBLISHED de un autor, de la más reciente a la más antigua, paginadas en la consulta. */
+    PageResult<Publication> findPublishedByAuthor(String authorUserId, int page, int size);
 
     Publication save(Publication publication);
 }

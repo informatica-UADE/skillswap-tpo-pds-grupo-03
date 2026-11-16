@@ -235,6 +235,9 @@ class DiscoveryApplicationServiceTest {
         @Override public Optional<ar.edu.uade.skillswap.application.model.DiscoveryData.AuthorView> findAuthor(String userId) {
             return Optional.of(new ar.edu.uade.skillswap.application.model.DiscoveryData.AuthorView(userId, "Nombre " + userId, 0));
         }
+        @Override public PageResult<Publication> findPublishedByAuthor(String authorUserId, int page, int size) {
+            return new PageResult<>(List.of(), page, size, 0);
+        }
         @Override public Publication save(Publication publication) { return publication; }
     }
 

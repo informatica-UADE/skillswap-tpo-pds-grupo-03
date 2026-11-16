@@ -11,6 +11,7 @@ import ar.edu.uade.skillswap.controllers.mapper.UiModelMapper;
 import ar.edu.uade.skillswap.model.Models;
 
 import java.util.List;
+import java.util.Objects;
 
 public final class WiredUiControllers implements UiControllers,
         UiControllers.BusquedaController,
@@ -35,9 +36,10 @@ public final class WiredUiControllers implements UiControllers,
     }
 
     public WiredUiControllers(SkillSwapApplicationWiring wiring) {
-        this.wiring = java.util.Objects.requireNonNull(wiring);
+        this.wiring = Objects.requireNonNull(wiring);
         searchController = new BusquedaUiController(wiring.discoveryService(), wiring.currentUserProvider(), operations);
-        profileController = new PerfilUiController(wiring.profileService(), wiring.currentUserProvider(), operations);
+        profileController = new PerfilUiController(wiring.profileService(), wiring.publicProfiles(),
+                wiring.currentUserProvider(), operations);
         ratingController = new CalificacionUiController(wiring.ratingService(), wiring.currentUserProvider(), operations);
         bookingController = new ContratacionUiController(wiring.bookingService(),
                 wiring.currentUserProvider(), operations, this::toContratacion);
@@ -159,6 +161,11 @@ public final class WiredUiControllers implements UiControllers,
     }
 
     @Override
+    public Models.PerfilPublico verPerfilPublico(String perfilUserId, int pagina) {
+        return profileController.verPerfilPublico(perfilUserId, pagina);
+    }
+
+    @Override
     public int consultarSaldo(String userId) {
         return operations.execute(() ->
                 wiring.walletService().viewMyWallet().balanceInSkillCoins());
@@ -201,7 +208,7 @@ public final class WiredUiControllers implements UiControllers,
     private Models.Contratacion toContratacion(BookingView booking) {
         String otherUserId = booking.buyerUserId().equals(usuarioActual())
                 ? booking.providerUserId() : booking.buyerUserId();
-        return mapper.toContratacion(booking, booking.publicationTitle(), providerName(otherUserId));
+        return mapper.toContratacion(booking, booking.publicationTitle(), providerName(otherUserId), otherUserId);
     }
 
     private String providerName(String authorUserId) {

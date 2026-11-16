@@ -3,6 +3,7 @@ package ar.edu.uade.skillswap.application.mapper;
 import ar.edu.uade.skillswap.application.model.ProfileData.AvailabilityInput;
 import ar.edu.uade.skillswap.application.model.ProfileData.AvailabilityView;
 import ar.edu.uade.skillswap.application.model.ProfileData.ProfileView;
+import ar.edu.uade.skillswap.application.model.PublicProfileData.CompletedBookingsSummary;
 import ar.edu.uade.skillswap.domain.model.AvailabilitySlot;
 import ar.edu.uade.skillswap.domain.model.Profile;
 import java.util.Collection;
@@ -19,7 +20,7 @@ public final class ProfileApplicationMapper {
                 .toList();
     }
 
-    public static ProfileView toView(Profile profile) {
+    public static ProfileView toView(Profile profile, CompletedBookingsSummary completedBookings) {
         List<AvailabilityView> availability = profile.availability().stream()
                 .map(slot -> new AvailabilityView(slot.id(), slot.startsAt(), slot.endsAt(),
                         slot.capacity(), slot.reserved()))
@@ -27,6 +28,6 @@ public final class ProfileApplicationMapper {
         return new ProfileView(profile.id(), profile.userId(), profile.actorType(), profile.displayName(),
                 profile.biography(), profile.timeZone(), List.copyOf(profile.skills()),
                 List.copyOf(profile.interests()), profile.notificationChannels(), availability,
-                profile.reputation(), profile.ratingCount(), profile.active());
+                profile.reputation(), profile.ratingCount(), profile.active(), completedBookings);
     }
 }

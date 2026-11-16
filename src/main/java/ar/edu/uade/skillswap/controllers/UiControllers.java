@@ -70,6 +70,11 @@ public interface UiControllers {
     interface PerfilController {
         Perfil crearPerfil(String userId, NuevoPerfil datos);
         Perfil verPerfil(String userId);
+        /**
+         * Perfil público de cualquier usuario activo. No modifica información, así que no exige
+         * ser el usuario activo. {@code pagina} empieza en cero y pagina las publicaciones activas.
+         */
+        PerfilPublico verPerfilPublico(String perfilUserId, int pagina);
     }
 
     BusquedaController busqueda();

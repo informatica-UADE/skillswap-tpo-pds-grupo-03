@@ -3,6 +3,7 @@ package ar.edu.uade.skillswap.mock;
 import ar.edu.uade.skillswap.controllers.UiControllers;
 import ar.edu.uade.skillswap.model.Models.*;
 
+import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -33,8 +34,8 @@ public final class MockSkillSwapControllers implements UiControllers,
             pub("p5", "Mentoría de liderazgo para equipos", "Herramientas concretas para conversaciones, feedback y delegación.", "Negocios", Modalidad.REMOTA, 60, 220, 4.9, "Laura Rossi", List.of("Liderazgo", "Equipos"), false, TipoPublicacion.MENTORIA),
             pub("p6", "Excel para decisiones de negocio", "Tablas dinámicas, escenarios y un dashboard listo para reutilizar.", "Productividad", Modalidad.REMOTA, 90, 140, 4.6, "Martín Aguirre", List.of("Excel", "Datos"), false, TipoPublicacion.MENTORIA)
         ));
-        contrataciones.add(new Contratacion("c1", "Revisión profesional de portfolio", "Tomás Vidal", LocalDateTime.now().plusDays(2), 120, EstadoContratacion.CONFIRMADA));
-        contrataciones.add(new Contratacion("c2", "Mentoría de liderazgo para equipos", "Laura Rossi", LocalDateTime.now().minusDays(4), 220, EstadoContratacion.COMPLETADA));
+        contrataciones.add(new Contratacion("c1", "Revisión profesional de portfolio", "Tomás Vidal", proveedorId("Tomás Vidal"), LocalDateTime.now().plusDays(2), 120, EstadoContratacion.CONFIRMADA, "", "", ""));
+        contrataciones.add(new Contratacion("c2", "Mentoría de liderazgo para equipos", "Laura Rossi", proveedorId("Laura Rossi"), LocalDateTime.now().minusDays(4), 220, EstadoContratacion.COMPLETADA, "", "", ""));
         movimientos.add(new Movimiento("Saldo inicial de bienvenida", LocalDateTime.now().minusDays(30), 2500, 2500));
         movimientos.add(new Movimiento("Reserva: Revisión de portfolio", LocalDateTime.now().minusDays(1), -120, 2380));
         movimientos.add(new Movimiento("Mentoría brindada: Java inicial", LocalDateTime.now().minusHours(5), 100, 2480));
@@ -52,7 +53,13 @@ public final class MockSkillSwapControllers implements UiControllers,
                 new FranjaDisponibilidad(id + "-slot-2", firstStart.plusDays(2),
                         firstStart.plusDays(2).plusMinutes(duracion), 1));
         return new Publicacion(id, titulo, descripcion, categoria, modalidad, duracion, precio,
-                reputacion, proveedor, tags, EstadoPublicacion.PUBLICADA, destacada, franjas, tipo);
+                reputacion, proveedor, proveedorId(proveedor), tags, EstadoPublicacion.PUBLICADA, destacada, franjas, tipo);
+    }
+
+    /** Identificador de demostración derivado del nombre: "Sofía Méndez" pasa a "sofia-mendez". */
+    private static String proveedorId(String nombre) {
+        return Normalizer.normalize(nombre, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "").toLowerCase(Locale.ROOT).replace(' ', '-');
     }
 
     @Override public BusquedaController busqueda() { return this; }
@@ -102,7 +109,7 @@ public final class MockSkillSwapControllers implements UiControllers,
 
     @Override public Publicacion crearBorrador(String userId, String titulo, String descripcion, String categoria, Modalidad modalidad, int duracion, int precio, TipoPublicacion tipo) {
         if (!tiposPublicacion(userId).contains(tipo)) throw new IllegalArgumentException("Tu perfil no puede crear publicaciones de tipo " + tipo);
-        Publicacion p = new Publicacion(UUID.randomUUID().toString(), titulo, descripcion, categoria, modalidad, duracion, precio, 0, "Mateo Silva", List.of(categoria), EstadoPublicacion.BORRADOR, false, List.of(), tipo);
+        Publicacion p = new Publicacion(UUID.randomUUID().toString(), titulo, descripcion, categoria, modalidad, duracion, precio, 0, "Mateo Silva", userId, List.of(categoria), EstadoPublicacion.BORRADOR, false, List.of(), tipo);
         publicaciones.add(p); autores.put(p.id(), userId); return p;
     }
 
@@ -114,7 +121,7 @@ public final class MockSkillSwapControllers implements UiControllers,
                 slot.inicio(), slot.fin(), slot.cupos())).toList();
         var publication = new Publicacion(UUID.randomUUID().toString(), datos.titulo(), datos.descripcion(),
                 datos.categoria(), datos.modalidad(), datos.duracionMinutos(), datos.precio(), 0,
-                userId, datos.etiquetas(), EstadoPublicacion.BORRADOR, false, slots, datos.tipo());
+                userId, userId, datos.etiquetas(), EstadoPublicacion.BORRADOR, false, slots, datos.tipo());
         publicaciones.add(publication);
         autores.put(publication.id(), userId);
         return publication;
@@ -128,7 +135,7 @@ public final class MockSkillSwapControllers implements UiControllers,
         if (previous.estado() != EstadoPublicacion.BORRADOR) throw new IllegalStateException("Solo se editan borradores");
         var updated = new Publicacion(previous.id(), datos.titulo(), datos.descripcion(), datos.categoria(),
                 datos.modalidad(), datos.duracionMinutos(), previous.precio(), previous.reputacion(),
-                previous.proveedor(), datos.etiquetas(), previous.estado(), previous.destacada(),
+                previous.proveedor(), previous.proveedorId(), datos.etiquetas(), previous.estado(), previous.destacada(),
                 previous.franjasDisponibles(), previous.tipo());
         publicaciones.set(index, updated);
         return updated;
@@ -155,7 +162,7 @@ public final class MockSkillSwapControllers implements UiControllers,
 
     @Override public Publicacion cambiarEstado(String userId, String id, EstadoPublicacion estado) {
         for (int i=0;i<publicaciones.size();i++) if (publicaciones.get(i).id().equals(id)) {
-            Publicacion p=publicaciones.get(i); Publicacion n=new Publicacion(p.id(),p.titulo(),p.descripcion(),p.categoria(),p.modalidad(),p.duracionMinutos(),p.precio(),p.reputacion(),p.proveedor(),p.etiquetas(),estado,p.destacada(),p.franjasDisponibles(),p.tipo()); publicaciones.set(i,n); return n;
+            Publicacion p=publicaciones.get(i); Publicacion n=new Publicacion(p.id(),p.titulo(),p.descripcion(),p.categoria(),p.modalidad(),p.duracionMinutos(),p.precio(),p.reputacion(),p.proveedor(),p.proveedorId(),p.etiquetas(),estado,p.destacada(),p.franjasDisponibles(),p.tipo()); publicaciones.set(i,n); return n;
         }
         throw new IllegalArgumentException("Publicación inexistente");
     }
@@ -179,7 +186,7 @@ public final class MockSkillSwapControllers implements UiControllers,
 
         String normalizedMessage = mensajeCliente == null ? "" : mensajeCliente.trim();
         Contratacion c = new Contratacion(UUID.randomUUID().toString(), publication.titulo(),
-                publication.proveedor(), selectedSlot.inicio(), publication.precio(),
+                publication.proveedor(), publication.proveedorId(), selectedSlot.inicio(), publication.precio(),
                 EstadoContratacion.PENDIENTE, objetivo.trim(), normalizedMessage, selectedSlot.id());
         contrataciones.add(0,c);
         notificaciones.add(0,new Notificacion(UUID.randomUUID().toString(),"Solicitud enviada", "Tu solicitud para “"+publication.titulo()+"” fue enviada.",LocalDateTime.now(),false,"RESERVA")); return c;
@@ -197,7 +204,7 @@ public final class MockSkillSwapControllers implements UiControllers,
     private Contratacion updateContract(String id, boolean cancel) {
         for(int i=0;i<contrataciones.size();i++) if(contrataciones.get(i).id().equals(id)) {
             Contratacion c=contrataciones.get(i); EstadoContratacion next=cancel?EstadoContratacion.CANCELADA:switch(c.estado()) {case PENDIENTE->EstadoContratacion.ACEPTADA; case ACEPTADA->EstadoContratacion.CONFIRMADA; case CONFIRMADA->EstadoContratacion.EN_CURSO; case EN_CURSO->EstadoContratacion.COMPLETADA; default->c.estado();};
-            Contratacion n=new Contratacion(c.id(),c.titulo(),c.contraparte(),c.fecha(),c.precio(),next,
+            Contratacion n=new Contratacion(c.id(),c.titulo(),c.contraparte(),c.contraparteId(),c.fecha(),c.precio(),next,
                     c.objetivo(),c.mensajeCliente(),c.franjaId()); contrataciones.set(i,n); return n;
         } throw new IllegalArgumentException("Contratación inexistente");
     }
@@ -247,7 +254,7 @@ public final class MockSkillSwapControllers implements UiControllers,
             throw new SecurityException("La otra parte debe aceptar la propuesta");
         }
         Contratacion updated = new Contratacion(actual.id(), actual.titulo(), actual.contraparte(),
-                actual.fecha(), actual.precio(), actual.estado(), actual.objetivo(),
+                actual.contraparteId(), actual.fecha(), actual.precio(), actual.estado(), actual.objetivo(),
                 actual.mensajeCliente(), nuevaFranja);
         contrataciones.set(contrataciones.indexOf(actual), updated);
         franjasPropuestas.remove(id);
@@ -274,7 +281,7 @@ public final class MockSkillSwapControllers implements UiControllers,
         Contratacion actual = findContract(id);
         if (actual.estado() != expected) throw new IllegalStateException("Transición no permitida");
         Contratacion updated = new Contratacion(actual.id(), actual.titulo(), actual.contraparte(),
-                actual.fecha(), actual.precio(), target, actual.objetivo(),
+                actual.contraparteId(), actual.fecha(), actual.precio(), target, actual.objetivo(),
                 actual.mensajeCliente(), actual.franjaId());
         contrataciones.set(contrataciones.indexOf(actual), updated);
         return updated;
@@ -298,4 +305,22 @@ public final class MockSkillSwapControllers implements UiControllers,
     @Override public Perfil verPerfil(String userId) {
         if (perfilesCreados.containsKey(userId)) return perfilesCreados.get(userId);
         return new Perfil(userId,"Mateo Silva","Software Engineer & Mentor","Construyo productos digitales y acompaño a personas que quieren crecer en tecnología.",List.of("Java","Clean Architecture","Mentoría","SQL","Diseño OO"),4.9,37,52); }
+
+    /** Perfil de demostración armado con las publicaciones activas del proveedor. */
+    @Override public PerfilPublico verPerfilPublico(String perfilUserId, int pagina) {
+        if (pagina < 0) throw new IllegalArgumentException("La página debe ser positiva");
+        List<Publicacion> activas = publicaciones.stream()
+                .filter(p -> p.estado() == EstadoPublicacion.PUBLICADA && p.proveedorId().equals(perfilUserId)).toList();
+        if (activas.isEmpty()) throw new IllegalArgumentException("El perfil no existe o no está disponible");
+        Publicacion primera = activas.get(0);
+        int tamanio = PerfilPublico.TAMANIO_PAGINA;
+        int desde = Math.min(pagina * tamanio, activas.size());
+        var page = new PaginaPublicaciones(activas.subList(desde, Math.min(desde + tamanio, activas.size())),
+                pagina, tamanio, activas.size(), (activas.size() + tamanio - 1) / tamanio);
+        int completadas = (int) contrataciones.stream().filter(c -> perfilUserId.equals(c.contraparteId())
+                && c.estado() == EstadoContratacion.COMPLETADA).count();
+        var perfil = new Perfil(perfilUserId, primera.proveedor(), "Profesional", "Mentor de SkillSwap.",
+                primera.etiquetas(), primera.reputacion(), 0, completadas);
+        return new PerfilPublico(perfil, page, completadas, 0, List.of());
+    }
 }

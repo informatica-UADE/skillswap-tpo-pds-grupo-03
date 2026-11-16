@@ -94,7 +94,7 @@ public final class Models {
 
     public record Publicacion(String id, String titulo, String descripcion,
                               String categoria, Modalidad modalidad, int duracionMinutos,
-                              int precio, double reputacion, String proveedor,
+                              int precio, double reputacion, String proveedor, String proveedorId,
                               List<String> etiquetas, EstadoPublicacion estado,
                               boolean destacada, List<FranjaDisponibilidad> franjasDisponibles,
                               TipoPublicacion tipo) {
@@ -105,12 +105,32 @@ public final class Models {
         }
     }
 
-    public record Contratacion(String id, String titulo, String contraparte,
+    /** {@code contraparteId} identifica al otro participante para abrir su perfil público; vacío si no se conoce. */
+    public record Contratacion(String id, String titulo, String contraparte, String contraparteId,
                                LocalDateTime fecha, int precio, EstadoContratacion estado,
                                String objetivo, String mensajeCliente, String franjaId) {
         public Contratacion(String id, String titulo, String contraparte, LocalDateTime fecha,
                             int precio, EstadoContratacion estado) {
-            this(id, titulo, contraparte, fecha, precio, estado, "", "", "");
+            this(id, titulo, contraparte, "", fecha, precio, estado, "", "", "");
+        }
+    }
+
+    /** Reseña recibida que muestra el perfil público, sin identificar a quien la escribió. */
+    public record Resena(int puntaje, String comentario, LocalDateTime fecha) {}
+
+    /**
+     * Perfil público de cualquier usuario activo: sus datos de presentación, una página de sus
+     * publicaciones activas, las contrataciones completadas según el rol y las últimas reseñas.
+     */
+    public record PerfilPublico(Perfil perfil, PaginaPublicaciones publicaciones,
+                                int completadasComoProveedor, int completadasComoCliente,
+                                List<Resena> ultimasResenas) {
+        public static final int TAMANIO_PAGINA = 6;
+
+        public PerfilPublico {
+            Objects.requireNonNull(perfil, "Falta el perfil");
+            Objects.requireNonNull(publicaciones, "Faltan las publicaciones");
+            ultimasResenas = List.copyOf(ultimasResenas == null ? List.of() : ultimasResenas);
         }
     }
 

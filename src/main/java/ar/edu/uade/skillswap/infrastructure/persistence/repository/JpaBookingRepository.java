@@ -74,6 +74,29 @@ public final class JpaBookingRepository extends JpaRepositorySupport
     }
 
     @Override
+    public long countCompletedByProvider(String providerUserId) {
+        Objects.requireNonNull(providerUserId, "Falta el identificador del proveedor");
+        return countCompleted("providerUserId", providerUserId);
+    }
+
+    @Override
+    public long countCompletedByBuyer(String buyerUserId) {
+        Objects.requireNonNull(buyerUserId, "Falta el identificador del cliente");
+        return countCompleted("buyerUserId", buyerUserId);
+    }
+
+    private long countCompleted(String participantField, String userId) {
+        return query(em -> em.createQuery(
+                        "SELECT COUNT(b) FROM BookingEntity b "
+                                + "WHERE b." + participantField + " = :userId "
+                                + "AND b.status = :status",
+                        Long.class)
+                .setParameter("userId", userId)
+                .setParameter("status", "COMPLETED")
+                .getSingleResult());
+    }
+
+    @Override
     public Booking save(Booking booking) {
         Objects.requireNonNull(booking, "Falta la reserva");
 

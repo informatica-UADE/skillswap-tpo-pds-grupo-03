@@ -221,6 +221,9 @@ class PublicationApplicationServiceTest {
         @Override public List<Publication> findPublished() {
             return items.stream().filter(item -> item.status() == PublicationStatus.PUBLISHED).toList();
         }
+        @Override public PageResult<Publication> findPublishedByAuthor(String authorUserId, int page, int size) {
+            return new PageResult<>(List.of(), page, size, 0);
+        }
         @Override public Publication save(Publication publication) {
             findById(publication.id()).ifPresent(items::remove);
             items.add(publication);

@@ -16,6 +16,7 @@ import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaPublicatio
 import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaRatingRepository;
 import ar.edu.uade.skillswap.infrastructure.persistence.repository.JpaWalletRepository;
 import jakarta.persistence.EntityManagerFactory;
+import ar.edu.uade.skillswap.application.port.in.PublicProfileUseCases;
 import ar.edu.uade.skillswap.application.port.out.CurrentUserProvider;
 import ar.edu.uade.skillswap.application.port.out.ProfileRepository;
 import ar.edu.uade.skillswap.application.port.out.PublicationRepository;
@@ -28,6 +29,7 @@ import ar.edu.uade.skillswap.application.service.DiscoveryApplicationService;
 import ar.edu.uade.skillswap.application.service.NotificationApplicationService;
 import ar.edu.uade.skillswap.application.service.ProfileApplicationService;
 import ar.edu.uade.skillswap.application.service.PublicationApplicationService;
+import ar.edu.uade.skillswap.application.service.PublicProfileFacade;
 import ar.edu.uade.skillswap.application.service.RatingApplicationService;
 import ar.edu.uade.skillswap.application.service.WalletApplicationService;
 import ar.edu.uade.skillswap.infrastructure.identity.IdentityProviderAdapter;
@@ -81,6 +83,7 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
     private final RatingApplicationService ratingService;
     private final WalletApplicationService walletService;
     private final NotificationApplicationService notificationService;
+    private final PublicProfileUseCases publicProfiles;
 
     public SkillSwapApplicationWiring() {
         this(new MockIdentityClient("user-mateo"), new MockEmailClient(), new MockPushClient());
@@ -155,7 +158,7 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
         notificationObserver = new NotificationEventObserver(profiles, factory);
         ratingNotifications = new RatingNotificationEventPublisher(profiles, factory);
 
-        profileService = new ProfileApplicationService(profiles, currentUser, transactions);
+        profileService = new ProfileApplicationService(profiles, bookings, currentUser, transactions);
         publicationService = new PublicationApplicationService(publications, profiles, currentUser, transactions);
         discoveryService = new DiscoveryApplicationService(
                 publications, publicationQueries, profiles, currentUser, recommendationStrategy);
@@ -164,6 +167,7 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
         ratingService = new RatingApplicationService(bookings, ratings, profiles, currentUser, transactions, events);
         walletService = new WalletApplicationService(wallets, currentUser, transactions);
         notificationService = new NotificationApplicationService(notifications, currentUser, transactions);
+        publicProfiles = new PublicProfileFacade(profiles, publications, bookings, ratings, transactions);
 
         subscribeNotifications();
         transactions.required(() -> { seedDemoData(); return null; });
@@ -320,5 +324,9 @@ public final class SkillSwapApplicationWiring implements AutoCloseable {
 
     public RatingApplicationService ratingService() {
         return ratingService;
+    }
+
+    public PublicProfileUseCases publicProfiles() {
+        return publicProfiles;
     }
 }

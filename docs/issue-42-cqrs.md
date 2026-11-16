@@ -33,7 +33,7 @@ La separación es a nivel de contratos y adaptadores, no de procesos ni almacena
 | `application.model.PublicationData.PublicationView` | Proyección de lectura del catálogo, sin exponer entidades JPA. |
 | `application.port.in.PublicationCommandUseCases` | Contratos de creación, edición y cambio de estado. |
 | `application.port.in.PublicationQueryUseCases` | Consultas de publicaciones propias y tipos permitidos. |
-| `application.port.out.PublicationRepository` | Persistencia/carga de agregados para flujos de escritura y dominio. |
+| `application.port.out.PublicationRepository` | Persistencia/carga de agregados y paginación existente de publicaciones del perfil público; no contiene la búsqueda del catálogo. |
 | `application.port.out.PublicationQueryPort` | Búsqueda paginada, categorías y datos públicos de autor. |
 | `infrastructure.persistence.repository.JpaPublicationQueryAdapter` | Proyección JPA paginada para el catálogo. |
 | `infrastructure.InMemoryPublicationRepository` | Implementación en memoria de los puertos de agregado y consulta. |

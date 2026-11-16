@@ -62,6 +62,22 @@ public final class InMemoryPublicationRepository implements PublicationRepositor
     }
 
     @Override
+    public PageResult<Publication> findPublishedByAuthor(String authorUserId, int page, int size) {
+        Objects.requireNonNull(authorUserId, "Falta el ID del autor");
+        if (page < 0 || size < 1) throw new IllegalArgumentException("La paginación es inválida");
+        List<Publication> active = publications.values().stream()
+                .filter(item -> item.authorUserId().equals(authorUserId))
+                .filter(item -> item.status() == PublicationStatus.PUBLISHED)
+                .sorted(Comparator.comparing(Publication::createdAt).reversed().thenComparing(Publication::id))
+                .toList();
+        List<Publication> items = active.stream()
+                .skip((long) page * size)
+                .limit(size)
+                .toList();
+        return new PageResult<>(items, page, size, active.size());
+    }
+
+    @Override
     public PageResult<PublicationView> searchPublished(SearchQuery query) {
         Objects.requireNonNull(query, "Faltan los criterios de búsqueda");
         List<Publication> published = findPublished();
