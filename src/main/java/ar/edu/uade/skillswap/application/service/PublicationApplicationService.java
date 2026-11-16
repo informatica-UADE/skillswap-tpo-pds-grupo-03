@@ -9,6 +9,7 @@ import ar.edu.uade.skillswap.application.model.PublicationData.EditDraftCommand;
 import ar.edu.uade.skillswap.application.model.PublicationData.PublicationView;
 import ar.edu.uade.skillswap.application.port.in.PublicationCommandUseCases;
 import ar.edu.uade.skillswap.application.port.in.PublicationQueryUseCases;
+import ar.edu.uade.skillswap.application.port.out.CatalogRepository;
 import ar.edu.uade.skillswap.application.port.out.CurrentUserProvider;
 import ar.edu.uade.skillswap.application.port.out.ProfileRepository;
 import ar.edu.uade.skillswap.application.port.out.PublicationRepository;
@@ -26,13 +27,16 @@ public final class PublicationApplicationService
         implements PublicationCommandUseCases, PublicationQueryUseCases {
     private final PublicationRepository publications;
     private final ProfileRepository profiles;
+    private final CatalogRepository catalog;
     private final CurrentUserProvider currentUser;
     private final TransactionManager transactions;
 
     public PublicationApplicationService(PublicationRepository publications, ProfileRepository profiles,
-                                         CurrentUserProvider currentUser, TransactionManager transactions) {
+                                         CatalogRepository catalog, CurrentUserProvider currentUser,
+                                         TransactionManager transactions) {
         this.publications = Objects.requireNonNull(publications);
         this.profiles = Objects.requireNonNull(profiles);
+        this.catalog = Objects.requireNonNull(catalog);
         this.currentUser = Objects.requireNonNull(currentUser);
         this.transactions = Objects.requireNonNull(transactions);
     }
@@ -46,7 +50,7 @@ public final class PublicationApplicationService
             var builder = Publication.builder(actor, author.actorType(), command.type())
                     .title(command.title())
                     .description(command.description())
-                    .category(command.category())
+                    .category(catalogCategory(command.category()))
                     .modality(command.modality())
                     .durationMinutes(command.durationMinutes())
                     .capacity(command.capacity())
@@ -66,7 +70,8 @@ public final class PublicationApplicationService
         return transactions.required(() -> UseCaseSupport.translateDomainFailures(() -> {
             Publication publication = publications.findByIdForUpdate(publicationId)
                     .orElseThrow(() -> notFound("No existe la publicación indicada"));
-            publication.edit(actor, command.title(), command.description(), command.category(), command.modality(),
+            publication.edit(actor, command.title(), command.description(), catalogCategory(command.category()),
+                    command.modality(),
                     command.durationMinutes(), command.capacity(), command.tags());
             Profile author = authorProfile(publication.authorUserId());
             return PublicationApplicationMapper.toView(publications.save(publication), author);
@@ -102,6 +107,17 @@ public final class PublicationApplicationService
     public List<PublicationType> allowedPublicationTypes() {
         String actor = UseCaseSupport.currentUserId(currentUser);
         return List.copyOf(authorProfile(actor).actorType().publicationTypes());
+    }
+
+    /**
+     * La categoría de una publicación tiene que existir en el catálogo (#37) y se guarda con el nombre
+     * que registra el catálogo. Un borrador puede no tenerla todavía: publicarlo la exige.
+     */
+    private String catalogCategory(String category) {
+        if (category == null || category.isBlank()) return category;
+        return catalog.findCategoryName(category).orElseThrow(() -> new ApplicationException(
+                ApplicationErrorCode.VALIDATION,
+                "La categoría \"" + category.trim() + "\" no existe en el catálogo"));
     }
 
     /** Toda publicación tiene autor con perfil (FK en la base); sin perfil no se puede publicar. */

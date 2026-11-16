@@ -1,6 +1,7 @@
 package ar.edu.uade.skillswap.ui;
 
 import ar.edu.uade.skillswap.controllers.UiControllers;
+import ar.edu.uade.skillswap.controllers.error.PresentationException;
 import ar.edu.uade.skillswap.model.Models.*;
 
 import javax.swing.*;
@@ -18,9 +19,7 @@ import static ar.edu.uade.skillswap.ui.Theme.*;
 public final class SkillSwapView extends JPanel {
     private String USER_ID="user-mateo";
     private final UiControllers controllers;
-    private final UiActionHandler actions = new UiActionHandler(error ->
-            JOptionPane.showMessageDialog(this, error.mensaje(),
-                    "No se pudo completar la operación", JOptionPane.ERROR_MESSAGE));
+    private final UiActionHandler actions = new UiActionHandler(this::showError);
     private final JPanel content=new JPanel(new BorderLayout());
     private final JLabel pageTitle=label("Inicio",H1,TEXT);
     private final JLabel badge=label("",new Font("SansSerif",Font.BOLD,10),Color.WHITE);
@@ -116,7 +115,7 @@ public final class SkillSwapView extends JPanel {
     private JPanel base(){JPanel p=new JPanel();p.setBackground(BG);p.setLayout(new BoxLayout(p,BoxLayout.Y_AXIS));p.setBorder(new EmptyBorder(24,26,28,26));return p;}
     private void addSection(JPanel p,String title,String subtitle){JLabel h=label(title,H2,TEXT);h.setAlignmentX(LEFT_ALIGNMENT);p.add(h);if(subtitle!=null){JLabel s=label(subtitle,BODY,MUTED);s.setAlignmentX(LEFT_ALIGNMENT);p.add(Box.createVerticalStrut(3));p.add(s);}p.add(Box.createVerticalStrut(14));}
 
-    private void showHome(){Perfil me=controllers.perfiles().verPerfil(USER_ID);JPanel p=base();JPanel hero=new Theme.RoundedPanel(22,NAVY_2);hero.setLayout(new BorderLayout(22,0));hero.setBorder(new EmptyBorder(24,26,24,26));hero.setMaximumSize(new Dimension(Integer.MAX_VALUE,155));JPanel words=new JPanel();words.setOpaque(false);words.setLayout(new BoxLayout(words,BoxLayout.Y_AXIS));words.add(label("Hola, "+firstName(me.nombre())+" 👋",new Font("SansSerif",Font.BOLD,25),Color.WHITE));words.add(Box.createVerticalStrut(7));words.add(label("¿Qué habilidad querés desbloquear hoy?",BODY,new Color(213,228,238)));words.add(Box.createVerticalStrut(16));JTextField search=new JTextField();search.putClientProperty("JTextField.placeholderText","Buscar mentorías, servicios o habilidades...");search.setBorder(new EmptyBorder(11,13,11,13));search.addActionListener(uiAction(e->showExplore(search.getText())));words.add(search);hero.add(words);JPanel stat=new JPanel();stat.setOpaque(false);stat.setLayout(new BoxLayout(stat,BoxLayout.Y_AXIS));stat.add(label("TU PROGRESO",SMALL,new Color(169,202,219)));stat.add(label(String.valueOf(me.proyectosCompletados()),new Font("SansSerif",Font.BOLD,34),Color.WHITE));stat.add(label("proyectos completados",SMALL,new Color(213,228,238)));hero.add(stat,BorderLayout.EAST);hero.setAlignmentX(LEFT_ALIGNMENT);p.add(hero);p.add(Box.createVerticalStrut(26));addSection(p,"Recomendado para vos","Selecciones basadas en tus habilidades e intereses");p.add(cardGrid(controllers.busqueda().recomendar(USER_ID),this::showHome));p.add(Box.createVerticalStrut(26));addSection(p,"Explorá por categoría",null);JPanel cats=new JPanel(new FlowLayout(FlowLayout.LEFT,10,0));cats.setOpaque(false);for(String c:controllers.busqueda().categorias())if(!c.equals("Todas")){JButton b=button(c,false);b.addActionListener(uiAction(e->showExploreCategory(c)));cats.add(b);}cats.setAlignmentX(LEFT_ALIGNMENT);p.add(cats);page("Inicio",p);}
+    private void showHome(){Perfil me=controllers.perfiles().verPerfil(USER_ID);JPanel p=base();JPanel hero=new Theme.RoundedPanel(22,NAVY_2);hero.setLayout(new BorderLayout(22,0));hero.setBorder(new EmptyBorder(24,26,24,26));hero.setMaximumSize(new Dimension(Integer.MAX_VALUE,155));JPanel words=new JPanel();words.setOpaque(false);words.setLayout(new BoxLayout(words,BoxLayout.Y_AXIS));words.add(label("Hola, "+firstName(me.nombre())+" 👋",new Font("SansSerif",Font.BOLD,25),Color.WHITE));words.add(Box.createVerticalStrut(7));words.add(label("¿Qué habilidad querés desbloquear hoy?",BODY,new Color(213,228,238)));words.add(Box.createVerticalStrut(16));JTextField search=new JTextField();search.putClientProperty("JTextField.placeholderText","Buscar mentorías, servicios o habilidades...");search.setBorder(new EmptyBorder(11,13,11,13));search.addActionListener(uiAction(e->showExplore(search.getText())));words.add(search);hero.add(words);JPanel stat=new JPanel();stat.setOpaque(false);stat.setLayout(new BoxLayout(stat,BoxLayout.Y_AXIS));stat.add(label("TU PROGRESO",SMALL,new Color(169,202,219)));stat.add(label(String.valueOf(me.proyectosCompletados()),new Font("SansSerif",Font.BOLD,34),Color.WHITE));stat.add(label("proyectos completados",SMALL,new Color(213,228,238)));hero.add(stat,BorderLayout.EAST);hero.setAlignmentX(LEFT_ALIGNMENT);p.add(hero);p.add(Box.createVerticalStrut(26));addSection(p,"Recomendado para vos","Selecciones basadas en tus habilidades e intereses");p.add(cardGrid(controllers.busqueda().recomendar(USER_ID),this::showHome));p.add(Box.createVerticalStrut(26));addSection(p,"Explorá por categoría",null);JPanel cats=new JPanel(new FlowLayout(FlowLayout.LEFT,10,0));cats.setOpaque(false);for(Categoria c:controllers.busqueda().categorias())if(c.nivel()==0){JButton b=button(c.nombre(),false);b.addActionListener(uiAction(e->showExploreCategory(c.nombre())));cats.add(b);}cats.setAlignmentX(LEFT_ALIGNMENT);p.add(cats);page("Inicio",p);}
 
     private void showExplore(){showExplore("");}
     private void showExplore(String initial){showExploreWith(initial,"Todas");}
@@ -132,8 +131,12 @@ public final class SkillSwapView extends JPanel {
         filters.setAlignmentX(LEFT_ALIGNMENT);
         JTextField q = new JTextField(initial, 24);
         q.setBorder(new EmptyBorder(10, 12, 10, 12));
-        JComboBox<String> cat = new JComboBox<>(controllers.busqueda().categorias().toArray(String[]::new));
-        cat.setSelectedItem(category);
+        JComboBox<Categoria> cat = new JComboBox<>();
+        cat.addItem(Categoria.TODAS);
+        controllers.busqueda().categorias().forEach(cat::addItem);
+        for (int index = 0; index < cat.getItemCount(); index++) {
+            if (cat.getItemAt(index).nombre().equalsIgnoreCase(category)) cat.setSelectedIndex(index);
+        }
         JComboBox<String> order = new JComboBox<>(ORDENES);
         JButton go = button("Buscar", true);
         filters.add(q);
@@ -169,14 +172,14 @@ public final class SkillSwapView extends JPanel {
         Runnable[] refresh = new Runnable[1];
         refresh[0] = () -> {
             PaginaPublicaciones page = controllers.busqueda().buscar(new FiltrosBusqueda(q.getText(),
-                    (String) cat.getSelectedItem(), modalidad(modality.getSelectedIndex()), skill.getText(),
+                    ((Categoria) cat.getSelectedItem()).nombre(), modalidad(modality.getSelectedIndex()), skill.getText(),
                     positivoONulo(minPrice), positivoONulo(maxPrice), reputacionMinima(reputation.getSelectedIndex()),
                     (String) order.getSelectedItem(), currentPage[0], TAMANIO_PAGINA_EXPLORAR));
             results.removeAll();
             String pages = page.totalPaginas() == 0 ? "" : " · Página " + (page.pagina() + 1) + " de " + page.totalPaginas();
             addSection(results, page.total() + " resultados" + pages, "Mentorías y servicios disponibles");
             results.add(cardGrid(page.items(),
-                    () -> showExploreWith(q.getText(), (String) cat.getSelectedItem())));
+                    () -> showExploreWith(q.getText(), ((Categoria) cat.getSelectedItem()).nombre())));
             JPanel pager = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 12));
             pager.setOpaque(false);
             pager.setAlignmentX(LEFT_ALIGNMENT);
@@ -334,7 +337,26 @@ public final class SkillSwapView extends JPanel {
 
     private void showListings(){JPanel p=base();JPanel title=new JPanel(new BorderLayout());title.setOpaque(false);title.add(label("Gestioná tus publicaciones",H2,TEXT));JButton create=button("+ Nueva publicación",true);create.addActionListener(uiAction(e->createListing()));title.add(create,BorderLayout.EAST);title.setMaximumSize(new Dimension(Integer.MAX_VALUE,45));title.setAlignmentX(LEFT_ALIGNMENT);p.add(title);p.add(Box.createVerticalStrut(15));List<Publicacion> own=controllers.publicaciones().listarPropias(USER_ID);if(own.isEmpty()){p.add(empty("Todavía no publicaste servicios","Creá tu primera propuesta para comenzar a compartir tu talento."));}else for(Publicacion x:own){JPanel row=card(new BorderLayout(12,0));row.setMaximumSize(new Dimension(Integer.MAX_VALUE,90));row.add(label(x.tipo()==null?x.titulo():x.tipo()+" · "+x.titulo(),H3,TEXT),BorderLayout.WEST);row.add(pill(x.estado().name(),x.estado()==EstadoPublicacion.PUBLICADA?TEAL:MUTED),BorderLayout.CENTER);JButton toggle=button(x.estado()==EstadoPublicacion.PUBLICADA?"Pausar":"Publicar",false);toggle.addActionListener(uiAction(e->{controllers.publicaciones().cambiarEstado(USER_ID,x.id(),x.estado()==EstadoPublicacion.PUBLICADA?EstadoPublicacion.PAUSADA:EstadoPublicacion.PUBLICADA);showListings();}));row.add(toggle,BorderLayout.EAST);p.add(row);p.add(Box.createVerticalStrut(10));}page("Mis publicaciones",p);}
 
-    private void createListing(){JTextField title=new JTextField();JTextArea desc=new JTextArea(4,26);JComboBox<String> cat=new JComboBox<>(controllers.busqueda().categorias().stream().filter(c->!c.equals("Todas")).toArray(String[]::new));JComboBox<TipoPublicacion> type=new JComboBox<>(controllers.publicaciones().tiposPublicacion(USER_ID).toArray(TipoPublicacion[]::new));JPanel form=new JPanel(new GridLayout(0,1,4,5));form.add(new JLabel("Tipo"));form.add(type);form.add(new JLabel("Título"));form.add(title);form.add(new JLabel("Descripción"));form.add(new JScrollPane(desc));form.add(new JLabel("Categoría"));form.add(cat);if(JOptionPane.showConfirmDialog(this,form,"Nueva publicación",JOptionPane.OK_CANCEL_OPTION,JOptionPane.PLAIN_MESSAGE)==JOptionPane.OK_OPTION&&!title.getText().isBlank()){controllers.publicaciones().crearBorrador(USER_ID,title.getText(),desc.getText(),(String)cat.getSelectedItem(),Modalidad.REMOTA,60,150,(TipoPublicacion)type.getSelectedItem());message("Borrador creado","La publicación quedó lista para que tus alumnos conecten su flujo real.");showListings();}}
+    /**
+     * Nueva publicación con todos los datos del borrador. Si el dominio rechaza algo, se muestra el
+     * error y el formulario vuelve a abrirse con lo que se había cargado.
+     */
+    private void createListing() {
+        NuevaPublicacionForm form = new NuevaPublicacionForm(controllers.publicaciones().tiposPublicacion(USER_ID),
+                controllers.busqueda().categorias());
+        while (JOptionPane.showConfirmDialog(this, form, "Nueva publicación", JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE) == JOptionPane.OK_OPTION) {
+            try {
+                controllers.publicaciones().crearBorrador(USER_ID, form.datos());
+            } catch (PresentationException error) {
+                showError(error.error());
+                continue;
+            }
+            message("Borrador creado", "Publicalo desde Mis publicaciones para que aparezca en la búsqueda.");
+            showListings();
+            return;
+        }
+    }
 
     private void showContracts() {
         JPanel p = base();
@@ -540,6 +562,11 @@ public final class SkillSwapView extends JPanel {
 
     private ActionListener uiAction(ActionListener listener) {
         return event -> actions.run(() -> listener.actionPerformed(event));
+    }
+
+    private void showError(ErrorPresentacion error) {
+        JOptionPane.showMessageDialog(this, error.mensaje(), "No se pudo completar la operación",
+                JOptionPane.ERROR_MESSAGE);
     }
 
     private void message(String title,String body){JOptionPane.showMessageDialog(this,body,title,JOptionPane.INFORMATION_MESSAGE);}

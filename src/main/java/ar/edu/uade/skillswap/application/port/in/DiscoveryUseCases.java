@@ -1,6 +1,7 @@
 package ar.edu.uade.skillswap.application.port.in;
 
 import ar.edu.uade.skillswap.application.error.ApplicationException;
+import ar.edu.uade.skillswap.application.model.DiscoveryData.CategoryView;
 import ar.edu.uade.skillswap.application.model.DiscoveryData.SearchQuery;
 import ar.edu.uade.skillswap.application.model.PageResult;
 import ar.edu.uade.skillswap.application.model.PublicationData.PublicationView;
@@ -19,5 +20,6 @@ public interface DiscoveryUseCases {
      */
     PageResult<PublicationView> search(SearchQuery query);
     List<PublicationView> recommend(int limit);
-    List<String> categories();
+    /** Categorías del catálogo en el orden del árbol (cada una seguida de sus subcategorías), con su profundidad. */
+    List<CategoryView> categories();
 }

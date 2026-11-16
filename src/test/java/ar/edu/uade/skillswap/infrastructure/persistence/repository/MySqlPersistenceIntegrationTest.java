@@ -594,11 +594,11 @@ class MySqlPersistenceIntegrationTest {
         List<String> expected = new ArrayList<>();
         transactions.required(() -> {
             for (int price = 10; price <= 50; price += 10) {
-                Publication publication = newPublication(1, price, "Paginación");
+                Publication publication = newPublication(1, price, "Productividad");
                 publications.save(publication);
                 expected.add(publication.id());
             }
-            Publication draft = newPublication(1, 5, "Paginación");
+            Publication draft = newPublication(1, 5, "Productividad");
             draft.pause("provider");
             publications.save(draft); // excluded by status
             return null;
@@ -620,7 +620,7 @@ class MySqlPersistenceIntegrationTest {
     }
 
     private SearchQuery search(int page, int minimum, int maximum) {
-        return new SearchQuery("Java", "Paginación", Modality.REMOTE, null, minimum, maximum,
+        return new SearchQuery("Java", "Productividad", Modality.REMOTE, null, minimum, maximum,
                 0.0, SearchOrder.LOWEST_PRICE, page, 2);
     }
 
@@ -631,14 +631,14 @@ class MySqlPersistenceIntegrationTest {
         List<String> expected = transactions.required(() -> {
             List<String> ids = new ArrayList<>();
             for (int i = 0; i < 5; i++) {
-                Publication publication = newPublication(1, 20, "Paginación");
+                Publication publication = newPublication(1, 20, "Productividad");
                 publications.save(publication);
                 ids.add(publication.id());
             }
             transactions.currentEntityManager().flush();
             transactions.currentEntityManager().createNativeQuery(
                     "UPDATE publications SET created_at = '2026-01-01 10:00:00' WHERE category = :category")
-                    .setParameter("category", "Paginación").executeUpdate();
+                    .setParameter("category", "Productividad").executeUpdate();
             return ids.stream().sorted().toList();
         });
         List<String> actual = new ArrayList<>();

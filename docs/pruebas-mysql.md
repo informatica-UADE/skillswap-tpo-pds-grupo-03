@@ -16,6 +16,7 @@ Se verifican:
 - Pagos de contrataciones distintas sobre la misma billetera con fondos para una sola: no hay doble gasto.
 - Filtros por texto, categoría, modalidad, precio y reputación; conteo total, orden por precio, páginas sucesivas sin duplicados y página fuera de rango. Desempate por ID cuando precio y fecha son idénticos.
 - Orden por reputación del autor antes de la fecha, con paginación y filtro mínimo de reputación.
+- Catálogo jerárquico (#37, `MySqlCatalogRepositoryTest`): el árbol que carga V6 coincide con `DemoCatalog`; los nombres se comparan sin acentos; la clave foránea rechaza una categoría que no está en el catálogo y acepta `NULL` en un borrador; la actualización desde V5 conserva las categorías anteriores como raíces y deja en `NULL` los borradores sin categoría. El filtro por rama se verifica con `PublicationSearchContract` sobre MySQL.
 - Registro, consulta, actualización de habilidades/intereses, preferencias y disponibilidad, baja lógica y reactivación de perfiles.
 - Calificación persistida, actualización de reputación, rollback conjunto y unicidad por contratación/autor, comprobada en Application y directamente en MySQL. Las calificaciones duplicadas simultáneas también se verifican tres veces.
 - Bandejas de notificaciones por destinatario, lectura individual y masiva, permisos y rollback.
@@ -32,7 +33,7 @@ Las carreras usan conexiones y transacciones independientes en dos hilos, coordi
 
 Las reglas de estados, participantes, saldo y capacidad continúan en Domain/Application. Las correcciones se limitan a Infrastructure, configuración, migración y pruebas.
 
-El modo `--persistence=jpa` ejecuta Flyway y compone todos los repositorios JPA con un único `JpaTransactionManager` y `EntityManagerFactory`. La composición de servicios, Observer y Simple Factory es compartida con el modo en memoria. Los proveedores de email/push e identidad continúan siendo mock. El [README](../README.md) detalla cómo iniciar la interfaz con la base configurada.
+La aplicación ejecuta Flyway y compone todos los repositorios JPA con un único `JpaTransactionManager` y `EntityManagerFactory`; no hay un modo en memoria. Las pruebas que no necesitan MySQL usan la misma composición sobre una base H2 creada por prueba (`H2Database`), sin Flyway: Hibernate genera el esquema desde las entidades. Los proveedores de email/push e identidad continúan siendo mock. El [README](../README.md) detalla cómo iniciar la interfaz con la base configurada.
 
 ## Ejecución local en PowerShell
 

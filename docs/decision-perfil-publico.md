@@ -61,7 +61,7 @@ El cliente pasa de cuatro dependencias y una secuencia de lecturas a una depende
 | Facade (Application) | `PublicProfileFacade` | Coordina las cuatro lecturas en una transacción y arma la vista. | No decide qué es visible ni calcula reputación. |
 | Mapper de Application | `PublicProfileApplicationMapper` | Elige qué datos del perfil se publican y convierte entidades en DTOs. | No accede a repositorios. |
 | Puertos de salida | `ProfileRepository`, `PublicationRepository`, `BookingRepository`, `RatingRepository` | Interfaces definidas en Application, la capa que las necesita. | No conocen JPA. |
-| Infraestructura | `Jpa*Repository`, `InMemory*Repository` | Implementan las consultas: JPA sobre MySQL, en memoria para el modo demo y los tests. | No agregan reglas. |
+| Infraestructura | `Jpa*Repository` | Implementan las consultas sobre MySQL (H2 en las pruebas). | No agregan reglas. |
 | Controller (Presentation) | `PerfilUiController.verPerfilPublico(perfilUserId, pagina)` | Arma `PublicProfileQuery` con el tamaño de página de la pantalla, delega en el puerto y convierte la vista a `Models.PerfilPublico` con `UiModelMapper`. No exige que el perfil sea del usuario activo. | No arma el perfil ni conoce los repositorios. |
 | Vista (Swing) | `SkillSwapView.showPublicProfile` | Muestra encabezado, habilidades, historial, últimas reseñas y publicaciones activas con Anterior/Siguiente. Se abre haciendo clic en el nombre de un usuario, que se muestra como enlace (azul y subrayado): el autor en las tarjetas de publicaciones (Inicio, Explorar y el propio perfil público) y en el detalle, y la contraparte en Contrataciones. | No llama a Application: solo usa `UiControllers`. |
 
@@ -107,12 +107,11 @@ Se mantienen separadas, como en el resto del proyecto: el dominio no depende de 
 | --- | --- | --- |
 | `PublicProfileFacadeTest` | Unitaria de Application, con dobles de los cuatro repositorios y de `TransactionManager` | Arma la vista completa; pide una sola página y conteos (los dobles fallan si se usan los listados completos); la vista no tiene campos privados ni el autor de cada calificación; perfil dado de baja o inexistente → `NOT_FOUND` sin leer otros subsistemas; validación de entrada; las cuatro lecturas en una sola transacción. |
 | `PublicProfileQueriesContract` | Contrato ejecutable de los puertos de salida | Solo publicaciones `PUBLISHED` del autor, orden y paginación con total; conteos de `COMPLETED` por rol; últimas N calificaciones ordenadas. |
-| `InMemoryPublicProfileQueriesTest` | Contrato sobre los repositorios en memoria | Que el modo demo se comporte igual que la base. |
 | `JpaPublicProfileQueriesTest` | Integración de Infrastructure con JPA sobre H2 (corre siempre) | Las consultas JPQL y los mapeos. |
 | `MySqlPublicProfileQueriesTest` | Integración con MySQL real y las migraciones de Flyway (perfil `mysql-it`) | Las mismas consultas sobre el esquema real, con claves foráneas e índices. |
 
 | `PerfilUiControllerTest` | Unitaria de Presentation, con dobles de los puertos | Convierte la consulta (usuario, página, tamaño) y la vista; no exige el usuario activo; valida antes de llamar al puerto; traduce `NOT_FOUND` a `NO_ENCONTRADO`. "Mi perfil" muestra el rol y los proyectos completados reales. |
-| `SkillSwapUiControllersTest` | Integración de Presentation con Application y repositorios en memoria | El autor de una publicación se identifica por `proveedorId`; después de un ciclo completo (solicitar, aceptar, pagar, iniciar, completar, calificar) el perfil público muestra la contratación completada, la reputación y la reseña, y "Mi perfil" del cliente cuenta la completada. |
+| `SkillSwapUiControllersTest` | Integración de Presentation con Application y repositorios JPA sobre H2 | El autor de una publicación se identifica por `proveedorId`; después de un ciclo completo (solicitar, aceptar, pagar, iniciar, completar, calificar) el perfil público muestra la contratación completada, la reputación y la reseña, y "Mi perfil" del cliente cuenta la completada. |
 | `SkillSwapViewTest` | Prueba de la pantalla Swing | El nombre abre el perfil público desde una tarjeta de Inicio (sin entrar al detalle), desde Contrataciones y desde el detalle de una publicación, y "← Volver" regresa a la pantalla de origen. |
 | `PresentationContractsTest` | Contrato de los DTO | `PublicProfileData` y `Models.PerfilPublico` solo contienen datos simples y otros DTO. |
 
