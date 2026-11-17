@@ -8,25 +8,375 @@ skinparam nodesep 25
 skinparam ranksep 35
 
 package "Presentation" {
-  class SkillSwapView <<UI>>
-  interface UiControllers
-  class UiModels <<view models and mappers>>
+  class SkillSwapView <<Swing UI>> {
+    - controllers: UiControllers
+    - actions: UiActionHandler
+    + SkillSwapView(controllers: UiControllers)
+  }
+  interface UiControllers {
+    + busqueda(): UiControllers.BusquedaController
+    + publicaciones(): UiControllers.PublicacionController
+    + contrataciones(): UiControllers.ContratacionController
+    + calificaciones(): UiControllers.CalificacionController
+    + sesionDemo(): UiControllers.SesionDemo
+    + wallet(): UiControllers.WalletController
+    + notificaciones(): UiControllers.NotificacionController
+    + perfiles(): UiControllers.PerfilController
+  }
+  interface "UiControllers.BusquedaController" as UiBusquedaController {
+    + buscar(filtros: Models.FiltrosBusqueda): Models.PaginaPublicaciones
+    + recomendar(userId: String): List<Models.Publicacion>
+    + categorias(): List<Models.Categoria>
+  }
+  interface "UiControllers.PublicacionController" as UiPublicacionController {
+    + listarPropias(userId: String): List<Models.Publicacion>
+    + crearBorrador(userId: String, titulo: String, descripcion: String, categoria: String, modalidad: Models.Modalidad, duracion: int, precio: int, tipo: Models.TipoPublicacion): Models.Publicacion
+    + tiposPublicacion(userId: String): List<Models.TipoPublicacion>
+    + crearBorrador(userId: String, datos: Models.DatosBorrador): Models.Publicacion
+    + editarBorrador(userId: String, publicacionId: String, datos: Models.EdicionBorrador): Models.Publicacion
+    + cambiarEstado(userId: String, publicacionId: String, estado: Models.EstadoPublicacion): Models.Publicacion
+  }
+  interface "UiControllers.ContratacionController" as UiContratacionController {
+    + listarContrataciones(userId: String): List<Models.Contratacion>
+    + solicitar(userId: String, publicacionId: String, mensajeCliente: String, objetivo: String, franjaId: String): Models.Contratacion
+    + aceptar(userId: String, contratacionId: String): Models.Contratacion
+    + rechazar(userId: String, contratacionId: String, motivo: String): Models.Contratacion
+    + pagar(userId: String, contratacionId: String): Models.Contratacion
+    + cancelar(userId: String, contratacionId: String): Models.Contratacion
+    + cancelar(userId: String, contratacionId: String, motivo: String): Models.Contratacion
+    + proponerReprogramacion(userId: String, contratacionId: String, nuevaFranjaId: String): Models.Contratacion
+    + aceptarReprogramacion(userId: String, contratacionId: String): Models.Contratacion
+    + iniciar(userId: String, contratacionId: String): Models.Contratacion
+    + completar(userId: String, contratacionId: String): Models.Contratacion
+    + avanzar(userId: String, contratacionId: String): Models.Contratacion
+    + puedeAvanzar(userId: String, contratacionId: String): boolean
+  }
+  interface "UiControllers.CalificacionController" as UiCalificacionController {
+    + calificar(userId: String, contratacionId: String, puntaje: int, comentario: String): Models.Calificacion
+  }
+  interface "UiControllers.WalletController" as UiWalletController {
+    + consultarSaldo(userId: String): int
+    + listarMovimientos(userId: String): List<Models.Movimiento>
+    + acreditarDemo(userId: String, importe: int): int
+  }
+  interface "UiControllers.NotificacionController" as UiNotificacionController {
+    + listarNotificaciones(userId: String): List<Models.Notificacion>
+    + marcarLeida(userId: String, notificacionId: String): void
+    + marcarTodasLeidas(userId: String): void
+  }
+  interface "UiControllers.PerfilController" as UiPerfilController {
+    + crearPerfil(userId: String, datos: Models.NuevoPerfil): Models.Perfil
+    + verPerfil(userId: String): Models.Perfil
+    + verPerfilPublico(perfilUserId: String, pagina: int): Models.PerfilPublico
+  }
+  interface "UiControllers.SesionDemo" as UiSesionDemo {
+    + usuariosDisponibles(): List<Models.UsuarioDemo>
+    + usuarioActual(): String
+    + cambiarUsuario(userId: String): void
+  }
+
+  class BusquedaUiController <<GRASP Controller>> {
+    - discovery: DiscoveryUseCases
+    - identity: CurrentUserProvider
+    - operations: ControllerExecutor
+    - mapper: UiModelMapper
+  }
+  class PublicacionUiController <<GRASP Controller>> {
+    - commands: PublicationCommandUseCases
+    - queries: PublicationQueryUseCases
+    - identity: CurrentUserProvider
+    - operations: ControllerExecutor
+    - mapper: UiModelMapper
+  }
+  class ContratacionUiController <<GRASP Controller>> {
+    - bookings: BookingUseCases
+    - identity: CurrentUserProvider
+    - operations: ControllerExecutor
+    - mapper: UiModelMapper
+  }
+  class CalificacionUiController <<GRASP Controller>> {
+    - ratings: RatingUseCases
+    - identity: CurrentUserProvider
+    - operations: ControllerExecutor
+    - mapper: UiModelMapper
+  }
+  class WalletUiController <<GRASP Controller>> {
+    - wallets: WalletUseCases
+    - identity: CurrentUserProvider
+    - operations: ControllerExecutor
+    - mapper: UiModelMapper
+  }
+  class NotificacionUiController <<GRASP Controller>> {
+    - notifications: NotificationUseCases
+    - identity: CurrentUserProvider
+    - operations: ControllerExecutor
+    - mapper: UiModelMapper
+  }
+  class PerfilUiController <<GRASP Controller>> {
+    - profiles: ProfileUseCases
+    - publicProfiles: PublicProfileUseCases
+    - identity: CurrentUserProvider
+    - operations: ControllerExecutor
+    - mapper: UiModelMapper
+  }
+
+  interface ControllerExecutor {
+    + execute(operation: Supplier<T>): T
+  }
+  class ControllerUser <<identity validation helper>> {
+    ~ {static} requireActive(identity: CurrentUserProvider, userId: String): void
+    ~ {static} required(value: String, message: String): void
+  }
+  class UiModelMapper <<DTO mapper>> {
+    + toRegisterCommand(datos: Models.NuevoPerfil): ProfileData.RegisterCommand
+    + toCreateDraftCommand(datos: Models.DatosBorrador): PublicationData.CreateDraftCommand
+    + toEditDraftCommand(publicacionId: String, datos: Models.EdicionBorrador): PublicationData.EditDraftCommand
+    + toSearchQuery(filtros: Models.FiltrosBusqueda): DiscoveryData.SearchQuery
+    + toPublicProfileQuery(perfilUserId: String, pagina: int): PublicProfileData.PublicProfileQuery
+    + toPerfilPublico(view: PublicProfileData.PublicProfileView): Models.PerfilPublico
+    + toContratacion(view: BookingData.BookingView, activeUserId: String): Models.Contratacion
+    + toCalificacion(view: RatingData.RatingView): Models.Calificacion
+    + toMovimiento(view: WalletData.MovementView): Models.Movimiento
+    + toNotificacion(view: NotificationData.NotificationView): Models.Notificacion
+  }
+  class UiErrorMapper {
+    + toError(exception: RuntimeException): Models.ErrorPresentacion
+  }
+  class PresentationException {
+    - error: Models.ErrorPresentacion
+    + error(): Models.ErrorPresentacion
+  }
+  class UiActionHandler <<UI error handling>> {
+    - showError: Consumer<Models.ErrorPresentacion>
+    + run(action: Runnable): void
+  }
 
   SkillSwapView --> UiControllers
-  SkillSwapView --> UiModels
+  SkillSwapView ..> UiActionHandler
+  SkillSwapView ..> Models
+  UiControllers --> UiBusquedaController : busqueda()
+  UiControllers --> UiPublicacionController : publicaciones()
+  UiControllers --> UiContratacionController : contrataciones()
+  UiControllers --> UiCalificacionController : calificaciones()
+  UiControllers --> UiWalletController : wallet()
+  UiControllers --> UiNotificacionController : notificaciones()
+  UiControllers --> UiPerfilController : perfiles()
+  UiControllers --> UiSesionDemo : sesionDemo()
+}
+
+package "UI DTOs (ar.edu.uade.skillswap.model.Models)" {
+  class Models <<nested DTO holder>>
+  class "Models.NuevoPerfil" as UiNuevoPerfil <<record>> {
+    + nombre: String
+    + bio: String
+    + zonaHoraria: String
+    + habilidades: List<String>
+    + intereses: List<String>
+    + canales: Set<Models.CanalNotificacion>
+    + disponibilidad: List<Models.Disponibilidad>
+    + tipoActor: Models.TipoActor
+  }
+  class "Models.DatosBorrador" as UiDatosBorrador <<record>> {
+    + titulo: String
+    + descripcion: String
+    + categoria: String
+    + modalidad: Models.Modalidad
+    + duracionMinutos: int
+    + cupos: int
+    + precio: int
+    + etiquetas: List<String>
+    + disponibilidad: List<Models.Disponibilidad>
+    + tipo: Models.TipoPublicacion
+  }
+  class "Models.EdicionBorrador" as UiEdicionBorrador <<record>> {
+    + titulo: String
+    + descripcion: String
+    + categoria: String
+    + modalidad: Models.Modalidad
+    + duracionMinutos: int
+    + cupos: int
+    + etiquetas: List<String>
+  }
+  class "Models.FiltrosBusqueda" as UiFiltrosBusqueda <<record>> {
+    + texto: String
+    + categoria: String
+    + modalidad: Models.Modalidad
+    + habilidad: String
+    + precioMinimo: Integer
+    + precioMaximo: Integer
+    + reputacionMinima: Double
+    + orden: String
+    + pagina: int
+    + tamanio: int
+  }
+  class "Models.Perfil" as UiPerfil <<record>> {
+    + id: String
+    + nombre: String
+    + rol: String
+    + bio: String
+    + habilidades: List<String>
+    + reputacion: double
+    + resenas: int
+    + proyectosCompletados: int
+  }
+  class "Models.Publicacion" as UiPublicacion <<record>> {
+    + id: String
+    + titulo: String
+    + descripcion: String
+    + categoria: String
+    + modalidad: Models.Modalidad
+    + duracionMinutos: int
+    + precio: int
+    + reputacion: double
+    + proveedor: String
+    + proveedorId: String
+    + etiquetas: List<String>
+    + estado: Models.EstadoPublicacion
+    + destacada: boolean
+    + franjasDisponibles: List<Models.FranjaDisponibilidad>
+    + tipo: Models.TipoPublicacion
+  }
+  class "Models.PaginaPublicaciones" as UiPaginaPublicaciones <<record>> {
+    + items: List<Models.Publicacion>
+    + pagina: int
+    + tamanio: int
+    + total: long
+    + totalPaginas: int
+    + hayAnterior(): boolean
+    + haySiguiente(): boolean
+  }
+  class "Models.PerfilPublico" as UiPerfilPublico <<record>> {
+    + perfil: Models.Perfil
+    + publicaciones: Models.PaginaPublicaciones
+    + completadasComoProveedor: int
+    + completadasComoCliente: int
+    + ultimasResenas: List<Models.Resena>
+    + {static} TAMANIO_PAGINA: int
+  }
+  class "Models.Contratacion" as UiContratacion <<record>> {
+    + id: String
+    + titulo: String
+    + contraparte: String
+    + contraparteId: String
+    + fecha: LocalDateTime
+    + precio: int
+    + estado: Models.EstadoContratacion
+    + objetivo: String
+    + mensajeCliente: String
+    + franjaId: String
+  }
+  class "Models.Calificacion" as UiCalificacion <<record>> {
+    + id: String
+    + contratacionId: String
+    + puntaje: int
+    + comentario: String
+    + fecha: LocalDateTime
+  }
+  class "Models.Movimiento" as UiMovimiento <<record>> {
+    + concepto: String
+    + fecha: LocalDateTime
+    + importe: int
+    + saldo: int
+  }
+  class "Models.Notificacion" as UiNotificacion <<record>> {
+    + id: String
+    + titulo: String
+    + detalle: String
+    + fecha: LocalDateTime
+    + leida: boolean
+    + tipo: String
+  }
+  class "Models.ErrorPresentacion" as UiErrorPresentacion <<record>> {
+    + codigo: Models.CodigoError
+    + mensaje: String
+  }
+  class "Models.Resena" as UiResena <<record>> {
+    + puntaje: int
+    + comentario: String
+    + fecha: LocalDateTime
+  }
+  class "Models.Disponibilidad" as UiDisponibilidad <<record>>
+  class "Models.FranjaDisponibilidad" as UiFranjaDisponibilidad <<record>>
+  class "Models.Categoria" as UiCategoria <<record>>
+  class "Models.UsuarioDemo" as UiUsuarioDemo <<record>>
+  enum "Models.Modalidad" as UiModalidad
+  enum "Models.TipoActor" as UiTipoActor
+  enum "Models.TipoPublicacion" as UiTipoPublicacion
+  enum "Models.EstadoPublicacion" as UiEstadoPublicacion
+  enum "Models.EstadoContratacion" as UiEstadoContratacion
+  enum "Models.CanalNotificacion" as UiCanalNotificacion
+  enum "Models.CodigoError" as UiCodigoError
+
+  UiPerfilPublico *-- UiPerfil
+  UiPerfilPublico *-- UiPaginaPublicaciones
+  UiPerfilPublico *-- "0..*" UiResena
+  UiPaginaPublicaciones *-- "0..*" UiPublicacion
+  UiNuevoPerfil ..> UiDisponibilidad
+  UiNuevoPerfil ..> UiCanalNotificacion
+  UiNuevoPerfil ..> UiTipoActor
+  UiDatosBorrador ..> UiDisponibilidad
+  UiDatosBorrador ..> UiModalidad
+  UiDatosBorrador ..> UiTipoPublicacion
+  UiEdicionBorrador ..> UiModalidad
+  UiFiltrosBusqueda ..> UiModalidad
+  UiPublicacion ..> UiModalidad
+  UiPublicacion ..> UiEstadoPublicacion
+  UiPublicacion ..> UiTipoPublicacion
+  UiPublicacion ..> UiFranjaDisponibilidad
+  UiContratacion ..> UiEstadoContratacion
+  UiErrorPresentacion ..> UiCodigoError
 }
 
 package "Application" {
   package "Input ports" {
-    interface ProfileUseCases
-    interface PublicationCommandUseCases
-    interface PublicationQueryUseCases
-    interface DiscoveryUseCases
-    interface BookingUseCases
-    interface WalletUseCases
-    interface RatingUseCases
-    interface NotificationUseCases
-    interface PublicProfileUseCases
+    interface ProfileUseCases {
+      + register(command: ProfileData.RegisterCommand): ProfileData.ProfileView
+      + update(command: ProfileData.UpdateCommand): ProfileData.ProfileView
+      + viewMyProfile(): ProfileData.ProfileView
+      + activateMyProfile(): void
+      + deactivateMyProfile(): void
+    }
+    interface PublicationCommandUseCases {
+      + createDraft(command: PublicationData.CreateDraftCommand): PublicationData.PublicationView
+      + editDraft(command: PublicationData.EditDraftCommand): PublicationData.PublicationView
+      + changeStatus(command: PublicationData.ChangeStatusCommand): PublicationData.PublicationView
+    }
+    interface PublicationQueryUseCases {
+      + listMyPublications(): List<PublicationData.PublicationView>
+      + allowedPublicationTypes(): List<PublicationType>
+    }
+    interface DiscoveryUseCases {
+      + search(query: DiscoveryData.SearchQuery): PageResult<PublicationData.PublicationView>
+      + recommend(limit: int): List<PublicationData.PublicationView>
+      + categories(): List<DiscoveryData.CategoryView>
+    }
+    interface BookingUseCases {
+      + listMyBookings(): List<BookingData.BookingView>
+      + request(command: BookingData.RequestCommand): BookingData.BookingView
+      + accept(command: BookingData.BookingCommand): BookingData.BookingView
+      + reject(command: BookingData.RejectCommand): BookingData.BookingView
+      + pay(command: BookingData.BookingCommand): BookingData.BookingView
+      + cancel(command: BookingData.CancelCommand): BookingData.BookingView
+      + proposeReschedule(command: BookingData.RescheduleCommand): BookingData.BookingView
+      + acceptReschedule(command: BookingData.BookingCommand): BookingData.BookingView
+      + start(command: BookingData.BookingCommand): BookingData.BookingView
+      + complete(command: BookingData.BookingCommand): BookingData.BookingView
+    }
+    interface WalletUseCases {
+      + viewMyWallet(): WalletData.WalletView
+      + creditDemo(amountInSkillCoins: int): WalletData.WalletView
+    }
+    interface RatingUseCases {
+      + submit(command: RatingData.SubmitCommand): RatingData.RatingView
+    }
+    interface NotificationUseCases {
+      + listMine(): List<NotificationData.NotificationView>
+      + markRead(notificationId: String): void
+      + markAllRead(): void
+    }
+    interface PublicProfileUseCases {
+      + viewPublicProfile(query: PublicProfileData.PublicProfileQuery): PublicProfileData.PublicProfileView
+    }
   }
 
   package "Use case services" {
@@ -37,21 +387,46 @@ package "Application" {
     class WalletApplicationService
     class RatingApplicationService
     class NotificationApplicationService
-    class PublicProfileFacade <<Facade>>
+    class PublicProfileFacade <<Facade>> {
+      - profiles: ProfileRepository
+      - publications: PublicationRepository
+      - bookings: BookingRepository
+      - ratings: RatingRepository
+      - transactions: TransactionManager
+      + PublicProfileFacade(profiles: ProfileRepository, publications: PublicationRepository, bookings: BookingRepository, ratings: RatingRepository, transactions: TransactionManager)
+      + viewPublicProfile(query: PublicProfileData.PublicProfileQuery): PublicProfileData.PublicProfileView
+    }
   }
 
   package "Output ports" {
-    interface ProfileRepository
-    interface PublicationRepository
+    interface ProfileRepository {
+      + findByUserId(userId: String): Optional<Profile>
+    }
+    interface PublicationRepository {
+      + findPublishedByAuthor(authorUserId: String, page: int, size: int): PageResult<Publication>
+    }
     interface PublicationQueryPort
-    interface BookingRepository
+    interface BookingRepository {
+      + countCompletedByProvider(providerUserId: String): long
+      + countCompletedByBuyer(buyerUserId: String): long
+    }
     interface WalletRepository
-    interface RatingRepository
+    interface RatingRepository {
+      + findRecentBySubjectUserId(subjectUserId: String, limit: int): List<Rating>
+    }
     interface NotificationRepository
     interface CurrentUserProvider
-    interface TransactionManager
+    interface TransactionManager {
+      + required(work: Supplier<T>): T
+    }
     interface DomainEventPublisher
     interface NotificationGateway
+  }
+
+  package "Mappers (application.mapper)" {
+    class PublicProfileApplicationMapper <<static mapper>> {
+      + {static} toView(profile: Profile, publications: PageResult<Publication>, completedBookings: CompletedBookingsSummary, recentRatings: List<Rating>): PublicProfileView
+    }
   }
 
   package "Application models" {
@@ -59,6 +434,59 @@ package "Application" {
     class ReadResults
     class DomainEvent
     class NotificationMessage
+    class "PublicProfileData.PublicProfileQuery" as PublicProfileQuery <<immutable record>> {
+      + userId: String
+      + page: int
+      + size: int
+      + {static} MAX_PAGE_SIZE: int = 50
+    }
+    class "PublicProfileData.PublicProfileView" as PublicProfileView <<immutable read model>> {
+      + userId: String
+      + actorType: ActorType
+      + displayName: String
+      + biography: String
+      + skills: List<String>
+      + reputation: double
+      + ratingCount: int
+      + activePublications: PageResult<PublicationData.PublicationView>
+      + completedBookings: PublicProfileData.CompletedBookingsSummary
+      + recentRatings: List<PublicProfileData.ReceivedRatingView>
+    }
+    class "PublicProfileData.CompletedBookingsSummary" as CompletedBookingsSummary <<immutable record>> {
+      + asProvider: long
+      + asClient: long
+      + total(): long
+    }
+    class "PublicProfileData.ReceivedRatingView" as ReceivedRatingView <<immutable record>> {
+      + score: int
+      + comment: String
+      + createdAt: LocalDateTime
+    }
+    class "PageResult<T>" as PageResult <<immutable record>> {
+      + items: List<T>
+      + page: int
+      + size: int
+      + totalElements: long
+      + totalPages(): int
+    }
+    class "PublicationData.PublicationView" as PublicPublicationView <<immutable record>> {
+      + id: String
+      + authorUserId: String
+      + type: PublicationType
+      + title: String
+      + description: String
+      + category: String
+      + modality: Modality
+      + durationMinutes: int
+      + capacity: int
+      + priceInSkillCoins: int
+      + tags: Set<String>
+      + status: PublicationStatus
+      + availability: List<ProfileData.AvailabilityView>
+      + createdAt: LocalDateTime
+      + requestCount: int
+      + author: PublicationData.AuthorView
+    }
   }
 }
 
@@ -79,9 +507,22 @@ package "Domain" {
 
 package "Infrastructure" {
   class SkillSwapApplicationWiring <<composition root>>
-  class SkillSwapUiControllers <<UI composition>>
-  class BusquedaUiController
-  class PerfilUiController
+  class SkillSwapUiControllers <<controller composition>> {
+    + busqueda: UiControllers.BusquedaController
+    + publicaciones: UiControllers.PublicacionController
+    + contrataciones: UiControllers.ContratacionController
+    + calificaciones: UiControllers.CalificacionController
+    + wallet: UiControllers.WalletController
+    + notificaciones: UiControllers.NotificacionController
+    + perfiles: UiControllers.PerfilController
+    + sesionDemo: UiControllers.SesionDemo
+    + {static} from(wiring: SkillSwapApplicationWiring): SkillSwapUiControllers
+  }
+  class UiOperationExecutor <<presentation adapter>> {
+    - errors: UiErrorMapper
+    + execute(operation: Supplier<T>): T
+    + execute(operation: Runnable): void
+  }
 
   package "JPA adapters" {
     class JpaProfileRepository
@@ -111,11 +552,122 @@ package "Infrastructure" {
   }
 }
 
+package "Mock UI Kit" {
+  class MockSkillSwapControllers <<mock adapter>>
+}
+
 ' Input adapters expose UI contracts; application services implement input ports.
 SkillSwapUiControllers ..|> UiControllers
 SkillSwapUiControllers ..> SkillSwapApplicationWiring : from(wiring)
-BusquedaUiController --> DiscoveryApplicationService
-PerfilUiController --> PublicProfileUseCases
+SkillSwapUiControllers ..> BusquedaUiController : creates
+SkillSwapUiControllers ..> PublicacionUiController : creates
+SkillSwapUiControllers ..> ContratacionUiController : creates
+SkillSwapUiControllers ..> CalificacionUiController : creates
+SkillSwapUiControllers ..> WalletUiController : creates
+SkillSwapUiControllers ..> NotificacionUiController : creates
+SkillSwapUiControllers ..> PerfilUiController : creates
+MockSkillSwapControllers ..|> UiControllers
+MockSkillSwapControllers ..|> UiBusquedaController
+MockSkillSwapControllers ..|> UiPublicacionController
+MockSkillSwapControllers ..|> UiContratacionController
+MockSkillSwapControllers ..|> UiCalificacionController
+MockSkillSwapControllers ..|> UiWalletController
+MockSkillSwapControllers ..|> UiNotificacionController
+MockSkillSwapControllers ..|> UiPerfilController
+
+BusquedaUiController ..|> UiBusquedaController
+PublicacionUiController ..|> UiPublicacionController
+ContratacionUiController ..|> UiContratacionController
+CalificacionUiController ..|> UiCalificacionController
+WalletUiController ..|> UiWalletController
+NotificacionUiController ..|> UiNotificacionController
+PerfilUiController ..|> UiPerfilController
+
+SkillSwapUiControllers --> UiBusquedaController : busqueda
+SkillSwapUiControllers --> UiPublicacionController : publicaciones
+SkillSwapUiControllers --> UiContratacionController : contrataciones
+SkillSwapUiControllers --> UiCalificacionController : calificaciones
+SkillSwapUiControllers --> UiWalletController : wallet
+SkillSwapUiControllers --> UiNotificacionController : notificaciones
+SkillSwapUiControllers --> UiPerfilController : perfiles
+SkillSwapUiControllers --> UiSesionDemo : sesionDemo
+
+BusquedaUiController --> DiscoveryUseCases
+PublicacionUiController --> PublicationCommandUseCases
+PublicacionUiController --> PublicationQueryUseCases
+ContratacionUiController --> BookingUseCases
+CalificacionUiController --> RatingUseCases
+WalletUiController --> WalletUseCases
+NotificacionUiController --> NotificationUseCases
+PerfilUiController --> ProfileUseCases
+PerfilUiController --> PublicProfileUseCases : viewPublicProfile(query)
+
+BusquedaUiController --> CurrentUserProvider
+PublicacionUiController --> CurrentUserProvider
+ContratacionUiController --> CurrentUserProvider
+CalificacionUiController --> CurrentUserProvider
+WalletUiController --> CurrentUserProvider
+NotificacionUiController --> CurrentUserProvider
+PerfilUiController --> CurrentUserProvider
+
+BusquedaUiController --> ControllerExecutor
+PublicacionUiController --> ControllerExecutor
+ContratacionUiController --> ControllerExecutor
+CalificacionUiController --> ControllerExecutor
+WalletUiController --> ControllerExecutor
+NotificacionUiController --> ControllerExecutor
+PerfilUiController --> ControllerExecutor
+BusquedaUiController ..> UiModelMapper
+PublicacionUiController ..> UiModelMapper
+ContratacionUiController ..> UiModelMapper
+CalificacionUiController ..> UiModelMapper
+WalletUiController ..> UiModelMapper
+NotificacionUiController ..> UiModelMapper
+PerfilUiController ..> UiModelMapper
+BusquedaUiController ..> ControllerUser
+PublicacionUiController ..> ControllerUser
+ContratacionUiController ..> ControllerUser
+CalificacionUiController ..> ControllerUser
+WalletUiController ..> ControllerUser
+NotificacionUiController ..> ControllerUser
+PerfilUiController ..> ControllerUser
+
+UiOperationExecutor ..|> ControllerExecutor
+UiOperationExecutor --> UiErrorMapper
+UiOperationExecutor ..> PresentationException : throws
+UiErrorMapper ..> UiErrorPresentacion
+PresentationException --> UiErrorPresentacion
+UiActionHandler ..> PresentationException : catches
+UiActionHandler --> UiErrorPresentacion : presents
+
+UiBusquedaController ..> UiFiltrosBusqueda
+UiBusquedaController ..> UiPaginaPublicaciones
+UiBusquedaController ..> UiPublicacion
+UiBusquedaController ..> UiCategoria
+UiPublicacionController ..> UiDatosBorrador
+UiPublicacionController ..> UiEdicionBorrador
+UiPublicacionController ..> UiPublicacion
+UiContratacionController ..> UiContratacion
+UiPerfilController ..> UiNuevoPerfil
+UiPerfilController ..> UiPerfil
+UiPerfilController ..> UiPerfilPublico
+UiCalificacionController ..> UiCalificacion
+UiWalletController ..> UiMovimiento
+UiNotificacionController ..> UiNotificacion
+BusquedaUiController ..> UiFiltrosBusqueda
+BusquedaUiController ..> UiPaginaPublicaciones
+BusquedaUiController ..> UiPublicacion
+BusquedaUiController ..> UiCategoria
+PublicacionUiController ..> UiDatosBorrador
+PublicacionUiController ..> UiEdicionBorrador
+PublicacionUiController ..> UiPublicacion
+ContratacionUiController ..> UiContratacion
+CalificacionUiController ..> UiCalificacion
+WalletUiController ..> UiMovimiento
+NotificacionUiController ..> UiNotificacion
+PerfilUiController ..> UiNuevoPerfil
+PerfilUiController ..> UiPerfil
+PerfilUiController ..> UiPerfilPublico
 
 ProfileUseCases <|.. ProfileApplicationService
 PublicationCommandUseCases <|.. PublicationApplicationService
@@ -126,6 +678,15 @@ WalletUseCases <|.. WalletApplicationService
 RatingUseCases <|.. RatingApplicationService
 NotificationUseCases <|.. NotificationApplicationService
 PublicProfileUseCases <|.. PublicProfileFacade
+PublicProfileFacade ..> PublicProfileQuery : query
+PublicProfileFacade ..> PublicProfileView : return type
+PublicProfileFacade ..> PublicProfileApplicationMapper : toView(...)
+PublicProfileApplicationMapper ..> PublicProfileView : creates
+PublicProfileApplicationMapper ..> PublicPublicationView
+PublicProfileView *-- CompletedBookingsSummary : completedBookings
+PublicProfileView *-- "0..*" ReceivedRatingView : recentRatings
+PublicProfileView *-- PageResult : activePublications
+PageResult ..> PublicPublicationView : items
 
 ' Application services depend on output ports, not infrastructure implementations.
 ProfileApplicationService --> ProfileRepository
@@ -260,7 +821,11 @@ note right of DomainEventPublisher
 end note
 
 note bottom of UiControllers
-  Contrato de integración consumido por la vista.
+  Contrato de integración consumido por la vista. Las firmas públicas
+  declaradas en cada interfaz son las operaciones que implementa
+  el controller concreto que realiza ese contrato.
+  Las recomendaciones están en BusquedaController.recomendar;
+  no existe un RecomendacionController separado.
   Los casos de uso de Application son puertos
   separados y no todas sus operaciones tienen
   hoy una acción de UI conectada.
@@ -273,10 +838,14 @@ note bottom of PublicationRepository
   parte de las entregas de dominio documentadas aparte.
 end note
 note bottom of PublicProfileFacade
-Facade (#40): un punto de entrada para el perfil público.
+Facade (#40): Application expone un único caso de uso de lectura.
+PerfilUiController depende del puerto PublicProfileUseCases, no de la
+clase concreta; PublicProfileFacade implementa ese puerto.
 Coordina perfiles, publicaciones activas (página),
 contrataciones completadas (conteos) y últimas calificaciones
 en una transacción de lectura; no agrega reglas de negocio.
+PublicProfileApplicationMapper construye el Read Model inmutable.
+No se exponen entidades JPA ni campos privados.
 Contrato ejecutable: PublicProfileQueriesContract.
 end note
 @enduml

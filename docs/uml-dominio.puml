@@ -236,6 +236,142 @@ FlexibleRefundPolicy ..|> RefundPolicy
 SkillAffinityStrategy ..|> RecommendationStrategy
 RecentPopularityStrategy ..|> RecommendationStrategy
 
+package "Application (referencia externa a Domain)" {
+  interface ProfileUseCases
+  interface PublicProfileUseCases
+  interface PublicationCommandUseCases
+  interface PublicationQueryUseCases
+  interface DiscoveryUseCases
+  interface BookingUseCases
+  interface WalletUseCases
+  interface RatingUseCases
+  interface NotificationUseCases
+  interface CurrentUserProvider
+  interface TransactionManager
+  interface ProfileRepository
+  interface PublicationRepository
+  interface BookingRepository
+  interface RatingRepository
+
+  class PublicProfileFacade <<Facade>> {
+    + viewPublicProfile(query: PublicProfileData.PublicProfileQuery): PublicProfileData.PublicProfileView
+  }
+}
+
+PublicProfileFacade ..|> PublicProfileUseCases
+PublicProfileFacade --> ProfileRepository
+PublicProfileFacade --> PublicationRepository
+PublicProfileFacade --> BookingRepository
+PublicProfileFacade --> RatingRepository
+PublicProfileFacade --> TransactionManager
+PublicProfileFacade ..> Profile : perfil activo y datos públicos
+PublicProfileFacade ..> Publication : página publicada devuelta por el puerto
+PublicProfileFacade ..> Rating : calificaciones recibidas devueltas por el puerto
+
+note right of PublicProfileFacade
+  Esta clase pertenece a Application, no al dominio.
+  Coordina lecturas mediante ProfileRepository,
+  PublicationRepository, BookingRepository y RatingRepository.
+  BookingRepository aporta conteos; no se cargan entidades Booking.
+  La Facade no cambia invariantes ni expone entidades JPA:
+  Presentation recibe PublicProfileData.PublicProfileView.
+end note
+
+package "Presentation (referencia externa a Domain; detalle en uml-aplicacion.puml)" {
+  class SkillSwapView <<Swing UI>>
+  interface "UiControllers" as DomainUiControllers {
+    + busqueda(): UiControllers.BusquedaController
+    + publicaciones(): UiControllers.PublicacionController
+    + contrataciones(): UiControllers.ContratacionController
+    + calificaciones(): UiControllers.CalificacionController
+    + wallet(): UiControllers.WalletController
+    + notificaciones(): UiControllers.NotificacionController
+    + perfiles(): UiControllers.PerfilController
+  }
+  interface "UiControllers.BusquedaController" as DomainUiBusqueda
+  interface "UiControllers.PublicacionController" as DomainUiPublicacion
+  interface "UiControllers.ContratacionController" as DomainUiContratacion
+  interface "UiControllers.CalificacionController" as DomainUiCalificacion
+  interface "UiControllers.WalletController" as DomainUiWallet
+  interface "UiControllers.NotificacionController" as DomainUiNotificacion
+  interface "UiControllers.PerfilController" as DomainUiPerfil
+
+  class BusquedaUiController <<GRASP Controller>> {
+    - discovery: DiscoveryUseCases
+    - identity: CurrentUserProvider
+  }
+  class PublicacionUiController <<GRASP Controller>> {
+    - commands: PublicationCommandUseCases
+    - queries: PublicationQueryUseCases
+    - identity: CurrentUserProvider
+  }
+  class ContratacionUiController <<GRASP Controller>> {
+    - bookings: BookingUseCases
+    - identity: CurrentUserProvider
+  }
+  class CalificacionUiController <<GRASP Controller>> {
+    - ratings: RatingUseCases
+    - identity: CurrentUserProvider
+  }
+  class WalletUiController <<GRASP Controller>> {
+    - wallets: WalletUseCases
+    - identity: CurrentUserProvider
+  }
+  class NotificacionUiController <<GRASP Controller>> {
+    - notifications: NotificationUseCases
+    - identity: CurrentUserProvider
+  }
+  class PerfilUiController <<GRASP Controller>> {
+    - profiles: ProfileUseCases
+    - publicProfiles: PublicProfileUseCases
+    - identity: CurrentUserProvider
+  }
+  class MockSkillSwapControllers <<Mock UI Kit adapter>>
+}
+
+SkillSwapView ..> DomainUiControllers
+MockSkillSwapControllers ..|> DomainUiControllers
+MockSkillSwapControllers ..|> DomainUiBusqueda
+MockSkillSwapControllers ..|> DomainUiPublicacion
+MockSkillSwapControllers ..|> DomainUiContratacion
+MockSkillSwapControllers ..|> DomainUiCalificacion
+MockSkillSwapControllers ..|> DomainUiWallet
+MockSkillSwapControllers ..|> DomainUiNotificacion
+MockSkillSwapControllers ..|> DomainUiPerfil
+BusquedaUiController ..|> DomainUiBusqueda
+PublicacionUiController ..|> DomainUiPublicacion
+ContratacionUiController ..|> DomainUiContratacion
+CalificacionUiController ..|> DomainUiCalificacion
+WalletUiController ..|> DomainUiWallet
+NotificacionUiController ..|> DomainUiNotificacion
+PerfilUiController ..|> DomainUiPerfil
+BusquedaUiController --> DiscoveryUseCases
+PublicacionUiController --> PublicationCommandUseCases
+PublicacionUiController --> PublicationQueryUseCases
+ContratacionUiController --> BookingUseCases
+CalificacionUiController --> RatingUseCases
+WalletUiController --> WalletUseCases
+NotificacionUiController --> NotificationUseCases
+PerfilUiController --> ProfileUseCases
+PerfilUiController --> PublicProfileUseCases
+BusquedaUiController --> CurrentUserProvider
+PublicacionUiController --> CurrentUserProvider
+ContratacionUiController --> CurrentUserProvider
+CalificacionUiController --> CurrentUserProvider
+WalletUiController --> CurrentUserProvider
+NotificacionUiController --> CurrentUserProvider
+PerfilUiController --> CurrentUserProvider
+
+note bottom of DomainUiControllers
+  UiControllers es el contrato consumido por SkillSwapView.
+  Las clases de Presentation dependen de puertos de entrada
+  de Application; no tienen dependencias directas con agregados
+  de Domain ni con adaptadores de persistencia. Los métodos y DTOs
+  de cada contrato se detallan en uml-aplicacion.puml.
+  recomendar(userId) forma parte de BusquedaController;
+  no existe un RecomendacionController separado.
+end note
+
 note right of Rating
   La fábrica de dominio exige que la contratación
   esté completada y que quien califica sea participante.

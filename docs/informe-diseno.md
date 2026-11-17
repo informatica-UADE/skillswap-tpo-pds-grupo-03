@@ -2,7 +2,7 @@
 
 Trabajo Práctico Final - Proceso de Desarrollo de Software. Grupo 03.
 
-Revisión del 15/11/2026 para el PR #65, sobre main en e64048c (#63/#64 y #75 integrados). Este informe documenta el código y la validación de la rama; no certifica funcionalidades de otros issues abiertos. Los diagramas y el PDF histórico que los contiene permanecen intactos. La versión actual sin UML se entrega en output/pdf/informe-diseno-actualizado.pdf.
+Revisión del 15/11/2026 para el PR #65, sobre main en e64048c (#63/#64 y #75 integrados). Este informe documenta el código y la validación de la rama; no certifica funcionalidades de otros issues abiertos. El modelo editable y el PDF histórico con diagramas permanecen intactos; los fuentes PlantUML se actualizan para mostrar Facade y controllers. La versión actual del informe se entrega en output/pdf/informe-diseno-actualizado.pdf.
 
 ## 1. Alcance ejecutable
 
@@ -14,13 +14,15 @@ La aplicación siempre persiste en MySQL con repositorios JPA: no hay un modo en
 
 | Capa | Responsabilidad y evidencia |
 | --- | --- |
-| Presentation | SkillSwapView, UiControllers y controllers de búsqueda, perfil, publicaciones, contratación y calificación. Convierten datos y delegan. PresentationException y UiActionHandler muestran errores estables. |
+| Presentation | SkillSwapView consume el contrato UiControllers; BusquedaUiController, PublicacionUiController, ContratacionUiController, PerfilUiController, WalletUiController, CalificacionUiController y NotificacionUiController implementan contratos cohesivos por pantalla. Convierten DTOs y delegan en puertos de entrada. PresentationException y UiActionHandler muestran errores estables. |
 | Application | Servicios por capacidad, puertos y comandos/resultados. Identifican al actor, coordinan agregados, transacciones y eventos. No importan Swing ni JPA. |
 | Domain | Profile, Publication, Booking, Wallet, Rating, estados, políticas, Builder y cotizaciones. Conserva invariantes y depende de Java estándar. |
 | Infrastructure | Repositorios JPA, mappers, migraciones, transacciones y adapters. Implementa los puertos internos. |
 | Composición | SkillSwapApplicationWiring selecciona implementaciones. SkillSwapUiControllers (#32) arma un controller por pantalla (búsqueda, publicaciones, contrataciones, calificaciones, billetera, notificaciones y perfil) y la vista habla con cada uno; no delega métodos ni tiene lógica. La sesión demo no es un controller: DemoCurrentUserProvider es la identidad activa y lista los perfiles activos de la base para cambiar de usuario. |
 
-Las entidades JPA no atraviesan los puertos. Los resultados de Application y DTOs de UI contienen datos, enums y colecciones copiadas. PresentationContractsTest comprueba que los controllers dedicados no expongan entidades ni dependan de persistencia.
+Las entidades JPA no atraviesan los puertos. Los resultados de Application y DTOs de UI contienen datos, enums y colecciones copiadas. `SkillSwapView` depende de `UiControllers`; `MockSkillSwapControllers` implementa esos contratos para el Mock UI Kit, mientras `SkillSwapUiControllers` compone los controllers reales. No existe un `RecomendacionController` independiente: `BusquedaUiController.recomendar(userId)` delega en `DiscoveryUseCases.recommend(limit)`.
+
+Los controllers verifican que el `userId` coincida con la identidad activa y validan datos de entrada requeridos. La autorización sobre recursos y participantes permanece en Application/Domain. `UiModelMapper` convierte los view models de `Models` a comandos/consultas y traduce resultados de Application a modelos de UI. Se documentan los contratos existentes: por ejemplo, UI recibe `Models.Contratacion` (no `BookingView`) y la billetera devuelve el saldo como `int` y los movimientos como `List<Models.Movimiento>`; no se agregan DTOs ficticios como `WalletSummaryView`. La interfaz `ControllerExecutor`, implementada por `UiOperationExecutor`, centraliza la traducción de errores de aplicación/persistencia a `PresentationException` con `ErrorPresentacion`; `UiActionHandler` los presenta sin exponer detalles técnicos. Ningún controller consulta repositorios ni usa SQL/JPA. `PresentationContractsTest` comprueba que los controllers dedicados no expongan entidades ni dependan de persistencia.
 
 ## 3. Responsabilidades del negocio
 
@@ -46,21 +48,25 @@ El controller valida el usuario contra la identidad activa. Application/Domain c
 | State | BookingStates y PublicationStates determinan transiciones válidas; el agregado cambia estado y conserva historial. |
 | Builder | PublicationBuilder reúne datos obligatorios/opcionales y construye un borrador válido con tipos explícitos. |
 | Decorator | Promociones fijas/porcentuales acumulables en domain/pricing, probadas a nivel de cotización. La contratación toma el precio base: no se afirma integración de promociones desde la UI. |
-| Facade | PublicProfileFacade implementa PublicProfileUseCases: una sola consulta arma el perfil público (§4.1) coordinando perfiles, publicaciones, contrataciones y calificaciones en una transacción de lectura. Solo compone; las reglas quedan en las entidades y las consultas. Decisión en decision-perfil-publico.md (#40). |
+| Facade | PublicProfileFacade implementa PublicProfileUseCases: una sola consulta arma el perfil público (§4.1) coordinando ProfileRepository, PublicationRepository, BookingRepository y RatingRepository en una transacción de lectura. Devuelve PublicProfileView, un Read Model inmutable sin entidades JPA ni datos privados. Solo compone; las reglas quedan en las entidades y las consultas. Decisión en decision-perfil-publico.md (#40). |
 | Composite | CatalogItem (componente), CatalogCategory (compuesto) y CatalogSkill (hoja) forman el catálogo jerárquico de categorías y habilidades. El mismo recorrido funciona para una hoja y para una rama; la categoría protege el árbol (un padre, sin ciclos, nombres únicos). Buscar por una categoría incluye toda su rama, resuelto en la consulta con la ruta materializada. Decisión en decision-catalogo-composite.md (#37). |
 | Singleton localizado | Los enums reutilizan estados inmutables. No hay un Singleton mutable de aplicación o sesión. |
 | Repository / DAO | Puertos y adaptadores aíslan almacenamiento. Patrón de acceso a datos, distinto del catálogo GoF. |
-| MVC / Controller | Swing presenta, controllers convierten/delegan y Application/Domain ejecutan. La fachada no justifica concentrar reglas de todas las áreas. |
+| GRASP Controller / MVC | Los siete controllers de Presentation reciben eventos por interfaces de `UiControllers`, propagan identidad, convierten DTOs y delegan cada capacidad en sus puertos de entrada. La fachada no justifica concentrar áreas distintas en un God Controller. |
 
 Agregar un canal modifica el enum y switch de Simple Factory, su adapter y configuración; los casos de uso conservan el contrato. No se afirma OCP sin modificaciones en toda la solución.
 
 Factory Method se descartó por ausencia de una variación de creación mediante subclases; ver decision-factory-method-vs-simple-factory.md. El nombre create o la ausencia de static no cambian esa clasificación. Abstract Factory no tiene una familia de productos relacionados que construir. La decisión formal de CQRS (#42) permanece fuera de esta entrega.
 
+En concreto, sin esta Facade `PerfilUiController` tendría que depender de cuatro puertos, conocer el orden de las lecturas y combinar datos de perfiles, publicaciones, contrataciones y calificaciones. Eso aumentaría el acoplamiento de Presentation y mezclaría la traducción de acciones de UI con la composición del perfil. Con `PublicProfileUseCases` como único puerto de entrada, el controller convierte la solicitud y delega; `PublicProfileFacade` concentra solo la coordinación de esta consulta.
+
+La solución respeta Clean Architecture y DIP: Presentation depende de `PublicProfileUseCases`, no de `PublicProfileFacade`; la Facade, en Application, depende de interfaces de salida definidas por esa capa, implementadas en Infrastructure. El mapper convierte los agregados en records inmutables de Application y permite publicar solo los campos autorizados. SRP se mantiene porque la Facade no decide reglas de visibilidad, no calcula reputación ni persiste: esas responsabilidades permanecen en el perfil, las consultas de repositorio y los adapters correspondientes. Los diagramas [`uml-aplicacion.puml`](uml-aplicacion.puml) y [`uml-dominio.puml`](uml-dominio.puml) muestran la colaboración y dejan explícito que la Facade no pertenece a Domain.
+
 ## 5. GRASP y SOLID
 
 Information Expert ubica reglas en quien conoce los datos. Creator aparece en métodos de creación y Builder. Controller recibe acciones. Polymorphism se aplica a State, Strategy y cotizaciones. Low Coupling, Indirection y Protected Variations se apoyan en puertos/adapters. Pure Fabrication ubica mappers/transacciones fuera del dominio. High Cohesion exige separar capacidades.
 
-SRP separa crear, adaptar, coordinar y persistir. DIP mantiene contratos internos independientes. ISP agrupa capacidades. OCP/LSP permiten sustituir estrategias/adapters respetando contratos, con el compromiso explícito de la fábrica. #32 separó billetera y notificaciones en controllers propios, dejó la sesión demo como contexto de identidad y eliminó la clase que concentraba todas las pantallas; no se declara una aplicación perfecta de todos los principios.
+SRP separa crear, adaptar, coordinar y persistir. Para GRASP Controller, cada controller recibe eventos de un área y delega: búsqueda/recomendaciones, publicaciones, contrataciones, perfil, calificaciones, billetera o notificaciones. Esta alta cohesión evita que un controller monolítico concentre cambios y reglas ajenas; el bajo acoplamiento proviene de `UiControllers` y de los puertos de entrada, no de dependencias con servicios concretos, dominio o persistencia. El controller solo compara identidad activa y valida forma básica de entrada; reglas de autorización y negocio siguen en Application/Domain. DIP se mantiene porque Presentation consume interfaces y Application define los puertos de salida que implementa Infrastructure. #32 separó billetera y notificaciones en controllers propios, dejó la sesión demo como contexto de identidad y eliminó la clase que concentraba todas las pantallas; no se declara una aplicación perfecta de todos los principios.
 
 ## 6. Persistencia y consistencia
 
@@ -78,7 +84,7 @@ BorderLayout colocaba texto y estado de una contratación en la misma región; l
 
 BookingView incorpora el título que Application obtiene desde la publicación. Presentation deja de depender de una caché de búsquedas; cambiar de usuario o crear otra fachada conserva el título. La contraparte se calcula con la identidad activa, sin fijar Mateo.
 
-SkillSwapViewTest reproduce el problema de layout y verifica dimensiones visibles. SkillSwapUiControllersTest comprueba título sin caché y contraparte desde ambos participantes. Se mantienen permisos, saldo, unicidad, tipos y paginación. No se editaron diagramas.
+SkillSwapViewTest reproduce el problema de layout y verifica dimensiones visibles. SkillSwapUiControllersTest comprueba título sin caché y contraparte desde ambos participantes. Se mantienen permisos, saldo, unicidad, tipos y paginación. Los diagramas PlantUML ahora documentan los controllers y sus contratos sin conectarlos directamente con Domain o persistencia.
 
 ## 8. Cobertura reproducible
 
@@ -105,7 +111,7 @@ La suite local ejecuta 224 pruebas correctamente y omite explícitamente 39 de M
 
 El recorrido interactivo se registra en validacion-visual-pr65.md con capturas de publicación, solicitud, saldo, finalización y calificación. Usa datos ficticios y memoria; no se presenta como recorrido visual sobre MySQL ni prueba de carga. El flujo JPA equivalente se verifica automáticamente.
 
-Este Markdown es fuente del PDF actualizado, generado con scripts/generar-informe.py. Los .mdj, .puml y el PDF histórico con diagramas permanecen intactos. La revisión humana de la cabeza final corresponde a la persona revisora; no se fabrica ni se sustituye.
+Este Markdown es fuente del PDF actualizado, generado con scripts/generar-informe.py. El .mdj y el PDF histórico con diagramas permanecen intactos; los diagramas PlantUML fuente incluyen ahora la colaboración de la Facade y la capa de Presentation. La revisión humana de la cabeza final corresponde a la persona revisora; no se fabrica ni se sustituye.
 
 ## 10. Referencias y trazabilidad
 
